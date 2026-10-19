@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """One-shot structural reorganisation of Section 5 (Experiments) of the EN
-manuscript, following the ChatGPT review's mainline recommendation:
+manuscript, following the review's mainline recommendation:
 characterise the error curve / quantify boundary and plateau / probe mechanisms
 by controlled comparison.  Negative-result arms stay in the section but are
 grouped under "Excluded mechanisms and supporting checks" (the text of the

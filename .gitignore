@@ -20,3 +20,7 @@ __pycache__/
 .DS_Store
 *.log
 code/_*.png
+
+# Internal review materials (not reproduction code)
+code/draft_aefcb947_folder/
+code/doc-fetch-resources/

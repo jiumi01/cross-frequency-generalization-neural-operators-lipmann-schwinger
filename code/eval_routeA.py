@@ -2,7 +2,7 @@
 # Affiliation: Luoyang Institute of Science and Technology, Luoyang 471000, Henan, China
 """Route A control: strictly periodic incident waves vs the manuscript protocol.
 
-ChatGPT reviewer Q1 asks whether the periodic Green function + FFT wrapping is
+Reviewer comment Q1 asks whether the periodic Green function + FFT wrapping is
 consistent with an incident plane wave of arbitrary direction and frequency.
 This script implements the Route A control: the SAME media, the SAME integer
 frequency set, and the same trained FNO, compared under two incidence

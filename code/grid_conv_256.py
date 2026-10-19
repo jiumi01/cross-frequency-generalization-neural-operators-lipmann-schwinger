@@ -1,5 +1,5 @@
 # Author: Longgang Wang
-"""Systematic 256^2 convergence study (ChatGPT review item 1).
+"""Systematic 256^2 convergence study (review item 1).
 
 The reviewer asks for a systematic 64^2 / 128^2 / 256^2 convergence study
 covering the in-band region, the band edge, and the high-frequency region,
