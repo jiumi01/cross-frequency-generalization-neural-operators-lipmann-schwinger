@@ -1,0 +1,120 @@
+[finish] armed 2026-10-12 02:34:52
+[finish] A: replication pass done 05:47 -- missing=[]
+[finish] B: repl rebuild done 06:22: 2026-10-12 06:22:36 steps=eval,tex,figs,build,audit failed=audit
+[finish] C: retries finished 06:24 -- still missing=[]
+[finish] D: rebuild 06:24
+
+=== stage: eval ===
+   | [shard 0]   0.10    0.059  0.057  0.099  0.108  0.094  0.087  0.086  0.087  0.082  0.512  0.467  0.464  0.471  0.456  0.468
+   | [shard 0]   0.25    0.071  0.091  0.148  0.142  0.132  0.117  0.125  0.117  0.175  1.214  1.059  1.028  1.013  0.983  0.996
+   | [shard 0]   0.50    0.190  0.311  0.383  0.397  0.372  0.423  0.409  0.357  0.660  1.843  1.611  1.503  1.444  1.403  1.403
+   | [shard 0]   1.00    0.647  0.761  0.910  0.990  0.969  0.946  0.853  0.927  1.204  2.237  1.980  1.814  1.779  1.702  1.740
+   | [shard 0] re-eval (protocol changed) base_don_a025_s0
+   | [shard 0] [base_don_a025_s0] deeponet arm=a025 epoch=55 val=0.4111
+   | [shard 1]   0.10    0.055  0.059  0.106  0.111  0.097  0.090  0.088  0.091  0.081  0.499  0.464  0.455  0.465  0.455  0.466
+   | [shard 1]   0.25    0.068  0.090  0.149  0.145  0.135  0.120  0.130  0.121  0.173  1.183  1.035  1.007  0.997  0.975  0.991
+   | [shard 1]   0.50    0.189  0.329  0.396  0.384  0.363  0.390  0.375  0.340  0.657  1.781  1.564  1.457  1.417  1.388  1.397
+   | [shard 1]   1.00    0.715  0.803  0.838  0.826  0.782  0.746  0.709  0.801  1.148  2.116  1.901  1.753  1.745  1.689  1.739
+   | [shard 1] re-eval (protocol changed) base_don_a025_s1
+   | [shard 1] [base_don_a025_s1] deeponet arm=a025 epoch=54 val=0.4186
+   | [shard 2]   0.10    0.059  0.059  0.099  0.114  0.102  0.096  0.090  0.092  0.077  0.523  0.473  0.462  0.469  0.456  0.469
+   | [shard 2]   0.25    0.071  0.088  0.147  0.152  0.138  0.122  0.129  0.117  0.163  1.239  1.062  1.024  1.007  0.978  0.999
+   | [shard 2]   0.50    0.209  0.340  0.402  0.399  0.392  0.408  0.383  0.336  0.630  1.866  1.600  1.483  1.429  1.385  1.401
+   | [shard 2]   1.00    0.753  0.850  0.871  0.899  0.859  0.797  0.705  0.770  1.088  2.162  1.901  1.766  1.748  1.675  1.744
+   | [shard 2] re-eval (protocol changed) base_don_a025_s2
+   | [shard 2] [base_don_a025_s2] deeponet arm=a025 epoch=55 val=0.4269
+[stage eval] FAILED: eval shards failed: [0, 1, 2]
+
+=== stage: tex ===
+   | wrote D:\workbudd成果\神经算子求解 Lippmann–Schwinger 积分方程的跨频率泛化研究\paper\en\gen_macros.tex
+   | wrote D:\workbudd成果\神经算子求解 Lippmann–Schwinger 积分方程的跨频率泛化研究\paper\en\gen_results.tex
+   | wrote D:\workbudd成果\神经算子求解 Lippmann–Schwinger 积分方程的跨频率泛化研究\paper\cn\gen_macros.tex
+   | wrote D:\workbudd成果\神经算子求解 Lippmann–Schwinger 积分方程的跨频率泛化研究\paper\cn\gen_results.tex
+
+=== stage: figs ===
+   | loaded 74 evals
+   | wrote D:\workbudd成果\神经算子求解 Lippmann–Schwinger 积分方程的跨频率泛化研究\paper\en\figs\fig_main_cliff
+   | wrote D:\workbudd成果\神经算子求解 Lippmann–Schwinger 积分方程的跨频率泛化研究\paper\en\figs\fig_training
+   | wrote D:\workbudd成果\神经算子求解 Lippmann–Schwinger 积分方程的跨频率泛化研究\paper\en\figs\fig_arch
+   | wrote D:\workbudd成果\神经算子求解 Lippmann–Schwinger 积分方程的跨频率泛化研究\paper\en\figs\fig_crosscontrast
+   | wrote D:\workbudd成果\神经算子求解 Lippmann–Schwinger 积分方程的跨频率泛化研究\paper\en\figs\fig_bandwidth
+   | wrote D:\workbudd成果\神经算子求解 Lippmann–Schwinger 积分方程的跨频率泛化研究\paper\en\figs\fig_mode_phase_b4
+   | wrote D:\workbudd成果\神经算子求解 Lippmann–Schwinger 积分方程的跨频率泛化研究\paper\en\figs\fig_scaling
+   | {0.05: {'edge_ratio': 0.1333262705266694, 'plateau': 0.22205085537565286}, 0.1: {'edge_ratio': 0.13137842458494609, 'plateau': 0.43426288517917777}, 0.25: {'edge_ratio': 0.15498443560201502, 'plateau': 0.9631189418469975}, 0.5: {'edge_ratio': 0.17431249818170133, 'plateau': 1.4304474138249403}, 1.0: {'edge_ratio': 0.18981839323248736, 'plateau': 1.8693305478208642}}
+   | wrote D:\workbudd成果\神经算子求解 Lippmann–Schwinger 积分方程的跨频率泛化研究\paper\en\figs\fig_spectrum
+   | wrote D:\workbudd成果\神经算子求解 Lippmann–Schwinger 积分方程的跨频率泛化研究\paper\en\figs\fig_bound
+   | wrote D:\workbudd成果\神经算子求解 Lippmann–Schwinger 积分方程的跨频率泛化研究\paper\en\figs\fig_solver
+   | wrote D:\workbudd成果\神经算子求解 Lippmann–Schwinger 积分方程的跨频率泛化研究\paper\en\figs\fig_fields
+   | loaded 74 evals
+   | wrote D:\workbudd成果\神经算子求解 Lippmann–Schwinger 积分方程的跨频率泛化研究\paper\cn\figs\fig_main_cliff
+   | wrote D:\workbudd成果\神经算子求解 Lippmann–Schwinger 积分方程的跨频率泛化研究\paper\cn\figs\fig_training
+   | wrote D:\workbudd成果\神经算子求解 Lippmann–Schwinger 积分方程的跨频率泛化研究\paper\cn\figs\fig_arch
+   | wrote D:\workbudd成果\神经算子求解 Lippmann–Schwinger 积分方程的跨频率泛化研究\paper\cn\figs\fig_crosscontrast
+   | wrote D:\workbudd成果\神经算子求解 Lippmann–Schwinger 积分方程的跨频率泛化研究\paper\cn\figs\fig_bandwidth
+   | wrote D:\workbudd成果\神经算子求解 Lippmann–Schwinger 积分方程的跨频率泛化研究\paper\cn\figs\fig_mode_phase_b4
+   | wrote D:\workbudd成果\神经算子求解 Lippmann–Schwinger 积分方程的跨频率泛化研究\paper\cn\figs\fig_scaling
+   | {0.05: {'edge_ratio': 0.1333262705266694, 'plateau': 0.22205085537565286}, 0.1: {'edge_ratio': 0.13137842458494609, 'plateau': 0.43426288517917777}, 0.25: {'edge_ratio': 0.15498443560201502, 'plateau': 0.9631189418469975}, 0.5: {'edge_ratio': 0.17431249818170133, 'plateau': 1.4304474138249403}, 1.0: {'edge_ratio': 0.18981839323248736, 'plateau': 1.8693305478208642}}
+   | wrote D:\workbudd成果\神经算子求解 Lippmann–Schwinger 积分方程的跨频率泛化研究\paper\cn\figs\fig_spectrum
+   | wrote D:\workbudd成果\神经算子求解 Lippmann–Schwinger 积分方程的跨频率泛化研究\paper\cn\figs\fig_bound
+   | wrote D:\workbudd成果\神经算子求解 Lippmann–Schwinger 积分方程的跨频率泛化研究\paper\cn\figs\fig_solver
+   | wrote D:\workbudd成果\神经算子求解 Lippmann–Schwinger 积分方程的跨频率泛化研究\paper\cn\figs\fig_fields
+
+=== stage: build ===
+[build:en] wrote D:\workbudd成果\神经算子求解 Lippmann–Schwinger 积分方程的跨频率泛化研究\paper\en\main.pdf
+[build:cn] wrote D:\workbudd成果\神经算子求解 Lippmann–Schwinger 积分方程的跨频率泛化研究\paper\cn\main.pdf
+
+=== stage: audit ===
+   |   [ok]   \PlateauHi = 1.869 (matches independent recomputation)
+   |   [ok]   \CliffLo = 7.19 (matches independent recomputation)
+   |   [ok]   \CliffHi = 8.30 (matches independent recomputation)
+   |   [ok]   \AlphaLo = 0.01 (matches independent recomputation)
+   |   [ok]   \AlphaHi = 0.23 (matches independent recomputation)
+   |   [ok]   \AlphaEdge = 9.5 (matches independent recomputation)
+   |   [ok]   \RiseLo = 0.13 (matches independent recomputation)
+   |   [ok]   \RiseHi = 0.19 (matches independent recomputation)
+   |   [ok]   main.pdf: 12 pages, 58 fonts, 57167 extracted chars, 970 kB
+   | 
+   | === cn ===
+   |   [ok]   main.tex: no placeholders
+   |   [ok]   cn: gen_macros.tex is byte-identical to a fresh run
+   |   [ok]   cn: 96 macro names are digit-free and unique
+   |   [FAIL] cn: 7 macro(s) still at the '--' fallback but cited in the text: ['ResCleanMax', 'ResCorruptMin', 'ResDetectEta', 'ResRecheckAgree', 'ResRecheckMax', 'ResRecheckN', 'ResSepOrders']
+   |   [ok]   main.tex: all 28 refs resolve (39 labels, 2 from \input files)
+   |   [warn] main.tex: labels never referenced: ['eq:deltaM', 'eq:gsymbol', 'eq:kappa', 'sec:arch', 'sec:band', 'sec:cliff', 'sec:concl', 'sec:contrast', 'sec:disc', 'sec:gamma', 'sec:scaling']
+   |   [ok]   main.tex: all 29 citations present in refs.bib
+   |   [ok]   cn: 11 figures, largest 437 x 262 pt
+   |   [ok]   main.pdf: 10 pages, 59 fonts, 27589 extracted chars, 923 kB
+   | 
+   | === summary ===
+   |   2 FAILURES:
+   |    - en: 7 macro(s) still at the '--' fallback but cited in the text: ['ResCleanMax', 'ResCorruptMin', 'ResDetectEta', 'ResRecheckAgree', 'ResRecheckMax', 'ResRecheckN', 'ResSepOrders']
+   |    - cn: 7 macro(s) still at the '--' fallback but cited in the text: ['ResCleanMax', 'ResCorruptMin', 'ResDetectEta', 'ResRecheckAgree', 'ResRecheckMax', 'ResRecheckN', 'ResSepOrders']
+   |   [ok]   mixed-contrast plateau 0.380--1.865 lies within the arms' range (max arm 1.869)
+   |   [ok]   delta_2 reaches >=0.9 from f=3.5 on (saturates inside the extended range)
+   | 
+   | === captions ===
+   |   [note] band in-band floors: b12=0.190, b2=0.501, b3=0.275, b6=0.127
+   |   [note] [cn] no 'lowers the in-band floor' caption claim
+   |   [ok]   [cn] caption claims the out-of-band plateau is lowered with width and the data agree (widest band 0.164 is the lowest)
+   |   [note] [en] no 'lowers the in-band floor' caption claim
+   |   [ok]   [en] caption claims the out-of-band plateau is lowered with width and the data agree (widest band 0.164 is the lowest)
+   | 
+   | === seed protocol ===
+   |   [note] 25 arms, seeds per arm: min=2 max=3
+   |   [FAIL] seed counts are not uniform: pmatch_unet_a025 have 2 seed(s) while the widest arm has 3 -- the error bars are not like for like
+   | 
+   | === residual claims ===
+   |   [ok]   corpus residual distribution measured over 196608 samples from 12 arms
+   |   [ok]   no sample exceeds the 1e-9 acceptance gate (max 1.00e-09, p99 9.84e-10)
+   |   [FAIL] no independent recomputation of the recorded residual: the prose claims one
+   |   [FAIL] the naive/frozen split was not measured: the separation and the detection threshold cited in the prose are unsupported
+   | 
+   | === summary ===
+   |   3 prose claims contradicted by the data:
+   |    - seed counts are not uniform: pmatch_unet_a025 have 2 seed(s) while the widest arm has 3 -- the error bars are not like for like
+   |    - no independent recomputation of the recorded residual: the prose claims one
+   |    - the naive/frozen split was not measured: the separation and the detection threshold cited in the prose are unsupported
+[stage audit] FAILED: gate failure: audit_paper, check_claims
+ERROR conda.cli.main_run:execute(148): `conda run python code/make_paper.py --steps eval,tex,figs,build,audit` failed. (See above for error)
+[finish] D: rebuild done 06:30
+[finish] ALL DONE 2026-10-12 06:30:40 missing=[]

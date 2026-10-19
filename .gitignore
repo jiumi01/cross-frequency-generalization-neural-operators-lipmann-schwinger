@@ -1,0 +1,22 @@
+# Paper and derivative deliverables (kept out of the public repo)
+paper/
+submission/
+versions/
+release/
+release_docs/
+reviews/
+期刊选型/
+REVIEW_RESPONSE.md
+figures/
+
+# Large training / generated corpora: not redistributed (regenerate, see README)
+data/
+runs/
+
+# Tooling, caches, scratch
+.workbuddy/
+__pycache__/
+*.pyc
+.DS_Store
+*.log
+code/_*.png
