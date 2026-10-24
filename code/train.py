@@ -30,15 +30,24 @@ def load_cache(folder, device):
     return dict(v=v, psi=psi, k=k, th=th, f=f, max_res=ds.max_res())
 
 
-def make_inputs(d, idx, emb="none", anchor="none"):
+def make_inputs(d, idx, emb="none", anchor="none", order=2, channels=None):
+    """One training cell.
+
+    HEAD SEMANTICS: `channels` truncates the Born terms handed to the network
+    as input channels ONLY; the returned fourth value is the FULL term list,
+    and anchored_u must apply all `order` of them.  Truncating both was the
+    fit-depth/sum-depth defect that put a catastrophically wrong analytic
+    head under every a050/a100 arm (see evaluate.build for the numbers).
+    """
     v = d["v"][idx].float()
     psi_inc = P.incident_plane_wave(v.shape[-1], d["k"][idx], d["th"][idx],
                                     v.device).to(torch.complex64)
     f = d["f"][idx].float()
     if anchor == "none":
         return D.build_inputs(v, psi_inc, f, emb=emb), psi_inc, d["psi"][idx]
-    born = D.anchor_terms(v, d["k"][idx], d["th"][idx])
-    x = D.build_inputs(v, psi_inc, f, emb=emb, anchor=anchor, born=born)
+    born = D.born_series(v, d["k"][idx], d["th"][idx], order=order)
+    x = D.build_inputs(v, psi_inc, f, emb=emb, anchor=anchor,
+                       born=born[:channels])
     return x, psi_inc, d["psi"][idx], born
 
 
@@ -72,8 +81,37 @@ def main():
                     help="anchored residual operator: the network predicts the "
                          "residual on top of a.B1 + b.B2, the first two Born "
                          "corrections of the incident field (analytic at any "
-                         "frequency, no label); a and b are two complex "
-                         "coefficients trained on the band only")
+                         "frequency, no label); the coefficients are complex "
+                         "and trained on the band only")
+    ap.add_argument("--anchor-channels", type=int, default=None,
+                    help="how many of the B_1..B_M terms are handed to the "
+                         "network as input channels; defaults to all of them. "
+                         "Less than M is needed when the contraction factor "
+                         "exceeds one and the deep terms are orders of "
+                         "magnitude larger than B_1 -- see the divergence of "
+                         "the a100/M=7 arm.")
+    ap.add_argument("--anchor-order", type=int, default=2,
+                    help="depth of the analytic head: B1..B_M are summed with "
+                         "fitted complex coefficients and added to the learned "
+                         "residual. M=2 reproduces the original four-parameter "
+                         "anchor; larger M is only justified where the "
+                         "contraction factor rho stays below one (see "
+                         "code/anchor_higher_order.py)")
+    ap.add_argument("--anchor-freeze", action="store_true",
+                    help="keep the LS-fitted anchor coefficients frozen: "
+                         "requires_grad off, excluded from the optimizer. "
+                         "P1-a redirect.  The zero-GPU probes (proj_precheck, "
+                         "anchor_freeze_check) located the out-of-band "
+                         "failure of the trained arms in the FINE-TUNED "
+                         "coefficients -- the LS head alone holds the plateau "
+                         "at v=0.50 (0.51 against 18.6) -- and showed the "
+                         "residual is not the carrier (zeroing or projecting "
+                         "it changes the plateau by under 15%%).  The "
+                         "in-band fine-tune turns the head into a "
+                         "band-specific cancellation the residual must then "
+                         "undo; freezing the LS values lets the residual "
+                         "learn the model error instead.  Single changed "
+                         "variable against the ba_fno_* arms.")
     ap.add_argument("--ob-energy-lam", type=float, default=0.0,
                     help="C3b ablation: weight of an OUT-OF-BAND energy penalty "
                          "anchored on the Born correction field; acts on "
@@ -125,7 +163,8 @@ def main():
     log("samples=%d train=%d val=%d  cache_max_res=%.2e"
         % (n, tr_idx.numel(), val_idx.numel(), d["max_res"]))
 
-    kw = dict(in_ch=D.in_channels(a.f_emb, a.anchor), out_ch=2)
+    kw = dict(in_ch=D.in_channels(a.f_emb, a.anchor, a.anchor_order,
+                                  a.anchor_channels), out_ch=2)
     if a.model == "fno":
         kw.update(width=a.width, modes=a.modes, n_layers=a.layers, proj=a.proj, norm=a.norm)
     elif a.model == "fno-film":
@@ -143,15 +182,52 @@ def main():
     nparam = C.count_params(model)
     log("params=%.3fM  cfg=%s" % (nparam / 1e6, {k: v for k, v in kw.items()}))
 
-    # Anchored arm: two complex coefficients [Re a, Im a, Re b, Im b] on the
-    # analytic Born pair.  Initialised at (a, b) = (1, 0), i.e. the arm starts
-    # at the plain first-order Born field and the network learns what it must
-    # add.  Four numbers, trained on the band only -- they are the whole
-    # zero-shot content of the anchor.
+    # Anchored arm: `order` complex coefficients on the analytic Born terms.
+    # For the original M=2 the init is (a, b) = (1, 0), i.e. the arm starts at
+    # the plain first-order Born field.  For deeper heads that init is a poor
+    # starting point -- the head would begin at the M=1 truncation error -- so
+    # the coefficients are seeded by an in-band least-squares fit on a prefix
+    # of this very training cache (no test sample, no out-of-band label, the
+    # same fit code/anchor_baseline.py scores).  2*order numbers, fitted and
+    # then fine-tuned on the band only: they are the whole zero-shot content
+    # of the anchor.
     ab = None
     if a.anchor == "born":
-        ab = torch.nn.Parameter(torch.tensor([1.0, 0.0, 0.0, 0.0], device=dev))
-        log("anchor=born  a,b learnable  init a=(1,0) b=(0,0)")
+        # NB: the local name must not be `M` -- models is imported as M above,
+        # and a same-named local would shadow it for the WHOLE function, so
+        # the build_model call below would raise UnboundLocalError.
+        mord = a.anchor_order
+        init = torch.zeros(2 * mord, device=dev)
+        init[0] = 1.0
+        if mord > 2:
+            nf = min(512, int(tr_idx.numel()))
+            fit_idx = tr_idx[:nf]
+            with torch.no_grad():
+                vf = d["v"][fit_idx].float()
+                kf, thf = d["k"][fit_idx], d["th"][fit_idx]
+                pif = P.incident_plane_wave(vf.shape[-1], kf, thf,
+                                            vf.device).to(torch.complex128)
+                uf = (d["psi"][fit_idx].to(torch.complex128) - pif)
+                c, cond = D.fit_anchor_coeffs(vf, kf, thf, uf, mord)
+            if c is None:
+                log("anchor=born order=%d  LS init REFUSED (cond=%.2e); "
+                    "falling back to c1=(1,0)" % (mord, cond))
+            else:
+                init = c.to(dev).float()
+                log("anchor=born order=%d  LS init on %d in-band samples "
+                    "(cond=%.2e)  c=%s" % (mord, nf, cond,
+                                           " ".join("%+.3f%+.3fj" %
+                                                    (init[2*j].item(),
+                                                     init[2*j+1].item())
+                                                    for j in range(mord))))
+        ab = torch.nn.Parameter(init)
+        if a.anchor_freeze:
+            ab.requires_grad_(False)
+            log("anchor=born order=%d coefficients FROZEN at LS values"
+                % (mord,))
+        else:
+            log("anchor=born order=%d coefficients=%d learnable"
+                % (mord, 2 * mord))
 
     cfg = dict(**vars(a))
     cfg.update(model=a.model, params=int(nparam))
@@ -162,8 +238,10 @@ def main():
     cfg["torch"] = torch.__version__
     C.save_json(cfg, os.path.join(out, "config.json"))
 
-    opt = torch.optim.Adam((list(model.parameters()) + [ab] if ab is not None
-                            else model.parameters()), lr=a.lr)
+    train_params = list(model.parameters())
+    if ab is not None and ab.requires_grad:
+        train_params.append(ab)
+    opt = torch.optim.Adam(train_params, lr=a.lr)
     sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=a.epochs,
                                                        eta_min=a.lr * 0.01)
     csv = open(os.path.join(out, "train_log.csv"), "w")
@@ -184,7 +262,9 @@ def main():
                 x, psi_inc, psi_t = make_inputs(d, sel, emb=a.f_emb)
             else:
                 x, psi_inc, psi_t, born = make_inputs(d, sel, emb=a.f_emb,
-                                                      anchor=a.anchor)
+                                                      anchor=a.anchor,
+                                                      order=a.anchor_order,
+                                                      channels=a.anchor_channels)
             out_ = model(x)
             u = torch.complex(out_[:, 0], out_[:, 1])
             if a.anchor == "born":
@@ -284,7 +364,9 @@ def main():
                     x, psi_inc, psi_t = make_inputs(d, sel, emb=a.f_emb)
                 else:
                     x, psi_inc, psi_t, born = make_inputs(d, sel, emb=a.f_emb,
-                                                          anchor=a.anchor)
+                                                          anchor=a.anchor,
+                                                          order=a.anchor_order,
+                                                      channels=a.anchor_channels)
                 o = model(x)
                 u = torch.complex(o[:, 0], o[:, 1])
                 if a.anchor == "born":
@@ -315,6 +397,10 @@ def main():
     csv.close()
     res = dict(name=a.name, best_val=best, epochs_done=ep, params=int(nparam),
                sec=time.time() - t0, stopped_early=stop)
+    if ab is not None:
+        # auditable: for a frozen arm this must equal the LS init line in
+        # train.log to the printed precision
+        res["final_ab"] = [float(x) for x in ab.detach().cpu().flatten()]
     C.save_json(res, os.path.join(out, "result.json"))
     log("DONE best_val=%.4e  (%.0fs)" % (best, time.time() - t0))
 

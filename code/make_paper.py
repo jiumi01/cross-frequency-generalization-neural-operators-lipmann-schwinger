@@ -243,6 +243,20 @@ def compile_paper(lang, engine):
                 print("   | %d overfull hbox(es); worst: %s"
                       % (len(ob), "; ".join(_pt_txt(s) for s in worst)))
         print("[build:%s] wrote %s%s" % (lang, dest, warn))
+        # Deliver it here rather than leaving the copy to a human step.
+        # audit_paper reads submission/, so a stale copy there is audited as if
+        # it were this build; the body sync closed that for main.tex and left
+        # the PDF open.  A locked target file is reported, not swallowed:
+        # delivery_guard compares the two text layers and fails loudly.
+        sub = os.path.join(C.ROOT, "submission", "paper_%s" % lang)
+        if os.path.isdir(sub):
+            try:
+                shutil.copy2(pdf, os.path.join(sub, "main.pdf"))
+                print("[build:%s] delivered submission/paper_%s/main.pdf" % (lang, lang))
+            except PermissionError:
+                print("[build:%s] WARNING submission/paper_%s/main.pdf is locked; "
+                      "delivery is now stale and the parity gate will fail"
+                      % (lang, lang))
         return dest
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
@@ -282,8 +296,18 @@ def check_generated_fresh(folder, label=None):
 def stage_build():
     for lang in ("en", "cn"):
         check_generated_fresh(os.path.join(C.ROOT, "paper", lang), lang)
-    compile_paper("en", "pdflatex")
-    compile_paper("cn", "xelatex")
+    # A `None` return means the engine exited non-zero or produced no PDF.  That
+    # used to be printed and then dropped, so on 2026-10-22 the English build
+    # died on a missing figure while the driver reported success and a Chinese
+    # PDF was written as a whole -- "the build passed" was true of one
+    # manuscript and false of the other.  The return value is the verdict, so
+    # the verdict is what decides.
+    built = {}
+    for lang, engine in (("en", "pdflatex"), ("cn", "xelatex")):
+        built[lang] = compile_paper(lang, engine)
+    missing = [k for k, v in built.items() if v is None]
+    if missing:
+        raise RuntimeError("build failed for: " + ", ".join(missing))
 
 
 def stage_audit():

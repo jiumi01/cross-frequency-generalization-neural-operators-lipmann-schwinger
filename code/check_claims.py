@@ -19,6 +19,8 @@ import sys
 import glob
 import json
 import argparse
+import re
+from collections import Counter
 import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -234,7 +236,7 @@ def residual_guard(res_dir):
 
 
 def seed_guard(ev):
-    """The uniform-seed claim must be a measurement, not a recollection.
+    """The like-for-like claim must be a measurement, not a recollection.
 
     The manuscript asserted that the ablations ran "one or two seeds" while the
     main arms ran three.  That was accurate when written and silently became
@@ -242,6 +244,16 @@ def seed_guard(ev):
     was reading the sentence, because it is a claim about the *protocol* rather
     than about a number in a table.  The prose now cites \\NumSeeds, so it is
     checked against the evaluation records here.
+
+    W1 (2026-10-24) extended the v=1.00 anchored pair (main_fno_a100 and
+    bax_fno_a100_m7) from three to six seeds.  The property the manuscript
+    actually claims is *within a comparison*: both sides of a paired test must
+    share seeds, otherwise the error bars are not like for like.  Uniformity
+    across the whole paper is neither claimed nor required -- the a050 arms
+    stay at three -- so the check is: every family that departs from the base
+    seed count must sit in a complete verdict-bearing pair (main + bax at one
+    contrast tag) whose members share the identical seed set, and the
+    diagnostic arms at that tag must sit inside that shared set.
     """
     import re as _re
     fam = {}
@@ -250,20 +262,52 @@ def seed_guard(ev):
         if m:
             fam.setdefault(m.group(1), set()).add(int(m.group(2)))
     if not fam:
-        bad("no per-seed evaluation records: the uniform-seed claim is unverifiable")
+        bad("no per-seed evaluation records: the seed claim is unverifiable")
         return
     counts = {k: len(v) for k, v in fam.items()}
-    lo = min(counts.values())
-    hi = max(counts.values())
-    thin = sorted(k for k, c in counts.items() if c < hi)
-    note("%d arms, seeds per arm: min=%d max=%d" % (len(fam), lo, hi))
-    if thin:
-        bad("seed counts are not uniform: %s have %d seed(s) while the widest "
-            "arm has %d -- the error bars are not like for like"
-            % (", ".join(thin[:8]), lo, hi))
-    else:
+    base = Counter(counts.values()).most_common(1)[0][0]
+    odd = sorted(k for k, c in counts.items() if c != base)
+    if not odd:
         ok("all %d arms carry the same %d seeds, so the claim of a uniform "
-           "seed protocol holds" % (len(fam), hi))
+           "seed protocol holds" % (len(fam), base))
+        return
+    # Every departing family must be the main or bax arm of one contrast tag,
+    # and the pair must be complete and seed-identical.
+    tags = {}
+    for k in odd:
+        m = _re.match(r"^(main|bax)_fno_(a\d+)", k)
+        if not m:
+            bad("%s carries %d seeds while every other arm carries %d, and "
+                "it is not part of a verdict-bearing pair -- the error bars "
+                "are not like for like" % (k, counts[k], base))
+            continue
+        tags.setdefault(m.group(2), []).append(k)
+    extended = []
+    for tag, ks in sorted(tags.items()):
+        want = {"main_fno_%s" % tag}
+        want |= {k for k in fam if k.startswith("bax_fno_%s" % tag)}
+        if set(ks) != want:
+            bad("%s: the extended seed set covers %s but the verdict-bearing "
+                "pair is %s -- both sides of the paired test must share seeds"
+                % (tag, sorted(ks), sorted(want)))
+            continue
+        sets = {k: fam[k] for k in ks}
+        if len({frozenset(v) for v in sets.values()}) != 1:
+            bad("%s: the extended arms disagree on seeds: %s"
+                % (tag, {k: sorted(v) for k, v in sorted(sets.items())}))
+            continue
+        shared = set(next(iter(sets.values())))
+        for k, v in sorted(fam.items()):
+            if _re.search(r"(?:^|_)(?:ba|baf)_fno_%s(?:_|$)" % tag, k) \
+                    and not v <= shared:
+                bad("diagnostic %s carries seeds %s outside the shared "
+                    "verdict set %s" % (k, sorted(v - shared), sorted(shared)))
+        extended.append(tag)
+    if extended:
+        ok("%d arms carry %d seeds; %s extended to %d with both sides of "
+           "each paired test sharing the seed set"
+           % (len(fam) - len(odd), base, "/".join(extended),
+              max(len(fam[k]) for k in odd)))
 
 
 def caption_guard(ev):
@@ -370,6 +414,53 @@ def caption_guard(ev):
     else:
         note("wide-band U-Net arm missing; the U-Net in-band caption claim "
              "could not be bound")
+
+
+ROOT = C.ROOT
+
+
+def macro_name_guard(root=None):
+    """A TeX control word stops at the first non-letter.
+
+    ``\\newcommand{\\DAPlatM2}{0.300}`` does not define a macro called
+    DAPlatM2.  It defines ``\\DAPlatM`` and leaves a literal ``2`` in the
+    preamble, which is a fatal ``Missing \\begin{document}`` -- and it is
+    fatal in the preamble because that is where the generated macro file is
+    read, so every downstream gate reports clean while the PDF is never
+    produced.  The exact macro name caused this on 2026-10-22, and the earlier
+    \\ResP50 instance is the same class, so the class is closed here: no
+    generated macro name may contain a digit, and no two may collide.
+    """
+    root = root or ROOT
+    pat = re.compile(r"\\newcommand\{\\([A-Za-z@]+)\}")
+    for lang, folder in (("en", os.path.join(root, "paper", "en")),
+                         ("en-sub", os.path.join(root, "submission",
+                                                 "paper_en")),
+                         ("cn", os.path.join(root, "paper", "cn")),
+                         ("cn-sub", os.path.join(root, "submission",
+                                                 "paper_cn"))):
+        p = os.path.join(folder, "gen_macros.tex")
+        if not os.path.exists(p):
+            continue
+        names = pat.findall(open(p, encoding="utf-8").read())
+        if not names:
+            continue
+        # every name the generator emits must also be checked for digits; the
+        # regex above would not even see one, so scan the raw file too
+        raw = open(p, encoding="utf-8").read()
+        digit = re.findall(r"\\newcommand\{\\(\w*\d\w*)\}", raw)
+        if digit:
+            bad("macro names contain digits in %s: %s -- a TeX control word "
+                "stops at the first non-letter, so these define the wrong "
+                "macro and break the preamble"
+                % (lang, ", ".join(sorted(set(digit))[:6])))
+            continue
+        dup = sorted(n for n in set(names) if names.count(n) > 1)
+        if dup:
+            bad("duplicate macro definitions in %s: %s" % (lang, ", ".join(dup)))
+        else:
+            ok("%s: %d generated macro names are legal control words and "
+               "unique" % (lang, len(names)))
 
 
 def macro_space_guard(root=None):
@@ -845,9 +936,23 @@ def realgeo_guard(root=None):
                 bad("[%s] \\RealMirrorR = %r but the recorded correlation is %s"
                     % (lang, m.group(1).strip(), probe))
 
-    # the two sentences that carry the refusal must actually be there
+    # The three sentences that carry the level-3 verdict must actually be
+    # there.  There are three rather than one because the verdict is not a
+    # single scalar: the plateau fails to separate against the band-limited
+    # control at 64^2, the structural part of the plateau difference survives
+    # against a spectrum-matched control on both meshes, and the jump does not
+    # order the two families at all.  A gate that required only the first
+    # sentence would let a later edit drop the other two while everything
+    # stayed green -- a check that tests the losing arm only.  The contract was
+    # rewritten on 2026-10-22 when the spectrum-matched control replaced the
+    # old "128^2 separation / order reversal" pair; keeping the old phrases
+    # would have forced the text to say something the data no longer supports.
     want = {"en": ("does not separate", "\\RealPlateauOverlapArms"),
             "cn": ("并不分离", "\\RealPlateauOverlapArms")}
+    want2 = {"en": ("higher on\nthe geological window", "\\GeoSurPlatDelta"),
+             "cn": ("结构效应", "\\GeoSurPlatDevPct")}
+    want3 = {"en": ("does not order the two families", "\\GeoJumpPCoarse"),
+             "cn": ("从未把两族排出次序", "\\GeoJumpPCoarse")}
     for mp in sorted(glob.glob(os.path.join(root, "paper", "*", "main.tex"))):
         lang = os.path.basename(os.path.dirname(mp))
         if lang not in want:
@@ -861,6 +966,17 @@ def realgeo_guard(root=None):
         if macro not in t:
             bad("[%s] the non-separation sentence is not bound to "
                 "\\%s" % (lang, macro.strip("\\")))
+        for tag, tbl in (("the 128^2 separation", want2),
+                         ("the order reversal", want3)):
+            if lang not in tbl:
+                continue
+            ph, mac = tbl[lang]
+            if ph not in t:
+                bad("[%s] the manuscript never states %s, so the level-3 "
+                    "verdict is reported in one half only" % (lang, tag))
+            if mac not in t:
+                bad("[%s] the sentence carrying %s is not bound to \\%s"
+                    % (lang, tag, mac.strip("\\")))
         # a \label is not a citation: require the float to be *pointed at*, or
         # a manuscript could carry the label while never showing the reader the
         # figure that the level-3 sentences refer to. The level-3 table may
@@ -914,15 +1030,24 @@ def plateau_normalised_guard(ev, root=None):
     viol = []
 
     def per_seed(pref, vm):
-        """Per-seed eps(f=5) divided by that seed's own f>=6 plateau."""
-        names = keys(ev, pref)
-        out = []
-        for n in names:
+        """Per-seed eps(f=5) divided by that seed's own f>=6 plateau, keyed
+        by seed index so a paired difference can align the two arms by seed.
+        W1 extended the v=1.00 anchored arms to six seeds and left the
+        architecture baselines at three, so a flat per-family array would
+        mis-align (or fail to broadcast) exactly where the pairing matters;
+        make_results_tex.py pairs on the common seed set for the same reason.
+        """
+        out = {}
+        for n in keys(ev, pref):
             rows = ev[n]["sweep"]["%.2f" % vm]
             F = np.array([r["f"] for r in rows], float)
             M = np.array([r["mean"] for r in rows], float)
-            out.append(float(M[np.isclose(F, 5.0)][0] / M[F >= 6.0].mean()))
-        return np.array(out, float)
+            out[int(re.search(r"_s(\d+)$", n).group(1))] = float(
+                M[np.isclose(F, 5.0)][0] / M[F >= 6.0].mean())
+        return out
+
+    def _arr(mapping):
+        return np.array([mapping[s] for s in sorted(mapping)], float)
 
     def per_seed_inband(pref, vm):
         """Per-seed in-band (f<=4) mean divided by that seed's own plateau."""
@@ -947,52 +1072,59 @@ def plateau_normalised_guard(ev, root=None):
             continue
         fams_ok = True
         # The FNO must be above its own plateau at f=5 in EVERY seed ...
-        if np.all(per["Fno"] > 1.0):
+        if np.all(_arr(per["Fno"]) > 1.0):
             ok("v=%.2f: FNO is above its own plateau at f=5 in all %d seeds "
                "(min %.3f) -- the step reading survives per-seed checking"
-               % (vmax, len(per["Fno"]), per["Fno"].min()))
+               % (vmax, len(per["Fno"]), _arr(per["Fno"]).min()))
         else:
             bad("v=%.2f: FNO is at or below its own plateau at f=5 in some seed "
                 "(%s) -- 'passes its own plateau' is false"
-                % (vmax, ", ".join("%.3f" % v for v in per["Fno"])))
+                % (vmax, ", ".join("%.3f" % v for v in _arr(per["Fno"]))))
             fams_ok = False
         # ... and both U-Nets must be below theirs in EVERY seed.
         for mac in ("Unet", "Pmatch"):
             if mac not in per:
                 continue
-            if np.all(per[mac] < 1.0):
+            if np.all(_arr(per[mac]) < 1.0):
                 ok("v=%.2f: %s is below its own plateau at f=5 in all seeds "
                    "(max %.3f) -- 'no step' survives per-seed checking"
-                   % (vmax, mac, per[mac].max()))
+                   % (vmax, mac, _arr(per[mac]).max()))
             else:
                 bad("v=%.2f: %s reaches or exceeds its own plateau at f=5 in some "
                     "seed (%s) -- the shape contrast is unsupported"
-                    % (vmax, mac, ", ".join("%.3f" % v for v in per[mac])))
+                    % (vmax, mac, ", ".join("%.3f" % v
+                                            for v in _arr(per[mac]))))
                 fams_ok = False
         # Panel (c) is drawn at vmax = 0.25 only, and there the DeepONet is
         # below its plateau as well.  It is excluded from the claim because it
         # is the degenerate case: nearly all of its dynamic range is spent
         # inside the band, so its flatness carries no information about the edge.
         if vmax == 0.25 and "Don" in per:
-            if np.all(per["Don"] < 1.0):
+            if np.all(_arr(per["Don"]) < 1.0):
                 note("v=0.25: DeepONet also below its own plateau at f=5 "
                      "(max %.3f); it is excluded from the claim because its "
                      "in-band value already reaches %.3f of that plateau"
-                     % (per["Don"].max(),
+                     % (_arr(per["Don"]).max(),
                         float(np.mean(per_seed_inband(
                             "base_don_%s_" % tag, vmax)))))
             else:
                 bad("v=0.25: DeepONet is at or above its own plateau at f=5 in "
-                    "some seed (%s)" % ", ".join("%.3f" % v for v in per["Don"]))
+                    "some seed (%s)" % ", ".join("%.3f" % v
+                                                 for v in _arr(per["Don"])))
                 fams_ok = False
-        d = per["Fno"] - per["Unet"]
-        if np.all(d > 0):
+        # The paired difference is taken over the seeds the two arms share,
+        # which is the like-for-like subset and the only reading a paired
+        # claim can rest on.
+        common = sorted(set(per["Fno"]) & set(per["Unet"]))
+        d = np.array([per["Fno"][s] - per["Unet"][s] for s in common], float)
+        if len(d) and np.all(d > 0):
             ok("v=%.2f: paired FNO minus U-Net(base) at f=5 is positive in all "
-               "%d seeds, mean %+.3f [%+.3f, %+.3f] (\\ArchFnoMinusUnet%s)"
+               "%d shared seeds, mean %+.3f [%+.3f, %+.3f] (\\ArchFnoMinusUnet%s)"
                % (vmax, len(d), d.mean(), d.min(), d.max(), suf))
         else:
             bad("v=%.2f: paired FNO minus U-Net(base) at f=5 is not positive in "
-                "every seed (%s)" % (vmax, ", ".join("%+.3f" % v for v in d)))
+                "every shared seed (%s)" % (vmax, ", ".join("%+.3f" % v
+                                                            for v in d)))
             fams_ok = False
         if not fams_ok:
             viol.append(vmax)
@@ -1580,6 +1712,237 @@ def anchor_guard(ev, res=None):
         ok("anchor plateau below the trivial baseline at every contrast")
 
 
+def deep_guard(ev, res=None):
+    """The deep analytic head: truncation, contraction, selection, transfer.
+
+    The scan, the contraction measurement and the order-selection experiment
+    are three separate zero-GPU instruments, and each could be wrong in a way
+    that flatters the conclusion.  This gate re-derives from their records the
+    eight claims the prose actually makes, rather than re-reading the macros:
+
+      1. protocol parity: all three instruments ran at n=200 / gamma / the
+         manuscript's contrasts and frequency grid;
+      2. monotone decay where it should hold: at every contrast whose
+         measured contraction factor is below one, the plateau falls with M;
+      3. a turning point where it should appear: at the contrast whose
+         contraction factor is largest, some M is worse than M-1, so the
+         "deeper is better" reading is not available;
+      4. the refusal is real: any order marked not-fitted has a Gram
+         condition number past the declared ceiling;
+      5. no catastrophic cancellation: every accepted fit's coefficients stay
+         moderate, so a conditioning-warning fit is not silently reporting
+         round-off as accuracy;
+      6. in-band selection equals out-of-band optimum at every contrast;
+      7. the frequency drift of the contraction factor is materially smaller
+         than the cliff -- the number that licenses the corrected wording
+         (rho is NOT frequency-independent, but its smooth drift cannot make
+         a band-edge step);
+      8. the head at the selected depth beats the trained operator's plateau
+         at every contrast.
+
+    Claim 7 is the one that exists because of a correction.  The manuscript
+    originally said the residual was "near-frequency-independent"; measuring
+    rho showed a 2.4x drift, so the prose was weakened to "smooth, and three
+    times smaller than the cliff".  A gate that only checked the stronger
+    claim would have gone on failing silently.
+    """
+    res = res or RES
+    files = {"order": "anchor_higher_order.json",
+             "rho": "anchor_contraction.json",
+             "sel": "anchor_order_selection.json"}
+    d = {}
+    for k, fn in files.items():
+        p = os.path.join(res, fn)
+        if not os.path.exists(p):
+            bad("deep head: %s missing -- run code/%s.py" % (fn, fn[:-5]))
+            return
+        d[k] = json.load(open(p, encoding="utf-8"))
+
+    # 1. protocol parity
+    if int(d["sel"]["n_eval"]) != 200 or d["sel"].get("gamma") != C.GAMMA:
+        bad("deep head: selection record protocol mismatch n=%s gamma=%s"
+            % (d["sel"]["n_eval"], d["sel"].get("gamma")))
+    else:
+        ok("deep head: all three instruments on the manuscript's protocol "
+           "(n=200, gamma=%s)" % C.GAMMA)
+    if sorted(float(k) for k in d["sel"]["arms"]) != [float(v)
+                                                      for v in C.VMAX_LIST]:
+        bad("deep head: contrasts %s != %s"
+            % (sorted(d["sel"]["arms"]), C.VMAX_LIST))
+        return
+
+    def plateau(rec, M):
+        o = rec["orders"].get(str(M), {})
+        return o.get("plateau") if o.get("fitted") else None
+
+    # 2. monotone decay where rho < 1
+    for vk, rec in d["order"]["arms"].items():
+        rho = d["rho"]["arms"][vk]["rho_level"]
+        if rho >= 1.0:
+            continue
+        seq = [(M, plateau(rec, M)) for M in range(1, 9)]
+        seq = [(M, p) for M, p in seq if p is not None]
+        if len(seq) < 2:
+            continue
+        worst = max((seq[i + 1][1] / seq[i][1]) for i in range(len(seq) - 1))
+        if worst < 1.0:
+            ok("deep head: v=%s (rho=%.3f < 1) plateau falls monotonically "
+               "with M, worst ratio %.2f" % (vk, rho, worst))
+        else:
+            bad("deep head: v=%s has rho=%.3f < 1 but the plateau rises "
+                "-- the truncation reading is wrong" % (vk, rho))
+
+    # 3. a turning point where rho is largest
+    vk = max(d["rho"]["arms"], key=lambda k: d["rho"]["arms"][k]["rho_level"])
+    rec = d["order"]["arms"][vk]
+    seq = [(M, plateau(rec, M)) for M in range(1, 9)]
+    seq = [(M, p) for M, p in seq if p is not None]
+    turns = [i for i in range(len(seq) - 1) if seq[i + 1][1] > seq[i][1]]
+    if turns:
+        i = turns[0]
+        ok("deep head: v=%s (rho=%.3f) turns at M=%d (%.3f -> %.3f) -- "
+           "deeper is not monotonically better"
+           % (vk, d["rho"]["arms"][vk]["rho_level"], seq[i][0], seq[i][1],
+              seq[i + 1][1]))
+    else:
+        bad("deep head: v=%s has rho=%.3f > 1 but NO turning point -- either "
+            "the scan is too short or the optimal-truncation story is "
+            "unsupported" % (vk, d["rho"]["arms"][vk]["rho_level"]))
+
+    # 4. the refusal is real
+    ceil = float(d["order"].get("cond_ceiling", 1e12))
+    refused = [o for rec in d["order"]["arms"].values()
+               for M in range(1, 9)
+               for o in [rec["orders"].get(str(M), {})]
+               if o.get("fitted") is False]
+    if refused:
+        if all(o.get("cond", 0) > ceil for o in refused):
+            ok("deep head: %d refused fit(s), all past the declared "
+               "conditioning ceiling %.0e (largest cond %.1e)"
+               % (len(refused), ceil, max(o["cond"] for o in refused)))
+        else:
+            bad("deep head: a fit was refused with cond below the ceiling -- "
+                "the refusal criterion is not the one being enforced")
+    else:
+        note("deep head: no fit was refused at any (contrast, order)")
+
+    # 5. no catastrophic cancellation
+    worst_c = 0.0
+    for rec in d["order"]["arms"].values():
+        for M in range(1, 9):
+            o = rec["orders"].get(str(M), {})
+            if not o.get("fitted"):
+                continue
+            for re_, im in o.get("coeffs", []):
+                worst_c = max(worst_c, abs(re_), abs(im))
+    if worst_c < 100.0:
+        ok("deep head: largest fitted |c_j| is %.2f -- no catastrophic "
+           "cancellation in the ill-conditioned basis" % worst_c)
+    else:
+        bad("deep head: fitted |c_j| reaches %.1f -- the fit may be "
+            "cancellation, not accuracy" % worst_c)
+
+    # 6. in-band selection equals out-of-band optimum
+    mism = [vk for vk, a in d["sel"]["arms"].items()
+            if a.get("M_sel") != a.get("M_oracle")]
+    if not mism:
+        ok("deep head: in-band validation selects the out-of-band-optimal "
+           "order at all %d contrasts" % len(d["sel"]["arms"]))
+    else:
+        bad("deep head: in-band selection misses the out-of-band optimum at "
+            "v=%s -- the zero-shot order-selection claim fails"
+            % ", ".join(mism))
+
+    # 7. frequency drift is much smaller than the cliff
+    st = arm_stats(ev)
+    spread = max(d["rho"]["arms"][vk]["rho_spread"] for vk in d["rho"]["arms"])
+    cliffs = [s["ratio"] for s in st.values() if np.isfinite(s["ratio"])]
+    if cliffs:
+        cliff = float(np.mean(cliffs))
+        if spread < cliff / 2.0:
+            ok("deep head: rho drifts %.2fx over f while the trained cliff is "
+               "%.2fx -- the smooth drift cannot make the step"
+               % (spread, cliff))
+        else:
+            bad("deep head: rho drift %.2fx is not small against the cliff "
+                "%.2fx; the corrected wording is not licensed"
+                % (spread, cliff))
+
+    # 8. the head beats the trained plateau everywhere
+    worse = []
+    for vmax in C.VMAX_LIST:
+        vk = "%.2f" % vmax
+        if vmax not in st or vk not in d["sel"]["arms"]:
+            continue
+        if d["sel"]["arms"][vk]["plateau_sel"] >= st[vmax]["plateau"]:
+            worse.append(vk)
+    if worse:
+        bad("deep head: plateau at the selected depth is not below the "
+            "trained operator's at v=%s" % ", ".join(worse))
+    else:
+        ok("deep head: plateau at the selected depth is below the trained "
+           "operator's at every contrast")
+
+    # the learned-residual arms, read against their pre-registered criteria
+    tag = "a%03d" % int(round(0.25 * 100))
+    base = keys(ev, "main_fno_%s_" % tag)
+    b1 = keys(ev, "ba_fno_%s_s" % tag)
+    b2 = [n for n in keys(ev, "ba_fno_%s_" % tag) if "_m" in n]
+    if base and b1:
+        F, M1, _, _ = curve(ev, b1, 0.25)
+        p1 = float(M1[F >= 6].mean())
+        floor2 = d["sel"]["arms"]["0.25"]["plateau_m2"]
+        if p1 > floor2:
+            ok("deep head: BA1 (M=2 head + learned residual) plateau %.3f is "
+               "WORSE than its own M=2 analytic floor %.3f -- reported as a "
+               "negative result, the residual contaminates out of band"
+               % (p1, floor2))
+        else:
+            bad("deep head: BA1 plateau %.3f beats its floor %.3f; the "
+                "negative-result wording in the prose is stale" % (p1, floor2))
+    if base and b2:
+        F, M2, _, _ = curve(ev, b2, 0.25)
+        ib2, _ = inband(ev, b2, 0.25)
+        p2 = float(M2[F >= 6].mean())
+        Fb, Mb, _, _ = curve(ev, base, 0.25)
+        pbase = float(Mb[Fb >= 6].mean())
+        ib_base, _ = inband(ev, base, 0.25)
+        if ib2 <= ib_base and p2 <= 0.5 * pbase:
+            note("deep head: BA2 PASS by pre-registration (in-band %.4f <= "
+                 "%.4f and plateau %.3f <= half of %.3f)"
+                 % (ib2, ib_base, p2, pbase))
+        elif p2 <= pbase:
+            note("deep head: BA2 PARTIAL by pre-registration (plateau %.3f "
+                 "<= %.3f but in-band %.4f vs %.4f)"
+                 % (p2, pbase, ib2, ib_base))
+        else:
+            note("deep head: BA2 FAIL by pre-registration (plateau %.3f > "
+                 "%.3f)" % (p2, pbase))
+    # The high-contrast arms are reported as FAILURES; if either ever passes,
+    # the prose that calls them failures is stale and must be rewritten rather
+    # than quietly left behind.  Both contrasts are checked because the
+    # boundary sits between 0.25 and 0.50 and was located, not assumed.
+    for v in (0.50, 1.00):
+        tag = "a%03d" % int(round(v * 100))
+        base = keys(ev, "main_fno_%s_" % tag)
+        arms = [n for n in keys(ev, "ba_fno_%s_" % tag) if "_m" in n]
+        if not (base and arms):
+            continue
+        F, M, _, _ = curve(ev, arms, v)
+        p = float(M[F >= 6].mean())
+        Fb, Mb, _, _ = curve(ev, base, v)
+        pbase = float(Mb[Fb >= 6].mean())
+        head = d["sel"]["arms"]["%.2f" % v]["plateau_sel"]
+        if p > pbase:
+            ok("deep head: the v=%.2f arm FAILS as reported (plateau %.3f > "
+               "trained %.3f > head alone %.3f) -- the failure prose is "
+               "current" % (v, p, pbase, head))
+        else:
+            bad("deep head: the v=%.2f arm now reaches plateau %.3f against "
+                "the trained operator's %.3f -- the manuscript still calls it "
+                "a failure, which is stale" % (v, p, pbase))
+
+
 def main():
     global RES
     ap = argparse.ArgumentParser()
@@ -2132,9 +2495,55 @@ def main():
 
     print("\n=== analytic anchor ===")
     anchor_guard(ev)
+    deep_guard(ev)
+
+    print("\n=== three-grid convergence and intervals ===")
+    import guards_gridstats as G
+    G.delivery_guard()
+    G.grid_guard()
+    G.ci_guard(ev)
+    G.baseline_pairing_guard()
+    G.doi_guard()
+    # the module prints its own lines; only its failures are carried across, and
+    # only once
+    FAIL.extend(G.FAIL)
 
     print("\n=== macro spacing ===")
+    macro_name_guard()
     macro_space_guard()
+
+    print("\n=== text residue in the delivered files ===")
+    import guards_text as T
+    T.figure_guard()
+    T.text_residue_guard()
+    T.range_dash_guard()
+    FAIL.extend(T.FAIL)
+
+    print("\n=== the three boundary locators, on every ladder ===")
+    import guards_locators as LG
+    LG.locator_guard()
+    FAIL.extend(LG.FAIL)
+
+    print("\n=== resolution: does the boundary belong to the problem or the mesh ===")
+    import guards_res as RG
+    RG.res_guard()
+    print("\n=== the qualitative claims the resolution section prints ===")
+    RG.claim_guard()
+    FAIL.extend(RG.FAIL)
+
+    print("\n=== spectrum-matched control and per-sample bound ===")
+    import guards_surrogate as SG
+    SG.surrogate_guard()
+    SG.bound_guard()
+    SG.bound_text_guard()
+    SG.paired_jump_guard()
+    FAIL.extend(SG.FAIL)
+
+    print("\n=== fit-depth/sum-depth correction and the bax arms ===")
+    import guards_bax as XB
+    XB.bax_guard()
+    XB.bax_text_guard()
+    FAIL.extend(XB.FAIL)
 
     print("\n=== caption batch sizes ===")
     batch_label_guard()

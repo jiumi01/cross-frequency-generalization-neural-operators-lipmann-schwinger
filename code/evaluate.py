@@ -22,14 +22,31 @@ import data as D
 import models as M
 
 
-def build(n_grid, k, theta, v, device, emb="none", anchor="none"):
+def build(n_grid, k, theta, v, device, emb="none", anchor="none", order=2,
+          channels=None):
+    """Build one evaluation cell.
+
+    HEAD SEMANTICS (the fit-depth/sum-depth defect, fixed here): the analytic
+    head must sum every term it was fitted against.  `channels` truncates the
+    Born terms handed to the NETWORK as input channels only; the returned
+    third value is the FULL term list, and anchored_u applies all `order` of
+    them -- exactly what run_ba2.py documents ("the head still sums all seven
+    terms -- the coefficients are applied outside the network").  Every
+    a050/a100 arm evaluated before this fix summed only the first `channels`
+    terms of an `order`-term fit, which is a DIFFERENT and much worse head
+    (plateau 98 vs 0.39 at v=0.50 under the formal protocol, see
+    results/ls_head_alone.json); the head-alone archives
+    (results/ls_head_alone.json, results/anchor_freeze_check.json) record
+    both readings under the names "truncated"/"shallow" vs "full".
+    """
     psi_inc = P.incident_plane_wave(n_grid, k, theta, device).to(torch.complex64)
     vf = v.float()
     if anchor == "none":
         return D.build_inputs(vf, psi_inc, (k / (2 * np.pi)), emb=emb), psi_inc
-    born = D.anchor_terms(vf, k, theta)
-    return (D.build_inputs(vf, psi_inc, (k / (2 * np.pi)), emb=emb,
-                           anchor=anchor, born=born), psi_inc, born)
+    born = D.born_series(vf, k, theta, order=order)
+    x = D.build_inputs(vf, psi_inc, (k / (2 * np.pi)), emb=emb,
+                       anchor=anchor, born=born[:channels])
+    return x, psi_inc, born
 
 
 def load_model(ckpt_path, device):
@@ -38,8 +55,13 @@ def load_model(ckpt_path, device):
     name = cfg["model"]
     # The input channel count follows the run's own frequency embedding, so an
     # ff run loads without special-casing at every call site.
+    # The analytic head's depth changes the input width, so it has to be read
+    # back from the run's own config: defaulting it to 2 would rebuild an
+    # order-8 head with four channels and score the wrong model.
     kw = dict(in_ch=D.in_channels(cfg.get("f_emb", "none"),
-                                  cfg.get("anchor", "none")), out_ch=2)
+                                  cfg.get("anchor", "none"),
+                                  cfg.get("anchor_order", 2),
+                                  cfg.get("anchor_channels")), out_ch=2)
     if name in ("fno", "fno-film"):
         kw.update(width=cfg["width"], modes=cfg["modes"], n_layers=cfg["layers"],
                   proj=cfg["proj"], norm=cfg.get("norm", "none"))
@@ -89,7 +111,8 @@ def parse_name(name):
 
 @torch.no_grad()
 def eval_cell(model, f, vmax, n=200, device="cuda", seed=50000, f_lo=None, f_hi=None,
-              gamma=None, emb="none", anchor="none", ab=None):
+              gamma=None, emb="none", anchor="none", ab=None, order=2,
+              channels=None):
     gamma = C.GAMMA if gamma is None else gamma
     d = D.sample_batch(n, seed, device, f_lo=f_lo, f_hi=f_hi, vmax_lo=vmax,
                        vmax_hi=vmax, f_fixed=(None if f is None else f),
@@ -98,12 +121,13 @@ def eval_cell(model, f, vmax, n=200, device="cuda", seed=50000, f_lo=None, f_hi=
         x, psi_inc = build(C.N, d["k"], d["theta"], d["v"], device, emb=emb)
     else:
         x, psi_inc, born = build(C.N, d["k"], d["theta"], d["v"], device,
-                                 emb=emb, anchor=anchor)
+                                 emb=emb, anchor=anchor, order=order,
+                                 channels=channels)
     o = model(x)
     u = torch.complex(o[:, 0], o[:, 1])
     if anchor == "born":
-        # the anchor is applied exactly as in training: same Born pair, same
-        # two complex coefficients, both shipped with the checkpoint
+        # the anchor is applied exactly as in training: same Born terms, same
+        # coefficients, both shipped with the checkpoint
         u = D.anchored_u(u, born, ab.to(device))
     psi_hat = psi_inc + u
     e = (torch.linalg.norm((psi_hat - d["psi"]).reshape(n, -1), dim=1) /
@@ -130,20 +154,27 @@ def evaluate_run(name, ckpt, arm, arch, seed, tag, n, gamma, device, out_dir):
     model, ck = load_model(ckpt, device)
     emb = ck["cfg"].get("f_emb", "none")
     anchor = ck["cfg"].get("anchor", "none")
+    aorder = ck["cfg"].get("anchor_order", 2)
+    achannels = ck["cfg"].get("anchor_channels")
     ab = ck.get("anchor_ab", None)
     if anchor == "born" and ab is None:
         raise SystemExit("%s: anchor=born but the checkpoint carries no "
                          "anchor_ab -- the analytic term would be silently "
                          "dropped and the arm scored as a bare network" % name)
-    print("[%s] %s arm=%s epoch=%s val=%.4f f_emb=%s anchor=%s"
-          % (name, arch, arm, ck.get("epoch"), ck.get("val"), emb, anchor),
-          flush=True)
+    print("[%s] %s arm=%s epoch=%s val=%.4f f_emb=%s anchor=%s order=%d"
+          % (name, arch, arm, ck.get("epoch"), ck.get("val"), emb, anchor,
+             aorder), flush=True)
     # A callable gamma (per-frequency compensation) is recorded as a protocol
     # key, not as a number: _fresh compares this field as a string so that a
     # change of compensation table forces re-evaluation.
     gkey = ("compensated" if callable(gamma) else float(gamma))
+    # Protocol key for the analytic head's semantics.  Archives scored before
+    # the fit-depth/sum-depth fix lack this field; _fresh() treats an anchored
+    # archive without "full" as stale, so no truncated-scored number can sit
+    # beside a full-scored one in any table assembled from results/.
     res = dict(name=name, run=name, arch=arch, arm=arm, seed=seed, tag=tag,
-               f_emb=emb, anchor=anchor,
+               f_emb=emb, anchor=anchor, anchor_order=aorder,
+               anchor_channels=achannels, head_semantics="full",
                params=int(ck["cfg"]["params"]), ckpt_epoch=ck.get("epoch"),
                ckpt_val=ck.get("val"), f_test=C.F_TEST, n=n, gamma=gkey,
                model=ck["cfg"]["model"], modes=ck["cfg"].get("modes"),
@@ -159,7 +190,7 @@ def evaluate_run(name, ckpt, arm, arch, seed, tag, n, gamma, device, out_dir):
     for vi, vmax in enumerate(C.VMAX_LIST):
         e, _ = eval_cell(model, None, vmax, n=n, device=device, seed=70000 + vi,
                          f_lo=1.0, f_hi=4.0, gamma=gamma, emb=emb,
-                         anchor=anchor, ab=ab)
+                         anchor=anchor, ab=ab, order=aorder, channels=achannels)
         per_ib[vi] = e
         res["in_band"].append(dict(vmax=vmax, mean=float(e.mean()),
                                    std=float(e.std()), median=float(np.median(e)),
@@ -170,7 +201,8 @@ def evaluate_run(name, ckpt, arm, arch, seed, tag, n, gamma, device, out_dir):
         rows = []
         for fi, f in enumerate(C.F_TEST):
             e, _ = eval_cell(model, f, vmax, n=n, device=device, seed=60000 + vi,
-                             gamma=gamma, emb=emb, anchor=anchor, ab=ab)
+                             gamma=gamma, emb=emb, anchor=anchor, ab=ab,
+                             order=aorder, channels=achannels)
             per[vi, fi] = e
             rows.append(dict(f=f, mean=float(e.mean()), std=float(e.std()),
                              sem=float(e.std() / np.sqrt(len(e))),
@@ -233,8 +265,17 @@ def _fresh(path, n, gamma):
     if g is None:
         return False
     if isinstance(g, str) or isinstance(want, str):
-        return str(g) == str(want)
-    return abs(float(g) - float(want)) <= 1e-12
+        if str(g) != str(want):
+            return False
+    elif abs(float(g) - float(want)) > 1e-12:
+        return False
+    # An anchored archive scored before the fit-depth/sum-depth fix has no
+    # head-semantics key; it was produced by a DIFFERENT operator (the head
+    # summed only the first `channels` terms of an `order`-term fit), so it is
+    # stale even though its grid and gamma match.
+    if str(d.get("anchor")) == "born" and d.get("head_semantics") != "full":
+        return False
+    return True
 
 
 def main():

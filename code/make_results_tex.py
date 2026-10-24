@@ -25,7 +25,7 @@ _SPECTRUM = "unset"
 CAP = { "en": dict(
   main=("Cross-frequency generalization of the FNO: mean relative $L_2$ error, "
         "over \\NumSeeds\\ seeds and 200 paired media per frequency. Training "
-        "uses $f\\in[1,4]$, so every column from $f=4.25$ on is out of band. Rows "
+        "uses $f\\in[1,4]$; the header splits the columns at that edge. Rows "
         "marked $\\psi_{\\mathrm{inc}}$ are the trivial baseline "
         "$u_\\theta\\equiv0$."),
   summary=("Generalization cliff per contrast arm: mean relative $L_2$ error over "
@@ -81,6 +81,27 @@ CAP = { "en": dict(
           "$n=200$, seeds shared with the trained rows. $a,b$ are fitted on a "
           "prefix of the training cache only -- no test medium, no "
           "out-of-band frequency. The learned residual is identically zero."),
+  deep=("Analytic head depth on the common protocol: paired media, $n=200$, "
+        "shared seeds. Each row is fitted on one in-band prefix; $M$ counts "
+        "Born corrections, $M_{\\mathrm{sel}}$ is picked in band. The last "
+        "column is the trained plateau over the head's."),
+  gridthree=("(a) Reference convergence: one medium drawn at $256^2$ and "
+             "downsampled to the two coarser grids. (b) The trained FNO, on its "
+             "native $64^2$ input, scored against three targets."),
+  ci=("Headline scalars with $95\\%$ intervals from \\CIBoot\\ bootstrap "
+      "replicates resampling media; onset: first node reaching half the "
+      "plateau."),
+  locators=("All three boundary locators, recomputed on every rung of the four "
+            "control ladders. \\emph{n/a}: the locator declines to answer, as "
+            "on the widest band, where every test node lies inside the trained "
+            "band."),
+  res=("Resolution check: three locators and two scalars at $64^{2}$ and "
+       "$128^{2}$. (a) native protocol; (b) one media draw discretised on both "
+       "grids; (c) Marmousi windows; (d) their control. Rows of (c), (d) give "
+       "$f^{\\star}$, jump and errors only."),
+  res_note=("$\\varepsilon_{\\infty}$ averages $f>5$ in (a), (b), as in "
+            "Table~\\ref{tab:main}, and $f\\ge5$ in (c), (d), as in "
+            "Supplementary Table~15."),
   banddown=("Below-band FNO behaviour per contrast arm: mean relative "
             "$L_2$ error over \\NumSeeds\\ seeds at the left band edge and "
             "below, against the in-band floor (Table~\\ref{tab:summary}) and "
@@ -123,8 +144,8 @@ CAP = { "en": dict(
  ),
  "cn": dict(
   main=("FNO 的跨频率泛化：\\NumSeeds\\ 个种子、每个频率 200 个配对介质的"
-        "平均相对 $L_2$ 误差。训练仅使用 $f\\in[1,4]$，故自 $f=4.25$ 起的各列"
-        "均在训练频带之外。标为 $\\psi_{\\mathrm{inc}}$ 的行是平凡基线 $u_\\theta\\equiv0$。"),
+        "平均相对 $L_2$ 误差。训练仅使用 $f\\in[1,4]$；表头在该边处拆分各列。"
+        "标为 $\\psi_{\\mathrm{inc}}$ 的行是平凡基线 $u_\\theta\\equiv0$。"),
   summary=("各对比度臂的泛化悬崖汇总：为 \\NumSeeds\\ 个随机种子的均值，"
            "紧邻的一列为该窗口上的种子标准差。$\\varepsilon_{\\mathrm{in}}$：训练频带内、"
            "留出介质上的平均相对 $L_2$ 误差；$\\varepsilon_{\\infty}$：$f\\ge6$ 的"
@@ -165,6 +186,23 @@ CAP = { "en": dict(
   anchor=("解析锚定，按与其余各臂完全相同的协议评分（$n=200$，介质与种子配对）。"
           "系数 $a,b$ 仅由训练缓存前缀拟合：不含测试介质，不含带外频率。"
           "学习残差恒为零。"),
+  deep=("解析头深度：$n=200$，配对介质与种子。每行由同一带内前缀拟合；"
+        "$M$ 为 Born 项数。末列为训练算子平台与本头平台之比。"),
+  gridthree=("(a) 参考解收敛性：同一介质在 $256^2$ 上生成并降采样。(b) FNO "
+             "固定 $64^2$ 输入，对三个目标分辨率评分。"),
+  ci=("主标量及其 $95\\%$ 区间（\\CIBoot\\ 次按介质重采样）；"
+      "onset 为曲线首次达到平台一半的频点。"),
+  locators=("三个边界定位器在四条控制实验梯子每一级上的取值。"
+            "\\emph{n/a} 表示该定位器拒绝作答；最宽频带上它无定义，"
+            "因为全部测试节点都在训练频带内。"),
+  res=("分辨率检查：三个定位器与两个标量在 $64^{2}$/$128^{2}$ 上重算。"
+       "(a) 原生协议；(b) 同一批介质离散于两种网格；(c) Marmousi 窗口；"
+       "(d) 合成对照。(c)(d) 行只给 $f^{\\star}$、跃变与误差。"),
+  # The CN manuscript carries the level-3 table in its own body (\input{gen_tab_realgeo}),
+  # so it must be cited by \ref there; only the EN version leaves it to the
+  # supplement, where the pointer is by number because the label would dangle.
+  res_note=("(a)(b) 的 $\\varepsilon_{\\infty}$ 取 $f>5$ 均值（与表~\\ref{tab:main} 一致），"
+            "(c)(d) 取 $f\\ge5$ 均值（与表~\\ref{tab:realgeo} 一致）。"),
   banddown=("FNO 各臂的带下行为：\\NumSeeds\\ 个种子在左带缘 $f=1.0$ 及其"
             "下方的平均相对 $L_2$ 误差，对照带内下限（表 \\ref{tab:summary}）"
             "与 $f=0.5$ 处平凡基线；末列为两个 $f=0.5$ 条目之比。"),
@@ -358,7 +396,31 @@ def triv_row(vmax):
     The architectures return psi_inc + u_theta, so u_theta == 0 is a predictor
     they contain; its relative error is exactly this ratio.  Every out-of-band
     plateau in the paper has to be read against it.
+
+    Source order is `triv_paired.json` then `spectrum.json`, and the order is
+    not cosmetic.  `spectrum.json` records the baseline as a mean over 600
+    media; the model rows it is compared against are means over the 200
+    evaluation media.  The two draws share their media and angles (checked
+    bitwise in `baseline_paired.prefix_check`) but not their sample size, so
+    the 600-media denominator contains the 200 evaluation media plus 400
+    others.  Restricting it to the evaluation media moves each cell by 2.7% on
+    average and by up to 8.3% (results/triv_paired.json, `rel_diff_vs_600`) --
+    the same size as the plateau shift the refinement study reports -- so the
+    numerator and the denominator have to come from the same sample or the
+    ratio inherits that difference as if it were a finding.  `triv_paired` is
+    the paired one and is preferred whenever it exists.
     """
+    p = os.path.join(C.RES, "triv_paired.json")
+    if os.path.exists(p):
+        d = json.load(open(p, encoding="utf-8"))
+        key = None
+        for k in d["data"]:
+            if abs(float(k) - float(vmax)) < 1e-9:
+                key = k
+        if key is None:
+            return None
+        arm = d["data"][key]
+        return np.array([np.mean(arm["f=%g" % f]) for f in C.F_TEST], float)
     s = load_spectrum()
     if not s:
         return None
@@ -391,12 +453,25 @@ def table_main(ev, arms, cap):
             # the SAME arm, and pooling would invite reading across rows.
             body.append("\\quad$\\psi_{\\mathrm{inc}}$ & "
                         + " & ".join(fmt(t) for t in tb) + " \\\\")
-    hdr = " & ".join(freq_label(f) for f in (F if F is not None else C.F_TEST))
-    return ("\\begin{table*}[t]\n\\centering\n\\caption{%s}\n\\label{tab:main}\n"
-            "\\small\n\\setlength{\\tabcolsep}{4.2pt}\n"
-            "\\begin{tabular}{l" % cap["main"] + "c" * len(C.F_TEST) + "}\n\\toprule\n"
-            "$v_{\\max}$ & " + hdr + " \\\\\n\\midrule\n" + "\n".join(body) +
-            "\n\\bottomrule\n\\end{tabular}\n\\end{table*}\n")
+    freqs = F if F is not None else C.F_TEST
+    hdr = " & ".join(freq_label(f) for f in freqs)
+    # The in-band / out-of-band split is the fact this table exists to show,
+    # so it is carried by the table's STRUCTURE -- a grouped two-tier header
+    # and a rule at the band edge -- rather than by a sentence in the caption
+    # the reader has to hold in mind across sixteen columns.
+    n_in = sum(1 for f in freqs if f <= C.F_TRAIN[1] + 1e-9)
+    n_out = len(freqs) - n_in
+    head = ("\\begin{table*}[t]\n\\centering\n\\caption{%s}\n\\label{tab:main}\n"
+            "\\footnotesize\n\\setlength{\\tabcolsep}{3.0pt}\n"
+            "\\begin{tabular}{l" + "c" * n_in + "!{\\vline}" + "c" * n_out
+            + "}\n\\toprule\n"
+            " & \\multicolumn{%d}{c}{in band} & \\multicolumn{%d}{c}{out of "
+            "band} \\\\\n" % (n_in, n_out)
+            + "\\cmidrule(lr){2-%d}\\cmidrule(lr){%d-%d}\n"
+            % (1 + n_in, 2 + n_in, 1 + len(freqs))
+            + "$v_{\\max}$ & " + hdr + " \\\\\n\\midrule\n" + "\n".join(body)
+            + "\n\\bottomrule\n\\end{tabular}\n\\end{table*}\n")
+    return head % cap["main"]
 
 
 def table_summary(ev, arms, cap):
@@ -1468,6 +1543,13 @@ def macros(ev, arms, res):
              % "{:,}".format(_nva).replace(",", "\\,"))
     L.append("\\newcommand{\\ArmCacheSamples}{%s}"
              % "{:,}".format(_arm_cache).replace(",", "\\,"))
+    # The cache is written in 512-sample blocks and the training ladder's top
+    # rung is 12 288, so a slice of every cache is generated and never used.
+    # Reviewers are entitled to ask what that slice is for, and the answer is
+    # "nothing": quoting the unused count rather than leaving it to be derived
+    # from the difference is what makes that answer checkable.
+    L.append("\\newcommand{\\ArmCacheUnused}{%s}"
+             % "{:,}".format(max(0, _arm_cache - _ntr - _nva)).replace(",", "\\,"))
     L.append("\\newcommand{\\NumEpochs}{%d}" % _nep)
     # The three design constants of the protocol.  They are quoted in the
     # protocol section and again by the third evidence rung, and two copies of
@@ -1745,25 +1827,41 @@ def macros(ev, arms, res):
     # paired comparison needs one number per seed, and check_claims asserts the
     # two conventions agree to 2e-3.
     for _v, _suf in [(0.25, ""), (1.00, "S")]:
-        _per = {}
+        # Per-seed readings keyed by seed index.  The seed-averaged macros
+        # above use every run of an arm, but a *paired* comparison needs the
+        # two arms to share a seed: W1 extended the v=1.00 anchored arms to
+        # six seeds while the architecture baselines stayed at three, so the
+        # paired gap is computed on the common seed set (the like-for-like
+        # subset) rather than on a mis-aligned broadcast.
+        _per, _common = {}, None
         for _mac, _pr in [("Fno", "main_fno_%s_" % arm_key(_v)),
                           ("Unet", "base_unet_%s_" % arm_key(_v)),
                           ("Don", "base_don_%s_" % arm_key(_v)),
                           ("Pmatch", "pmatch_unet_%s_" % arm_key(_v))]:
-            _vals = []
+            _vals = {}
             for _n in runs_for(ev, _pr):
+                _sm = re.search(r"_s(\d+)$", _n)
                 _rows = ev[_n]["sweep"]["%.2f" % _v]
                 _F = np.array([r["f"] for r in _rows], float)
                 _M = np.array([r["mean"] for r in _rows], float)
                 _pl = _M[_F >= 6.0].mean()
-                _vals.append(float(_M[np.isclose(_F, 5.0)][0] / _pl))
-            _per[_mac] = np.array(_vals, float)
+                _vals[int(_sm.group(1))] = float(
+                    _M[np.isclose(_F, 5.0)][0] / _pl)
+            _per[_mac] = _vals
+            _common = (set(_vals) if _common is None
+                       else (_common & set(_vals)))
         for _mac in ("Fno", "Unet", "Don", "Pmatch"):
-            _v_ = _per[_mac]
+            _own = np.array([_per[_mac][s] for s in sorted(_per[_mac])],
+                            float)
             L.append("\\newcommand{\\Arch%sNormFiveSd%s}{%s}"
                      % (_mac, _suf,
-                        fmt(_v_.std(ddof=1), 3) if len(_v_) > 1 else "--"))
-        _d = _per["Fno"] - _per["Unet"]
+                        fmt(_own.std(ddof=1), 3) if len(_own) > 1 else "--"))
+        _common = sorted(_common) if _common else []
+        if len(_common) > 1 and all(_per[m] for m in _per):
+            _d = (np.array([_per["Fno"][s] for s in _common], float)
+                  - np.array([_per["Unet"][s] for s in _common], float))
+        else:
+            _d = np.array([float("nan")])
         L.append("\\newcommand{\\ArchFnoMinusUnet%s}{%s}"
                  % (_suf, fmt(_d.mean(), 3)))
         L.append("\\newcommand{\\ArchFnoMinusUnetLo%s}{%s}"
@@ -1774,7 +1872,9 @@ def macros(ev, arms, res):
         # bound the seed-level variability of the normalised reading in one
         # number rather than four.
         L.append("\\newcommand{\\ArchNormFiveSdMax%s}{%s}"
-                 % (_suf, fmt(max(v.std(ddof=1) for v in _per.values()), 3)))
+                 % (_suf, fmt(max(np.array(
+                     [_per[m][s] for s in sorted(_per[m])], float).std(ddof=1)
+                     for m in _per if len(_per[m]) > 1), 3)))
 
     # ---- the reach of the mode budget, on the object the networks use -------
     # NOTE `u` here is the SCATTERED field, not the total field, and that is a
@@ -1852,19 +1952,20 @@ def macros(ev, arms, res):
     # and its relative error is exactly ||u||/||psi||.  It accounts for most of
     # the out-of-band plateau, so leaving it out let the plateau be read as a
     # band-limitation effect.  Reported per arm, in band and on the plateau.
-    _k0 = "f=%g" % C.F_TEST[0]
-    have_triv = bool(spec) and all(
-        _k0 in spec["data"][k] and "triv" in spec["data"][k][_k0]
-        for k in spec["data"])
+    _k0 = triv_row(C.VMAX_LIST[0])
+    have_triv = _k0 is not None and all(
+        triv_row(v) is not None for v in C.VMAX_LIST)
     if have_triv:
         ti, to, ratio, exc = [], [], [], []
         for vmax in arms:
-            # diag_spectrum keys the arms with plain str(v_max): "0.05" ... "1.0".
-            arm = spec["data"].get(str(vmax))
-            if not arm:
+            tv = triv_row(vmax)
+            if tv is None:
                 continue
-            Fv = np.array(spec["f"], float)
-            tv = np.array([arm["f=%g" % f]["triv"] for f in Fv], float)
+            # Frequency axis comes from the same loader as the values, so the
+            # in-band/plateau masks cannot be applied to a different grid than
+            # the one the baseline was evaluated on.
+            Fv = np.array(C.F_TEST, float)
+            tv = np.asarray(tv, float)
             ti.append(float(tv[Fv <= C.F_TRAIN[1] + 1e-9].mean()))
             tv_out = float(tv[Fv >= 6.0].mean())
             to.append(tv_out)
@@ -2444,6 +2545,9 @@ def macros(ev, arms, res):
     L += c1_macros()
     L += disc_macros()
     L += anchor_macros()
+    L += deep_macros()
+    L += grid_macros()
+    L += loc_macros()
     return "\n".join(L) + "\n"
 
 
@@ -2624,7 +2728,7 @@ def table_arms(ev, cap):
         params = ev[names[0]].get("params")
         rows.append((prefix, label, params, e4, e5, plat))
     t = ("\\begin{table}[ht]\n\\centering\n\\caption{%s}\n\\label{tab:arms}\n"
-         "\\footnotesize\n\\setlength{\\tabcolsep}{3.2pt}\n"
+         "\\footnotesize\n\\setlength{\\tabcolsep}{3.6pt}\n"
          "\\begin{tabular}{llrrrr}\n\\toprule\n"
          "arm & configuration & params (M) & $\\varepsilon(4)$ & "
          "$\\varepsilon(5)$ & $\\varepsilon(f\\ge6)$ \\\\\n\\midrule\n"
@@ -2738,7 +2842,7 @@ def table_disc(cap):
         ("TL warm start, $10^{-3}$ (C4b)", d4["arms"]["tl_warm"]),
     ]
     t = ("\\begin{table}[ht]\n\\centering\n\\caption{%s}\n\\label{tab:disc}\n"
-         "\\footnotesize\n\\setlength{\\tabcolsep}{3.2pt}\n"
+         "\\footnotesize\n\\setlength{\\tabcolsep}{3.6pt}\n"
          "\\begin{tabular}{lrrrrrr}\n\\toprule\n"
          "arm & $\\varepsilon_{\\mathrm{in}}$ & $\\varepsilon(4)$ & "
          "$\\varepsilon(5)$ & $r$ & $\\varepsilon_{\\infty}$ & onset \\\\\n"
@@ -2821,7 +2925,7 @@ def table_c1(cap):
             ("compensated, $\\gamma(f)$",
              "$%s$ (const.)" % fmt(v["attained_compensated"], 2), g)]
     t = ("\\begin{table}[ht]\n\\centering\n\\caption{%s}\n\\label{tab:c1}\n"
-         "\\footnotesize\n\\setlength{\\tabcolsep}{3.2pt}\n"
+         "\\footnotesize\n\\setlength{\\tabcolsep}{3.6pt}\n"
          "\\begin{tabular}{llrrrrrr}\n\\toprule\n"
          "arm & attained norm & $\\varepsilon_{\\mathrm{in}}$ & "
          "$\\varepsilon(4)$ & $\\varepsilon(4.25)$ & "
@@ -2960,6 +3064,275 @@ def table_anchor(cap):
                      fmt(ref[4], 2)))
         t += (" & trivial, $\\hat u\\equiv0$ & n/a & n/a & n/a & $%s$ & n/a \\\\\n"
               % fmt(a["trivial_plateau"]))
+        if vmax != C.VMAX_LIST[-1]:
+            t += "\\midrule\n"
+    return t + "\\bottomrule\n\\end{tabular}\n\\end{table}\n"
+
+
+# ---------------------------------------------------------------- deep anchor
+# Everything below is read from three zero-GPU instruments:
+#   results/anchor_higher_order.json  -- plateau vs head depth M
+#   results/anchor_contraction.json   -- the Born contraction factor rho(v, f)
+#   results/anchor_order_selection.json -- M chosen in band, scored out of band
+# plus the BA1/BA2 evaluation records for the learned-residual arms.
+
+def deep_load():
+    """The three zero-GPU anchor instruments, or None if any is missing.
+
+    Requiring all three is deliberate.  The order scan alone would invite the
+    reading "deeper is better"; the contraction measurement is what supplies
+    the reason a turning point exists; the order-selection record is what
+    makes the depth a choice rather than a dial tuned on the test set.  A
+    partial set would support a stronger claim than the evidence carries.
+    """
+    out = {}
+    for key, name in (("order", "anchor_higher_order.json"),
+                      ("rho", "anchor_contraction.json"),
+                      ("sel", "anchor_order_selection.json")):
+        p = os.path.join(C.RES, name)
+        if not os.path.exists(p):
+            return None
+        out[key] = json.load(open(p, encoding="utf-8"))
+    return out
+
+
+def _ba_stats(ev, prefix, vmax):
+    """(in_band, e4, e5, plateau, r) for a learned-residual arm, or None.
+
+    Same protocol as the trained arms it is read against: means over the seeds
+    whose evaluation record exists on the current grid.  Returns None rather
+    than a partial number so a table row is omitted instead of half-written.
+    """
+    names = runs_for(ev, prefix)
+    if not names:
+        return None
+    F, M, _ = mean_over_seeds(ev, names, vmax)
+    ib, _ = inband(ev, names, vmax)
+    plateau = float(np.mean(M[F >= 6]))
+    e4 = float(M[np.isclose(F, 4.0)][0]) if np.isclose(F, 4.0).any() else np.nan
+    e5 = float(M[np.isclose(F, 5.0)][0]) if np.isclose(F, 5.0).any() else np.nan
+    ok = np.isfinite(e4) and e4 > 0 and np.isfinite(e5)
+    r = (e5 / e4) if ok else float("nan")
+    return float(ib), e4, e5, plateau, r, names
+
+
+def deep_macros():
+    """Prose macros for the deep analytic head.
+
+    The macros that carry the argument are the ones a reader can check against
+    the tables: the plateau at the in-band-selected depth, the depth itself,
+    the gain over the shallow head already in the manuscript, and the measured
+    contraction factor with its frequency spread.  The frequency spread is
+    included because it is the number that CORRECTS the manuscript's earlier
+    "near-frequency-independent" wording: rho does move with f, by a factor
+    \RhoSpread, which is real but three times smaller than the cliff.
+    """
+    keys = ["DAMsel", "DAMselStrong", "DAPlatSel", "DAInSel", "DAPlatMTwo",
+            "DAFnoPlat", "DAFnoIn", "DAWinOut", "DAWinIn",
+            "DAPlatWeak", "DAPlatStrong", "DAFnoPlatWeak", "DAFnoPlatStrong",
+            "DAGainMTwo", "DAGainFno",
+            "RhoLevel", "RhoSpread", "RhoWeak", "RhoStrong", "RhoUnit",
+            "RhoRatioF",
+            "DATurnM", "DATurnA", "DATurnB", "DARefusedCond",
+            "BAOneIn", "BAOnePlat", "BAOneR", "BAOneFloor",
+            "BAOneWinIn", "BAOneWinOut", "DAGainHeadIn",
+            "BATwoIn", "BATwoPlat", "BATwoR", "BATwoFloor",
+            "BATwoWinIn", "BATwoWinOut",
+            "DAFnoInStrong", "DAPlatMid",
+            "BATwoInStrong", "BATwoPlatStrong", "BATwoRStrong",
+            "BATwoInMid", "BATwoPlatMid", "BATwoRMid",
+            "DAFnoInMid", "DAFnoPlatMid"]
+    d = deep_load()
+    if d is None:
+        return ["\\newcommand{\\%s}{--}" % k for k in keys]
+    ev = load(RES_DIR)
+
+    def arm(v):
+        return d["sel"]["arms"]["%.2f" % v]
+
+    def ordv(v, M):
+        return d["order"]["arms"]["%.2f" % v]["orders"].get(str(M), {})
+
+    m = {}
+    v025, v100 = 0.25, 1.00
+    m["DAMsel"] = "%d" % arm(v025)["M_sel"]
+    m["DAMselStrong"] = "%d" % arm(v100)["M_sel"]
+    m["DAPlatSel"] = fmt(arm(v025)["plateau_sel"])
+    m["DAInSel"] = fmt(arm(v025)["in_band_sel"])
+    m["DAPlatMTwo"] = fmt(arm(v025)["plateau_m2"])
+    m["DAPlatWeak"] = fmt(arm(0.05)["plateau_sel"])
+    m["DAPlatStrong"] = fmt(arm(v100)["plateau_sel"])
+
+    ref = arm_curves(ev, v025) if ev else None
+    if ref is not None:
+        F, plateau, e4, e5, ratio, names = ref
+        ib, _ = inband(ev, names, v025)
+        m["DAFnoPlat"] = fmt(plateau)
+        m["DAFnoIn"] = fmt(ib)
+        # out-of-band win: trained plateau over head plateau
+        m["DAWinOut"] = fmt(plateau / max(arm(v025)["plateau_sel"], 1e-9), 1)
+        # in-band: whichever object is better, expressed as the winner's factor
+        a_in = arm(v025)["in_band_sel"]
+        m["DAWinIn"] = fmt(max(ib, a_in) / min(ib, a_in), 1)
+    ref100 = arm_curves(ev, v100) if ev else None
+    if ref100 is not None:
+        F, plateau, e4, e5, ratio, names = ref100
+        # NB: not named `ib` -- that name already holds the v=0.25 in-band
+        # value, and rebinding it here silently scaled every later ratio by
+        # the wrong contrast's error level.
+        _ib100, _ = inband(ev, names, v100)
+        del _ib100
+        m["DAFnoPlatWeak"] = fmt(arm_curves(ev, 0.05)[1]) if arm_curves(
+            ev, 0.05) else "--"
+        # NB: DAFnoPlatStrong is set once, in the Strong/Mid loop below --
+        # assigning it here too is a duplicate \newcommand in the preamble.
+    m["DAGainMTwo"] = fmt(arm(v025)["plateau_m2"] /
+                        max(arm(v025)["plateau_sel"], 1e-9), 1)
+    if "DAFnoPlat" in m:
+        m["DAGainFno"] = fmt(float(m["DAFnoPlat"]) /
+                             max(arm(v025)["plateau_sel"], 1e-9), 1)
+
+    rho = d["rho"]["arms"]
+    m["RhoLevel"] = fmt(rho["0.25"]["rho_level"])
+    m["RhoSpread"] = fmt(float(np.mean([rho["%.2f" % v]["rho_spread"]
+                                        for v in C.VMAX_LIST])), 2)
+    m["RhoWeak"] = fmt(rho["0.05"]["rho_level"])
+    m["RhoStrong"] = fmt(rho["1.00"]["rho_level"])
+    # rho ~ c * v with c measured; the rho = 1 boundary follows from it
+    c = np.mean([rho["%.2f" % v]["rho_level"] / v for v in C.VMAX_LIST])
+    m["RhoUnit"] = fmt(1.0 / c)
+    m["RhoRatioF"] = fmt(rho["0.25"]["rho_at_f12"] / rho["0.25"]["rho_at_f4"], 2)
+
+    # the turning point at the highest contrast, read from the scan itself
+    ps = [(M, ordv(v100, M).get("plateau")) for M in range(1, 9)]
+    ps = [(M, p) for M, p in ps if p is not None]
+    turn = None
+    for i in range(len(ps) - 1):
+        if ps[i + 1][1] > ps[i][1]:
+            turn = (ps[i][0], ps[i][1], ps[i + 1][1])
+            break
+    if turn:
+        m["DATurnM"] = "%d" % turn[0]
+        m["DATurnA"] = fmt(turn[1])
+        m["DATurnB"] = fmt(turn[2])
+    refused = [M for M in range(1, 9)
+               if ordv(v100, M).get("fitted") is False]
+    if refused:
+        cond = ordv(v100, refused[0]).get("cond")
+        m["DARefusedCond"] = ("$%.1f\\times10^{%d}$" %
+                              (cond / 10 ** int(np.floor(np.log10(cond))),
+                               int(np.floor(np.log10(cond))))
+                              ) if cond else "--"
+
+    if ev:
+        b1 = _ba_stats(ev, "ba_fno_a025_s", v025)
+        if b1:
+            m["BAOneIn"] = fmt(b1[0])
+            m["BAOnePlat"] = fmt(b1[3])
+            m["BAOneR"] = fmt(b1[4], 2)
+        # the floor BA1 is scored against is the M=2 head it was built on
+        m["BAOneFloor"] = fmt(arm(v025)["plateau_m2"])
+        m["BAOneWinIn"] = fmt(ib / b1[0], 1)
+        m["BAOneWinOut"] = fmt(float(m["DAFnoPlat"]) / b1[3], 1)
+        b2 = _ba_stats(ev, "ba_fno_a025_m8_s", v025)
+        if b2:
+            m["BATwoIn"] = fmt(b2[0])
+            m["BATwoPlat"] = fmt(b2[3])
+            m["BATwoR"] = fmt(b2[4], 2)
+            m["BATwoFloor"] = fmt(arm(v025)["plateau_sel"])
+            m["DAGainHeadIn"] = fmt(arm(v025)["in_band_sel"] / b2[0], 1)
+            if "DAFnoIn" in m:
+                m["BATwoWinIn"] = fmt(float(m["DAFnoIn"]) / b2[0], 1)
+            if "DAFnoPlat" in m:
+                m["BATwoWinOut"] = fmt(float(m["DAFnoPlat"]) / b2[3], 1)
+        for vk, tag in (("1.00", "Strong"), ("0.50", "Mid")):
+            v = float(vk)
+            ref = arm_curves(ev, v) if ev else None
+            if ref is not None:
+                F0, pl0, e4, e5, ratio, names = ref
+                ibf, _ = inband(ev, names, v)
+                m["DAFnoIn" + tag] = fmt(ibf)
+                m["DAFnoPlat" + tag] = fmt(pl0)
+            b3 = None
+            for M in (8, 7, 6, 5, 4):
+                cand = _ba_stats(ev, "ba_fno_a%s_m%d_s" % (
+                    "100" if tag == "Strong" else "050", M), v)
+                if cand:
+                    b3 = cand
+                    break
+            if tag == "Mid":
+                o8 = d["order"]["arms"]["0.50"]["orders"].get(
+                    str(d["sel"]["arms"]["0.50"]["M_sel"]), {})
+                if o8.get("plateau") is not None:
+                    m["DAPlatMid"] = fmt(o8["plateau"])
+            if b3:
+                m["BATwoIn" + tag] = fmt(b3[0])
+                m["BATwoPlat" + tag] = fmt(b3[3])
+                m["BATwoR" + tag] = fmt(b3[4], 2)
+
+    out = []
+    for k in keys:
+        out.append("\\newcommand{\\%s}{%s}" % (k, m.get(k, "--")))
+    return out
+
+
+def table_deep(cap):
+    """Head depth against the trained operator.
+
+    One row per contrast: the head at its IN-BAND-selected depth, the head at
+    the manuscript's existing depth M=2, and the trained operator on the same
+    media and seeds.  The M=2 and M_sel rows differ only in how many analytic
+    terms are summed -- both are fitted on the same in-band prefix, and
+    neither is trained -- so the gap between them is the truncation error the
+    manuscript's original anchor was carrying.
+    """
+    d = deep_load()
+    if d is None:
+        return ""
+    ev = load(RES_DIR)
+    t = ("\\begin{table}[ht]\n\\centering\n\\caption{%s}\n\\label{tab:deep}\n"
+         "\\footnotesize\n\\setlength{\\tabcolsep}{4pt}\n"
+         "\\begin{tabular}{llrrrr}\n\\toprule\n"
+         "$v_{\\max}$ & predictor & $M$ & $\\varepsilon_{\\mathrm{in}}$ & "
+         "$\\varepsilon_{\\infty}$ & $\\varepsilon_{\\infty}$ ratio "
+         "to FNO \\\\\n\\midrule\n" % cap["deep"])
+    def ratio_to_fno(plateau, ref):
+        """Trained plateau over head plateau, with a floor on the head.
+
+        At the two lowest contrasts the head is exact to five decimals and the
+        ratio runs past 1e5.  Printing it would claim a precision the
+        measurement does not have -- the head's error there is at the level
+        where the reference solver's own tolerance matters -- so it is
+        reported as a bound instead.
+        """
+        if ref is None or not np.isfinite(plateau) or plateau <= 0:
+            return "n/a"
+        r = ref[1] / plateau
+        return ">10^{3}" if r > 1000.0 else fmt(r, 1)
+
+    for vmax in C.VMAX_LIST:
+        a = d["sel"]["arms"]["%.2f" % vmax]
+        ref = None
+        if ev:
+            rr = arm_curves(ev, vmax)
+            if rr is not None:
+                F, plateau, e4, e5, ratio, names = rr
+                ib, _ = inband(ev, names, vmax)
+                ref = (ib, plateau)
+        t += ("$%.2f$ & analytic head, $M=M_{\\mathrm{sel}}$ & $%d$ & $%s$ & "
+              "$%s$ & $%s$ \\\\\n"
+              % (vmax, a["M_sel"], fmt(a["in_band_sel"]),
+                 fmt(a["plateau_sel"]),
+                 ratio_to_fno(a["plateau_sel"], ref)))
+        ib2 = a["in_band"].get("2") if isinstance(a["in_band"], dict) else None
+        t += (" & analytic head, $M=2$ (Table~\\ref{tab:anchor}) & $2$ & "
+              "$%s$ & $%s$ & $%s$ \\\\\n"
+              % (fmt(ib2) if ib2 is not None else "n/a",
+                 fmt(a["plateau_m2"]),
+                 ratio_to_fno(a["plateau_m2"], ref)))
+        if ref is not None:
+            t += (" & trained FNO & n/a & $%s$ & $%s$ & $1.0$ \\\\\n"
+                  % (fmt(ref[0]), fmt(ref[1])))
         if vmax != C.VMAX_LIST[-1]:
             t += "\\midrule\n"
     return t + "\\bottomrule\n\\end{tabular}\n\\end{table}\n"
@@ -3108,6 +3481,863 @@ def plateau_macros(ev):
         plateau = r[1]
         out.append("\\newcommand{\\PlatTriv%s}{%.3f}"
                    % (_PLAT_TAG.get(vk[1:], vk[1:]), plateau / triv))
+    # How far the paired denominator sits from the 600-media one it replaced.
+    # Quoted in Section~\ref{sec:cliff} so that the change of denominator is
+    # visible as a number rather than left to the reader to notice.
+    tp = os.path.join(C.RES, "triv_paired.json")
+    mx = None
+    if os.path.exists(tp):
+        _tp = json.load(open(tp, encoding="utf-8"))
+        mx = (_tp.get("rel_diff_vs_600") or {}).get("max")
+    out.append("\\newcommand{\\BaselinePairedMax}{%s}"
+               % (fmt(100.0 * mx, 1) if mx is not None else "--"))
+    return out
+
+
+def _gridthree_load():
+    p = os.path.join(C.RES, "grid_conv_three.json")
+    if not os.path.exists(p):
+        return None
+    return json.load(open(p, encoding="utf-8"))
+
+
+def _ci_load():
+    p = os.path.join(C.RES, "ci_plateau.json")
+    if not os.path.exists(p):
+        return None
+    return json.load(open(p, encoding="utf-8"))
+
+
+def _grid_rows(d, key, f=None):
+    rows = d[key]["rows"]
+    return [r for r in rows if (f is None or abs(r["f"] - f) < 1e-9)]
+
+
+def _plat_mean(rows, field):
+    sub = [r[field] for r in rows if r["f"] >= 6.0]
+    return float(np.mean(sub)) if sub else None
+
+
+def grid_macros():
+    """Prose macros for the three-grid study and the resampling intervals.
+
+    Two numbers here are deliberately not rounded up into a claim of
+    invariance.  The plateau moves by GridPlatShift percent when the target is
+    refined two levels, and the media-resampling half-width on the same
+    quantity is of the same order; so the honest statement is "determined to a
+    few percent by both sources", not "grid-independent".  What IS
+    grid-independent is the plateau-to-baseline ratio, because the metric is a
+    ratio in which the leading discretisation error largely cancels -- that is
+    GridRatioShift, and it is the reason the paper's claims survive the
+    refinement at all.
+    """
+    keys = ["GridOrderLo", "GridOrderHi", "GridDeltaTop", "GridDeltaTopStrong",
+            "GridPlatShift", "GridPlatShiftStrong", "GridRatioShift",
+            "GridRatioShiftStrong",
+            "GridInputPath", "GridInputPathAbs",
+            "CIPlatLo", "CIPlatHi", "CIInLo", "CIInHi", "CIJumpLo", "CIJumpHi",
+            "CIOnsetShare", "CIUnetJumpLo", "CIUnetJumpHi", "CIUnetOnset",
+            "CIInTwoLo", "CIInTwoHi", "CIPlatTwoLo", "CIPlatTwoHi",
+            "CIJumpTwoLo", "CIJumpTwoHi", "CIBoot",
+            "CIRatioLo", "CIRatioHi", "CIRatioMid", "CIRatioMaxHalf",
+            "CIRatioResidHalf"]
+    m = {}
+
+    g = _gridthree_load()
+    if g is not None:
+        ps = [r["p"] for k in ("ref_0.25", "ref_1.00") for r in g[k]["rows"]]
+        m["GridOrderLo"] = fmt(min(ps), 2)
+        m["GridOrderHi"] = fmt(max(ps), 2)
+        a0 = _grid_rows(g, "ref_0.25", 12.0)[0]
+        a1 = _grid_rows(g, "ref_1.00", 12.0)[0]
+        m["GridDeltaTop"] = fmt(a0["d64v256"])
+        m["GridDeltaTopStrong"] = fmt(a1["d64v256"])
+        for tag, key, out in (("", "model_0.25", "GridPlatShift"),
+                              ("Strong", "model_1.00", "GridPlatShiftStrong")):
+            rows = _grid_rows(g, key)
+            p64 = _plat_mean(rows, "e64")
+            p256 = _plat_mean(rows, "e256")
+            t64 = _plat_mean(rows, "b64")
+            t256 = _plat_mean(rows, "b256")
+            if p64 and p256:
+                m[out] = fmt(100.0 * (p256 / p64 - 1.0), 1)
+            # One key per arm.  Writing both arms to GridRatioShift silently
+            # kept only the second, exactly the rebinding bug that made
+            # BAOneWinIn read 12.1 instead of 3.1 earlier in this project.
+            if p64 and p256 and t64 and t256:
+                m["GridRatioShift" + tag] = fmt(
+                    100.0 * ((p256 / t256) / (p64 / t64) - 1.0), 1)
+        rows = _grid_rows(g, "model_0.25", 12.0)[0]
+        m["GridInputPath"] = fmt(100.0 * (rows["e_native"] / rows["e64"] - 1.0), 1)
+        m["GridInputPathAbs"] = fmt(rows["e_native"])
+
+    c = _ci_load()
+    if c is not None:
+        by = {r["tag"]: r for r in c["rows"]}
+        m["CIBoot"] = "%d" % int(c["nboot"])
+        r = by.get("main_fno_a025")
+        if r:
+            m["CIPlatLo"], m["CIPlatHi"] = fmt(r["e_plat_lo"]), fmt(r["e_plat_hi"])
+            m["CIInLo"], m["CIInHi"] = fmt(r["e_in_lo"], 4), fmt(r["e_in_hi"], 4)
+            m["CIJumpLo"], m["CIJumpHi"] = fmt(r["r_lo"], 2), fmt(r["r_hi"], 2)
+            m["CIOnsetShare"] = "%d" % round(
+                100 * max(r["onset_dist"].values()))
+        u = by.get("base_unet_a025")
+        if u:
+            m["CIUnetJumpLo"] = fmt(u["r_lo"], 2)
+            m["CIUnetJumpHi"] = fmt(u["r_hi"], 2)
+            m["CIUnetOnset"] = fmt(u["onset"], 2)
+        b = by.get("ba_fno_a025_m8")
+        if b:
+            m["CIInTwoLo"], m["CIInTwoHi"] = fmt(b["e_in_lo"], 4), fmt(b["e_in_hi"], 4)
+            m["CIPlatTwoLo"] = fmt(b["e_plat_lo"])
+            m["CIPlatTwoHi"] = fmt(b["e_plat_hi"])
+            m["CIJumpTwoLo"] = fmt(b["r_lo"], 2)
+            m["CIJumpTwoHi"] = fmt(b["r_hi"], 2)
+
+        # Plateau relative to its own baseline: point value and interval for the
+        # reference arm, and the widest interval across all arms as a share of
+        # its point value.  This is the scalar the interpretation rests on, so
+        # it is the one whose interval has to be quoted rather than implied.
+        if r and r.get("ratio") is not None:
+            m["CIRatioMid"] = fmt(r["ratio"], 3)
+            m["CIRatioLo"] = fmt(r["ratio_lo"], 3)
+            m["CIRatioHi"] = fmt(r["ratio_hi"], 3)
+        # Tightness is claimed only for the arms whose numerator is of the same
+        # order as its denominator.  The head-plus-residual arm has a plateau of
+        # 0.026 against a baseline of 0.93, so its ratio is dominated by the
+        # denominator and pairing has almost nothing to cancel there: quoting
+        # one number for all nine arms would hide a 1.1x against a 40x.
+        hw = [0.5 * (x["ratio_hi"] - x["ratio_lo"]) / x["ratio"]
+              for x in c["rows"] if x.get("ratio") and x["ratio"] > 0.5]
+        if hw:
+            m["CIRatioMaxHalf"] = fmt(100 * max(hw), 1)
+        hr = [x for x in c["rows"] if x.get("ratio") and x["ratio"] <= 0.5]
+        if hr:
+            x = hr[0]
+            m["CIRatioResidHalf"] = fmt(
+                50 * (x["ratio_hi"] - x["ratio_lo"]) / x["ratio"], 0)
+
+    return ["\\newcommand{\\%s}{%s}" % (k, m.get(k, "--")) for k in keys]
+
+
+def table_gridthree(cap):
+    """Three-grid convergence, and the plateau against a refined target."""
+    g = _gridthree_load()
+    if g is None:
+        return ""
+    t = ("\\begin{table}[t]\n\\centering\n\\caption{%s}\n"
+         "\\label{tab:gridthree}\n\\small\n"
+         "\\setlength{\\tabcolsep}{4.6pt}\n"
+         "\\begin{tabular}{lrrrrrr}\n\\toprule\n"
+         "\\multicolumn{7}{c}{\\textbf{(a) reference-solution convergence, "
+         "$\\delta$ between adjacent grids}}\\\\\n\\midrule\n"
+         " & \\multicolumn{3}{c}{$v_{\\max}=0.25$} & "
+         "\\multicolumn{3}{c}{$v_{\\max}=1.00$}\\\\\n"
+         "\\cmidrule(lr){2-4}\\cmidrule(lr){5-7}\n"
+         "$f$ & $\\delta_{64\\to128}$ & $\\delta_{128\\to256}$ & $p$ & "
+         "$\\delta_{64\\to128}$ & $\\delta_{128\\to256}$ & $p$\\\\\n"
+         "\\midrule\n" % cap["gridthree"])
+    for r0, r1 in zip(_grid_rows(g, "ref_0.25"), _grid_rows(g, "ref_1.00")):
+        t += ("$%g$ & %s & %s & %s & %s & %s & %s\\\\\n"
+              % (r0["f"], fmt(r0["d64v128"]), fmt(r0["d128v256"]), fmt(r0["p"], 2),
+                 fmt(r1["d64v128"]), fmt(r1["d128v256"]), fmt(r1["p"], 2)))
+    t += ("\\bottomrule\n\\end{tabular}\n\n\\vspace{6pt}\n\n"
+          "\\begin{tabular}{llrrrr}\n\\toprule\n"
+          "\\multicolumn{6}{c}{\\textbf{(b) FNO error against the same prediction "
+          "scored on three targets, $v_{\\max}=0.25$}}\\\\\n\\midrule\n"
+          "$f$ & target & $\\varepsilon$ & $\\varepsilon_{\\mathrm{triv}}$ & "
+          "$\\varepsilon/\\varepsilon_{\\mathrm{triv}}$ & $\\sqrt{\\varepsilon^2"
+          "+\\delta_{64\\to256}^2}$ \\\\\n\\midrule\n")
+    for r, a in zip(_grid_rows(g, "model_0.25"), _grid_rows(g, "ref_0.25")):
+        quad = float(np.hypot(r["e64"], a["d64v256"]))
+        for lab, e, b in (("$64^2$", r["e64"], r["b64"]),
+                          ("$128^2$", r["e128"], r["b128"]),
+                          ("$256^2$", r["e256"], r["b256"])):
+            q = fmt(quad) if lab == "$64^2$" else ""
+            t += ("$%g$ & %s & %s & %s & %s & %s\\\\\n"
+                  % (r["f"], lab, fmt(e), fmt(b), fmt(e / b), q))
+        t += "\\midrule\n"
+    # the loop closes each frequency block with a rule; the last one is
+    # immediately followed by \bottomrule and would print two rules in a row
+    while t.endswith("\\midrule\n"):
+        t = t[:-len("\\midrule\n")]
+    return t + "\\bottomrule\n\\end{tabular}\n\\end{table}\n"
+
+
+def _loc_load():
+    p = os.path.join(C.RES, "locators.json")
+    if not os.path.exists(p):
+        return None
+    return json.load(open(p, encoding="utf-8"))
+
+
+def _loc_span(vals):
+    """Spread of a locator across the rungs that have a value."""
+    v = [x for x in vals if x is not None]
+    return (max(v) - min(v)) if len(v) > 1 else 0.0
+
+
+def loc_macros():
+    """Prose macros for the three-locator recomputation.
+
+    The point of this block is that the three locators are NOT the same number
+    on the reference arm (4.50, 4.25, [4.00,4.25]), yet each of them is
+    constant across the capacity and data ladders.  So the ladder conclusion is
+    locator-invariant even though the locators are not interchangeable, and
+    both halves have to be said.
+    """
+    d = _loc_load()
+    if d is None:
+        return []
+    m = {}
+    L = d["ladders"]
+    ref = [r for r in L["band"]["rows"] if r["label"].startswith("[1,4]")]
+    if ref:
+        r = ref[0]
+        m["LocRefFstar"] = fmt(r["fstar"], 2)
+        m["LocRefOnset"] = fmt(r["onset"], 2)
+        if r["step"]:
+            # A macro carrying `--` must never be used inside $...$: in math
+            # mode it typesets as two minus signs, so a range reads as
+            # "4.00 - -4.25".  The endpoints are therefore exported separately
+            # and the dash is written in text mode at the point of use.
+            m["LocRefStepLo"] = fmt(r["step"][0], 2)
+            m["LocRefStepHi"] = fmt(r["step"][1], 2)
+    # mode ladder: f* fires only where the in-band floor is low enough
+    md = L["mode"]["rows"]
+    fired = [r for r in md if r["fstar"] is not None]
+    silent = [r for r in md if r["fstar"] is None]
+    if fired:
+        m["LocModeFstar"] = fmt(fired[0]["fstar"], 2)
+        m["LocModeFstarSpread"] = fmt(_loc_span([r["fstar"] for r in fired]), 2)
+    m["LocModeSilent"] = str(len(silent))
+    m["LocModeRungs"] = str(len(md))
+    ons = [r["onset"] for r in md if r["onset"] is not None]
+    if ons:
+        m["LocModeOnsetLo"] = fmt(min(ons), 2)
+        m["LocModeOnsetHi"] = fmt(max(ons), 2)
+    st = [r["step"] for r in md if r["step"]]
+    if st:
+        lo, hi = min(s[0] for s in st), max(s[1] for s in st)
+        m["LocModeStepLo"] = fmt(lo, 2)
+        m["LocModeStepHi"] = fmt(hi, 2)
+        m["LocModeStepSame"] = "1" if (len({(round(s[0], 2), round(s[1], 2))
+                                          for s in st}) == 1) else "0"
+    # capacity and data ladders: all three locators flat
+    for k, tag in (("cap", "Cap"), ("ndata", "Data")):
+        rows = L[k]["rows"]
+        m["Loc%sFstarSpread" % tag] = fmt(
+            _loc_span([r["fstar"] for r in rows]), 2)
+        m["Loc%sOnsetSpread" % tag] = fmt(
+            _loc_span([r["onset"] for r in rows]), 2)
+        nst = len({(round(s[0], 2), round(s[1], 2))
+                   for s in (r["step"] for r in rows) if s})
+        m["Loc%sStepVariants" % tag] = str(nst)
+        m["Loc%sSilent" % tag] = str(len([r for r in rows if r["fstar"] is None]))
+        ins = [r["inband"] for r in rows if r["inband"]]
+        if len(ins) > 1:
+            m["Loc%sInLo" % tag] = fmt(min(ins), 3)
+            m["Loc%sInHi" % tag] = fmt(max(ins), 3)
+            m["Loc%sInRatio" % tag] = fmt(max(ins) / min(ins), 1)
+    # band ladder: all three move, and the widest band has no out-of-band node
+    bd = L["band"]["rows"]
+    fs = [r["fstar"] for r in bd if r["fstar"] is not None]
+    on = [r["onset"] for r in bd if r["onset"] is not None]
+    if fs:
+        m["LocBandFstarLo"] = fmt(min(fs), 2)
+        m["LocBandFstarHi"] = fmt(max(fs), 2)
+        m["LocBandFstarSpread"] = fmt(max(fs) - min(fs), 2)
+    if on:
+        m["LocBandOnsetLo"] = fmt(min(on), 2)
+        m["LocBandOnsetHi"] = fmt(max(on), 2)
+    md_ins = [r["inband"] for r in md if r["inband"]]
+    if len(md_ins) > 1:
+        m["LocModeInLo"] = fmt(min(md_ins), 3)
+        m["LocModeInHi"] = fmt(max(md_ins), 3)
+        m["LocModeInRatio"] = fmt(max(md_ins) / min(md_ins), 1)
+    # the widest band: the grid lies inside the trained band, so no locator exists
+    off = [r for r in bd if r["fstar"] is None and r["onset"] is None
+           and r["step"] is None]
+    m["LocOffGridCount"] = str(len(off))
+    if off:
+        m["LocOffGridLabel"] = off[0]["label"].replace("[", "[").replace("]", "]")
+    return ["\\newcommand{\\%s}{%s}" % (k, v) for k, v in sorted(m.items())]
+
+
+def table_locators(cap):
+    """Every rung of every control ladder, scored by all three locators.
+
+    Each control section defines its own boundary locator where it is used, so
+    the same paper compares an f*-shift for the mode budget against a
+    step-shift for capacity.  This table removes the ambiguity by computing all
+    three on all rungs from the archived per-seed curves: the locators disagree
+    on their absolute value, and agree that capacity and data do not move the
+    boundary.
+    """
+    d = _loc_load()
+    if d is None:
+        return ""
+    t = ("\\begin{table}[t]\n\\centering\n\\caption{%s}\n\\label{tab:locators}\n"
+         "\\footnotesize\n\\setlength{\\tabcolsep}{3.6pt}\n"
+         "\\begin{tabular}{llcccc}\n\\toprule\n"
+         "ladder & rung & $f^{\\star}$ & onset & largest step & "
+         "$\\varepsilon_{\\mathrm{in}}$\\\\\n\\midrule\n" % cap["locators"])
+    head = {"mode": "mode budget $M$",
+            "cap": "capacity",
+            "ndata": "training samples",
+            "band": "training band"}
+    for k in ("mode", "cap", "ndata", "band"):
+        rows = d["ladders"][k]["rows"]
+        t += ("\\multicolumn{6}{l}{\\emph{%s}}\\\\\n" % head[k])
+        for r in rows:
+            st = ("n/a" if r["step"] is None
+                  else "%.2f--%.2f" % (r["step"][0], r["step"][1]))
+            t += (" & \\quad %s & %s & %s & %s & %s\\\\\n"
+                  % (r["label"],
+                     "n/a" if r["fstar"] is None else "%.2f" % r["fstar"],
+                     "n/a" if r["onset"] is None else "%.2f" % r["onset"],
+                     st,
+                     "n/a" if r["inband"] is None else "%.3f" % r["inband"]))
+        if k != "band":
+            t += "\\midrule\n"
+    return t + ("\\bottomrule\n\\end{tabular}\n\\end{table}\n")
+
+
+def table_ci(cap):
+    """The four headline scalars with media-resampling intervals.
+
+    The last column is the plateau relative to its own trivial baseline.  It is
+    the quantity the paper's interpretation actually uses, so it cannot be the
+    one column without an interval; the denominator comes from
+    `baseline_paired.py`, i.e. from the evaluation media themselves, and the
+    bootstrap resamples one index for numerator and denominator.  That is why
+    its interval is an order of magnitude narrower than the marginal intervals
+    of the two components: the media-difficulty component is common to both and
+    cancels in the ratio.
+    """
+    c = _ci_load()
+    if c is None:
+        return ""
+    # \scriptsize, not \footnotesize: this is the densest table in the paper
+    # (7 columns, 4 of them carrying "est [lo, hi]" bootstrap intervals).  At
+    # \footnotesize the tabular overflows the 470.6pt text block by 26.7pt;
+    # shrinking the font keeps every digit at full precision instead of
+    # rounding the intervals away.  The sparse tables (5-8 plain columns) are
+    # \footnotesize; this one earns the smaller size by its column count.
+    t = ("\\begin{table}[t]\n\\centering\n\\caption{%s}\n\\label{tab:ci}\n"
+         "\\scriptsize\n\\setlength{\\tabcolsep}{3.0pt}\n"
+         "\\begin{tabular}{llccccc}\n\\toprule\n"
+         "predictor & $v_{\\max}$ & $\\varepsilon_{\\mathrm{in}}$ & "
+         "$\\varepsilon_{\\infty}$ & $r$ & "
+         "\\shortstack{$\\varepsilon_{\\infty}/$\\\\"
+         "$\\varepsilon^{\\mathrm{triv}}_{\\infty}$} & "
+         "onset\\\\\n\\midrule\n"
+         % cap["ci"])
+    order = ["main_fno_a005", "main_fno_a010", "main_fno_a025",
+             "main_fno_a050", "main_fno_a100",
+             "base_unet_a025", "base_unet_a100", "pmatch_unet_a025",
+             "ba_fno_a025_m8"]
+    name = {"main_fno": "FNO", "base_unet": "U-Net", "pmatch_unet": "U-Net (m)",
+            "ba_fno": "head + residual"}
+    by = {r["tag"]: r for r in c["rows"]}
+    for tag in order:
+        r = by.get(tag)
+        if r is None:
+            continue
+        fam = tag.rsplit("_a", 1)[0]
+        on = "%.2f" % r["onset"]
+        if abs(r["onset_hi"] - r["onset_lo"]) > 1e-9:
+            on = "%.2f--%.2f" % (r["onset_lo"], r["onset_hi"])
+        if r.get("ratio") is not None:
+            rat = "%s [%s, %s]" % (fmt(r["ratio"], 3),
+                                   fmt(r["ratio_lo"], 3), fmt(r["ratio_hi"], 3))
+        else:
+            rat = "{--}"
+        t += ("%s & $%.2f$ & %s [%s, %s] & %s [%s, %s] & %s [%s, %s] & %s & "
+              "%s\\\\\n"
+              % (name.get(fam, fam), r["vmax"],
+                 fmt(r["e_in"], 4), fmt(r["e_in_lo"], 4), fmt(r["e_in_hi"], 4),
+                 fmt(r["e_plat"], 4), fmt(r["e_plat_lo"], 4),
+                 fmt(r["e_plat_hi"], 4),
+                 fmt(r["r"], 2), fmt(r["r_lo"], 2), fmt(r["r_hi"], 2),
+                 rat, on))
+        if tag == "main_fno_a100":
+            t += "\\midrule\n"
+    return t + "\\bottomrule\n\\end{tabular}\n\\end{table}\n"
+
+
+def _res_load():
+    p = os.path.join(C.RES, "res_study.json")
+    if not os.path.exists(p):
+        return None
+    return json.load(open(p, encoding="utf-8"))
+
+
+def _load_results(name):
+    """Any archive in results/, or None.  Keeps macro generation degradable."""
+    p = os.path.join(C.RES, name)
+    if not os.path.exists(p):
+        return None
+    try:
+        return json.load(open(p, encoding="utf-8"))
+    except Exception:
+        return None
+
+
+def _sci(x):
+    """Percentages that are numerically zero are printed as powers of ten.
+
+    The synthetic controls are band-limited by construction, so at the
+    operators' own mode budget their out-of-band fraction is ~1e-8 %; printing
+    that as a fixed-point number would either round it to 0.00 or print machine
+    dust.  A macro body is the same string in math or text mode, so it carries
+    the exponent explicitly and the prose wraps it in $...$.
+    """
+    if x == 0.0:
+        return "0"
+    if abs(x) >= 1e-4:
+        return "%.2f" % x
+    e = int(np.floor(np.log10(abs(x))))
+    mant = x / (10.0 ** e)
+    return "%.1f\\times10^{%d}" % (mant, e)
+
+
+def _loc_cell(v, nd=2):
+    return "n/a" if v is None else ("%%.%df" % nd) % v
+
+
+def _step_cell(v):
+    return "n/a" if v is None else "%.2f--%.2f" % (v[0], v[1])
+
+
+def res_macros():
+    """Prose macros for the resolution study.
+
+    Two of the four contributions carry the same obligation -- show that the
+    reported boundary is a property of the problem and not of the mesh -- and
+    this block is the single machine-readable source for every number the text
+    quotes about it.  Coarse is 64^2 (the grid every other table uses), Fine is
+    128^2 (the retrained arm).
+    """
+    d = _res_load()
+    if d is None:
+        return []
+    m = {}
+    A = d.get("part_a", {}).get("grids", {})
+    B = d.get("part_b", {}).get("grids", {})
+    Cc = d.get("part_c", {}).get("grids", {})
+    coarse, fine = "64", "128"
+    if coarse in A and fine in A:
+        a, b = A[coarse], A[fine]
+        m["ResFstarCoarse"] = _loc_cell(a["fstar"])
+        m["ResFstarFine"] = _loc_cell(b["fstar"])
+        m["ResOnsetCoarse"] = _loc_cell(a["onset"])
+        m["ResOnsetFine"] = _loc_cell(b["onset"])
+        m["ResStepCoarseLo"] = "%.2f" % a["step"][0] if a["step"] else "n/a"
+        m["ResStepCoarseHi"] = "%.2f" % a["step"][1] if a["step"] else "n/a"
+        m["ResStepFineLo"] = "%.2f" % b["step"][0] if b["step"] else "n/a"
+        m["ResStepFineHi"] = "%.2f" % b["step"][1] if b["step"] else "n/a"
+        m["ResJumpCoarse"] = "%.2f" % a["jump"]
+        m["ResJumpFine"] = "%.2f" % b["jump"]
+        m["ResJumpDevPct"] = "%.1f" % (100.0 * abs(b["jump"] - a["jump"]) / a["jump"])
+        m["ResPlatCoarse"] = "%.3f" % a["plateau"]
+        m["ResPlatFine"] = "%.3f" % b["plateau"]
+        m["ResInCoarse"] = "%.3f" % a["in_band"]
+        m["ResInFine"] = "%.3f" % b["in_band"]
+        if a.get("val") and b.get("val"):
+            m["ResValCoarse"] = "%.4f" % a["val"][0]
+            m["ResValFine"] = "%.4f" % b["val"][0]
+        # the per-seed locator values are what turn "the boundary did not move"
+        # into "it did not move by more than the seed spread"
+        fs = [v for v in (b.get("fstar_seeds") or []) if v is not None]
+        if fs:
+            m["ResFstarSeedLo"] = "%.2f" % min(fs)
+            m["ResFstarSeedHi"] = "%.2f" % max(fs)
+        js = b.get("jump_seeds") or []
+        if js:
+            m["ResJumpSeedLo"] = "%.2f" % min(js)
+            m["ResJumpSeedHi"] = "%.2f" % max(js)
+        # The coarse arm's own spread, and the gap between the two arms' seed
+        # ranges.  Sign is the point: a positive gap means every refined seed
+        # sits above every coarse seed, so the shift is systematic and quoting
+        # it as "inside the seed spread" would be true of the magnitude and
+        # false of the structure.  The prose reads this macro, not its own
+        # arithmetic.
+        acs = a.get("jump_seeds") or []
+        if acs and js:
+            m["ResJumpCoarseSeedLo"] = "%.2f" % min(acs)
+            m["ResJumpCoarseSeedHi"] = "%.2f" % max(acs)
+            m["ResJumpGap"] = "%.2f" % (min(js) - max(acs))
+        for nm, blk in (("Coarse", a), ("Fine", b)):
+            vs = blk.get("val") or []
+            if vs:
+                m["ResVal%sLo" % nm] = "%.4f" % min(vs)
+                m["ResVal%sHi" % nm] = "%.4f" % max(vs)
+        m["ResPlatDevPct"] = ("%.2f" % (100.0 * abs(b["plateau"] - a["plateau"])
+                                        / max(a["plateau"], 1e-30)))
+        m["ResInDevPct"] = ("%.1f" % (100.0 * abs(b["in_band"] - a["in_band"])
+                                      / max(a["in_band"], 1e-30)))
+        m["ResGridN"] = str(len(A))
+        m["ResSeeds"] = str(len(b.get("val") or []))
+        # observed shift, in units of the test grid step that resolves the edge
+        if a["fstar"] is not None and b["fstar"] is not None:
+            m["ResFstarShift"] = "%.2f" % abs(b["fstar"] - a["fstar"])
+    if coarse in B and fine in B:
+        a, b = B[coarse], B[fine]
+        m["ResPairFstarCoarse"] = _loc_cell(a["fstar"])
+        m["ResPairFstarFine"] = _loc_cell(b["fstar"])
+        m["ResPairJumpCoarse"] = "%.2f" % a["jump"]
+        m["ResPairJumpFine"] = "%.2f" % b["jump"]
+        m["ResPairJumpDevPct"] = ("%.1f" % (100.0 * abs(b["jump"] - a["jump"])
+                                            / max(a["jump"], 1e-30)))
+        m["ResPairPlatCoarse"] = "%.3f" % a["plateau"]
+        m["ResPairPlatFine"] = "%.3f" % b["plateau"]
+        m["ResPairOnsetCoarse"] = _loc_cell(a["onset"])
+        m["ResPairOnsetFine"] = _loc_cell(b["onset"])
+    if coarse in Cc and fine in Cc:
+        a, b = Cc[coarse]["family"], Cc[fine]["family"]
+        for tag, blk, pre in (("Coarse", a, "C"), ("Fine", b, "F")):
+            m["ResGeoFstar%s" % tag] = _loc_cell(blk["real"]["fstar"])
+            m["ResGeoSynFstar%s" % tag] = _loc_cell(blk["synthetic"]["fstar"])
+            m["ResGeoJump%s" % tag] = "%.2f" % blk["real"]["jump"]
+            m["ResGeoSynJump%s" % tag] = "%.2f" % blk["synthetic"]["jump"]
+            m["ResGeoPlat%sLo" % tag] = "%.3f" % blk["real"]["plateau5_lo"]
+            m["ResGeoPlat%sHi" % tag] = "%.3f" % blk["real"]["plateau5_hi"]
+            m["ResGeoSynPlat%sLo" % tag] = "%.3f" % blk["synthetic"]["plateau5_lo"]
+            m["ResGeoSynPlat%sHi" % tag] = "%.3f" % blk["synthetic"]["plateau5_hi"]
+        # How far apart the two families are at each grid, measured as the gap
+        # between the highest geological window and the lowest synthetic
+        # control.  Negative means the ranges interpenetrate.  Both grids are
+        # emitted because the paper's claim is asymmetric between them and the
+        # prose must quote this number instead of asserting separation.
+        for tag, key in (("Coarse", coarse), ("Fine", fine)):
+            blk = Cc[key]["family"]
+            m["ResGeoPlatGap%s" % tag] = "%.3f" % (blk["synthetic"]["plateau5_lo"]
+                                                   - blk["real"]["plateau5_hi"])
+        m["ResGeoJumpDevPct"] = ("%.1f" % (100.0 * abs(b["real"]["jump"] - a["real"]["jump"])
+                                           / max(a["real"]["jump"], 1e-30)))
+        m["ResGeoSynJumpDevPct"] = ("%.1f" % (100.0 * abs(b["synthetic"]["jump"]
+                                                          - a["synthetic"]["jump"])
+                                              / max(a["synthetic"]["jump"], 1e-30)))
+        # the band fraction is stated at the network's own mode budget
+        mb = "20"
+        names = ("west", "centre", "east")
+        pg = Cc[fine].get("per_geometry", {})
+        if all(("geo_%s" % w) in pg and ("syn_%d" % s) in pg
+               for w in names for s in (0,)):
+            geo = [pg["geo_%s" % w] for w in names]
+            syn = [pg["syn_%d" % s] for s in range(3)]
+            if all(mb in g["bands"] for g in geo + syn):
+                m["ResBandGeoFinePct"] = "%.2f" % (100.0 * np.mean([g["bands"][mb] for g in geo]))
+                m["ResBandSynFinePct"] = _sci(100.0 * np.mean([g["bands"][mb] for g in syn]))
+                # No ratio macro: at the operators' own mode budget the control
+                # fields are band-limited and carry ~1e-9 %, so a ratio would
+                # divide by numerical dust and print a number in the 1e8 range.
+                # The two percentages are the honest form of the same statement.
+                m["ResBandMode"] = str(mb)
+        if coarse in Cc:
+            p0 = Cc[coarse].get("per_geometry", {})
+            if all(("geo_%s" % w) in p0 and ("syn_%d" % s) in p0
+                   for w in names for s in (0,)):
+                geo0 = [p0["geo_%s" % w] for w in names]
+                syn0 = [p0["syn_%d" % s] for s in range(3)]
+                if all(mb in g["bands"] for g in geo0 + syn0):
+                    m["ResBandGeoCoarsePct"] = "%.2f" % (100.0 * np.mean([g["bands"][mb] for g in geo0]))
+                    m["ResBandSynCoarsePct"] = _sci(100.0 * np.mean([g["bands"][mb] for g in syn0]))
+                    # the windows' own fraction is not mesh-invariant; the
+                    # coarse windows are area-averaged, which removes exactly
+                    # the modes being counted
+                    m["ResBandGeoDevPct"] = "%.0f" % (100.0 * abs(
+                        np.mean([g["bands"][mb] for g in geo])
+                        - np.mean([g["bands"][mb] for g in geo0]))
+                        / max(np.mean([g["bands"][mb] for g in geo0]), 1e-30))
+
+    # ---------------------------------------------------------------- (v22)
+    # Paired intervals on the two readings that were quoted as point values,
+    # and the spectrum-matched control that separates spectral content from
+    # geological structure.  Every number is computed by code/p0_checks.py and
+    # code/geo_windows.py from archived per-seed and per-window curves.
+    pc = _load_results("p0_checks.json") or {}
+    ga = pc.get("grid", {}).get("part_a", {})
+    jp = ga.get("jump")
+    if jp:
+        m["ResJumpPairedT"] = "%.2f" % jp["t"]
+        m["ResJumpPairedP"] = "%.3f" % jp["p"]
+        m["ResJumpPairedLo"] = "%+.2f" % jp["ci"][0]
+        m["ResJumpPairedHi"] = "%+.2f" % jp["ci"][1]
+    pp = ga.get("plateau5")
+    if pp:
+        m["ResPlatPairedP"] = "%.2f" % pp["p"]
+
+    # window-level spread of the Marmousi jump, which is the quantity that
+    # explains why three windows cannot order two families
+    mm = pc.get("marmousi", {})
+    for tag, key in (("Coarse", "64"), ("Fine", "128")):
+        rec = mm.get(key, {}).get("jump")
+        if not rec:
+            continue
+        m["GeoJumpDiff%s" % tag] = "%.3f" % abs(rec["diff"])
+        m["GeoJumpP%s" % tag] = "%.3f" % rec["p"]
+        m["GeoJumpCILo%s" % tag] = "%+.3f" % rec["ci"][0]
+        m["GeoJumpCIHi%s" % tag] = "%+.3f" % rec["ci"][1]
+        rv = np.asarray(rec.get("real") or [], float)
+        if rv.size > 1:
+            m["ResJumpWindowSpread"] = "%.0f" % (100.0 * (rv.max() - rv.min())
+                                                 / rv.mean())
+
+    sg = pc.get("surrogate", {})
+    for tag, key in (("", "64"), ("Fine", "128")):
+        s = sg.get(key)
+        if not s:
+            continue
+        for pre, name in (("Jump", "jump_all"), ("Plat", "plateau5_all")):
+            v = s.get(name)
+            if not v:
+                continue
+            fmt = "%.2f" if pre == "Jump" else "%.3f"
+            m["GeoSur%sReal%s" % (pre, tag)] = fmt % v["a"]
+            m["GeoSur%sSur%s" % (pre, tag)] = fmt % v["b"]
+            m["GeoSur%sDelta%s" % (pre, tag)] = "%.3f" % abs(v["diff"])
+            # signed interval, because a bound that crosses zero has to be read
+            # as crossing zero and printing |ci| would hide that.  The plateau
+            # interval is reported as a magnitude because its sign is fixed on
+            # both grids and the prose states the direction in words.
+            for side, val in (("Lo", v["ci"][0]), ("Hi", v["ci"][1])):
+                if pre == "Plat":
+                    val = abs(val)
+                sgn = "" if abs(val) < 5e-4 else ("+" if val > 0 else "-")
+                m["GeoSur%s%s%s" % (pre, side, tag)] = sgn + ("%.3f" % abs(val))
+            if pre == "Plat":
+                lo, hi = sorted([abs(v["ci"][0]), abs(v["ci"][1])])
+                m["GeoSurPlatLo%s" % tag] = "%.3f" % lo
+                m["GeoSurPlatHi%s" % tag] = "%.3f" % hi
+            m["GeoSur%sP%s" % (pre, tag)] = "%.3f" % v["p"]
+            m["GeoSur%sDevPct%s" % (pre, tag)] = "%.1f" % (
+                100.0 * abs(v["diff"]) / max(abs(v["a"]), 1e-30))
+        m["GeoSurWinN"] = str(s.get("n_windows"))
+        m["GeoSurGradRatio%s" % tag] = "%.2f" % s.get("grad_l1_ratio", float("nan"))
+        if s.get("band_match_max_dev"):
+            m["GeoSurBandDevPct%s" % tag] = "%.0f" % (100.0 * s["band_match_max_dev"])
+            m["GeoSurBandMedPct%s" % tag] = "%.1f" % (100.0 * s["band_match_med_dev"])
+        no = s.get("jump_nonoverlap")
+        if no:
+            m["GeoSurJumpNonOverP%s" % tag] = "%.2f" % no["p"]
+
+    bc = _load_results("bound_cross.json") or {}
+    if bc.get("n"):
+        m["GridBoundN"] = str(int(bc["n"]))
+    for row in bc.get("rows", []):
+        tag = "Ffour" if int(row["f"]) == 4 else "Ffive"
+        m["GridBoundEps%s" % tag] = "%.3f" % row["e64"]
+        m["GridBoundEpsSame%s" % tag] = "%.3f" % row["e64_same_denom"]
+        m["GridBoundDelta%s" % tag] = "%.3f" % row["delta"]
+        m["GridBoundErr%s" % tag] = "%.3f" % row["e256"]
+        m["GridBoundSame%s" % tag] = "%.3f" % row["bound_same_denom"]
+        m["GridBoundMixed%s" % tag] = "%.3f" % row["bound_mixed_denom"]
+        if row.get("bound_aggregate") is not None:
+            m["GridBoundAgg%s" % tag] = "%.3f" % row["bound_aggregate"]
+            m["GridBoundAggRatio%s" % tag] = "%.3f" % row["ratio_aggregate"]
+        m["GridBoundRatio%s" % tag] = "%.3f" % row["ratio_same"]
+        m["GridBoundCos%s" % tag] = "%+.3f" % row["cos_mean"]
+        # the pointwise half of the story: a mean that satisfies the bound while
+        # half the samples violate it must be reported as an RMS relation, so the
+        # violation rate and the worst case are macros, not prose.
+        if row.get("viol_same") is not None:
+            m["GridBoundViolPct%s" % tag] = "%.0f" % (100.0 * row["viol_same"])
+            m["GridBoundRatioMax%s" % tag] = "%.2f" % row["ratio_max_same"]
+        if row.get("cos_sd") is not None:
+            m["GridBoundCosSd%s" % tag] = "%.2f" % row["cos_sd"]
+        if row.get("cos_negative_frac") is not None:
+            m["GridBoundCosNegPct%s" % tag] = "%.0f" % (
+                100.0 * row["cos_negative_frac"])
+        if row.get("e256"):
+            m["GridBoundMarginPct%s" % tag] = "%.1f" % (
+                100.0 * (row["bound_same_denom"] / row["e256"] - 1.0))
+
+    return ["\\newcommand{\\%s}{%s}" % (k, v) for k, v in sorted(m.items())]
+
+
+def table_res(cap):
+    """The resolution check in one place: is the boundary a property of the mesh?
+
+    Four blocks.  (a) native protocol at both grids -- each model fed the media
+    it was trained on; (b) the paired-continuum control, where the media are
+    drawn once at 128^2 and block-averaged to 64^2, so the two models see the
+    same continuum object and only the mesh differs; (c) and (d) the Marmousi
+    windows and their synthetic control, recomputed at both grids by one code
+    path.  Every row is scored by the same three locators as
+    Table~\ref{tab:locators}, so a "no shift" statement here is the same
+    statement that table makes about the control ladders.
+    """
+    d = _res_load()
+    if d is None:
+        return ""
+    t = ("\\begin{table}[t]\n\\centering\n\\caption{%s}\n\\label{tab:res}\n"
+         "\\footnotesize\n\\setlength{\\tabcolsep}{4pt}\n"
+         "\\begin{tabular}{lcccccc}\n\\toprule\n"
+         "grid & $f^{\\star}$ & onset & largest step & jump & "
+         "$\\varepsilon_{\\mathrm{in}}$ & $\\varepsilon_{\\infty}$\\\\\n"
+         "\\midrule\n" % cap["res"])
+
+    def row(gridn, lb, pkey="plateau"):
+        """One row.  `pkey` selects the plateau averaging window, and it is not
+        cosmetic: block (a)/(b) must quote the same plateau as Table main
+        (mean over $f>5$, i.e. the plateau proper), while (c)/(d) must quote
+        the same plateau as Table realgeo (mean over $f\\ge5$), which is the
+        only convention that table was ever generated under.  Printing one
+        window in both places would put two numbers for one quantity in the
+        paper; printing both without saying so would be worse."""
+        return ("%s & %s & %s & %s & %.2f & %.3f & %.3f\\\\\n"
+                % (gridn, _loc_cell(lb["fstar"]), _loc_cell(lb["onset"]),
+                   _step_cell(lb["step"]), lb["jump"], lb["in_band"],
+                   lb.get(pkey) if lb.get(pkey) is not None else lb["plateau"]))
+
+    blocks = (("a", "(a) synthetic, native protocol", "synthetic"),
+              ("b", "(b) synthetic, paired continuum", "synthetic"),
+              ("c", "(c) Marmousi windows", "real"),
+              ("c", "(d) synthetic control", "synthetic"))
+    grids = (("64", "$64^{2}$"), ("128", "$128^{2}$"))
+    for tag, head, famkey in blocks:
+        blk = d.get("part_%s" % tag, {})
+        t += "\\multicolumn{7}{l}{\\emph{%s}}\\\\\n" % head
+        for gkey, glab in grids:
+            if famkey == "synthetic" and tag == "c":
+                fam = blk.get("grids", {}).get(gkey, {}).get("family", {}).get("synthetic")
+                lb = None if not fam else dict(
+                    fstar=fam["fstar"], onset=None, step=None, jump=fam["jump"],
+                    in_band=fam["in_band"], plateau=fam["plateau"],
+                    plateau5=fam.get("plateau5"))
+            elif famkey == "real":
+                fam = blk.get("grids", {}).get(gkey, {}).get("family", {}).get("real")
+                lb = None if not fam else dict(
+                    fstar=fam["fstar"], onset=None, step=None, jump=fam["jump"],
+                    in_band=fam["in_band"], plateau=fam["plateau"],
+                    plateau5=fam.get("plateau5"))
+            else:
+                lb = blk.get("grids", {}).get(gkey)
+            if lb is not None:
+                t += row(glab, lb, pkey=("plateau5" if tag == "c" else "plateau"))
+        t += "\\midrule\n"
+    while t.endswith("\\midrule\n"):
+        t = t[:-len("\\midrule\n")]
+    # The averaging windows are a note about the column, not part of the
+    # grid, so it goes *under* the tabular: inside a p{} multicolumn it
+    # stretches the seven columns to the full text width and the numbers
+    # end up scattered across the page (rendered and checked, page 12).
+    return (t + "\\bottomrule\n\\end{tabular}\n"
+            "\\par\\vspace{2pt}\\parbox{\\linewidth}{\\scriptsize %s}\n"
+            "\\end{table}\n" % (cap["res_note"]))
+
+
+def bax_macros():
+    """(v23) The fit-depth/sum-depth defect and the corrected arms.
+
+    Sources: results/ls_head_alone.json (three head variants, formal
+    protocol), results/proj_precheck.json (residual-projection probes),
+    results/bax_read.json (corrected arms + paired tests + verdicts), and
+    results/ba2_frz_read.json is NOT used -- the baf arms were trained on the
+    defective head and are diagnostics, quoted only through the re-scored
+    archives if at all.
+    """
+    keys = [
+        # head alone, three variants, at the arm's own contrast
+        "HeadTruncPlatMid", "HeadFullPlatMid", "HeadShallowPlatMid",
+        "HeadTruncPlatStrong", "HeadFullPlatStrong", "HeadShallowPlatStrong",
+        "HeadTruncInMid", "HeadFullInMid",
+        "HeadTruncInStrong", "HeadFullInStrong",
+        # residual-projection probes (as-trained arm, projections only)
+        "ProjPlatLoMid", "ProjPlatHiMid",
+        # corrected arms
+        "BaxInMid", "BaxPlatMid", "BaxInStrong", "BaxPlatStrong",
+        "BaxPlatRatioMid", "BaxPlatRatioStrong", "BaxOverHeadMid",
+        "BaxOverHeadStrong", "BaxInWorsePctStrong",
+        # paired tests bax vs trained FNO
+        "BaxVsMainInPMid", "BaxVsMainInLoMid", "BaxVsMainInHiMid",
+        "BaxVsMainPlatPMid", "BaxVsMainPlatLoMid", "BaxVsMainPlatHiMid",
+        "BaxVsMainInPStrong", "BaxVsMainInLoStrong", "BaxVsMainInHiStrong",
+        "BaxVsMainPlatPStrong", "BaxVsMainPlatLoStrong",
+        "BaxVsMainPlatHiStrong",
+        # pre-registered verdicts, as words
+        "BaxVerdictMid", "BaxVerdictStrong",
+        "RunInMid", "RunPlatMid", "RunInStrong", "RunPlatStrong",
+    ]
+    out = []
+    ls = _load_results("ls_head_alone.json")
+    bx = _load_results("bax_read.json")
+    pp = _load_results("proj_precheck.json")
+    m = {}
+    if ls:
+        for tag, vk in (("0.50", "Mid"), ("1.00", "Strong")):
+            v = ls["arms"][tag]["variants"]
+            own = tag  # the arm's own contrast row
+            rows = lambda sw: sw[own]
+            # the paper's plateau convention: mean over f >= 6, never the
+            # worst point f = 5 on its own -- same as bax_read.py
+            plat = lambda sw: float(np.mean([r["mean"] for r in rows(sw)
+                                             if r["f"] >= 6.0]))
+            inb = lambda sw: float(np.mean([r["mean"] for r in rows(sw)
+                                            if r["f"] <= 4.0]))
+            m["HeadTruncPlat" + vk] = fmt(plat(v["truncated"]))
+            m["HeadFullPlat" + vk] = fmt(plat(v["full"]))
+            m["HeadShallowPlat" + vk] = fmt(plat(v["shallow"]))
+            m["HeadTruncIn" + vk] = fmt(inb(v["truncated"]))
+            m["HeadFullIn" + vk] = fmt(inb(v["full"]))
+    if pp:
+        arm = pp.get("by_arm", {}).get("a050", {})
+        projs = [arm["R%s" % r]["plateau"] for r in ("0", "4", "5", "6", "8")
+                 if "R%s" % r in arm]
+        if projs:
+            m["ProjPlatLoMid"] = fmt(min(projs))
+            m["ProjPlatHiMid"] = fmt(max(projs))
+    # the arms AS RUN, under the truncated-head semantics they were scored
+    # with when the previous draft reported their boundary -- the backups are
+    # the only place those numbers still live
+    bdir = os.path.join(C.RES, "_archive_truncated_semantics")
+    for tag, m8, vk in (("a050", 8, "Mid"), ("a100", 7, "Strong")):
+        ibs, pls = [], []
+        for s in (0, 1, 2):
+            p = os.path.join(bdir, "eval_ba_fno_%s_m%d_s%d.json" %
+                             (tag, m8, s))
+            if not os.path.exists(p):
+                continue
+            d = json.load(open(p, encoding="utf-8"))
+            ib = next((r["mean"] for r in d["in_band"]
+                       if abs(r["vmax"] - float("0.50" if tag == "a050"
+                                                  else "1.00")) < 1e-6), None)
+            rows = d["sweep"]["%.2f" % float("0.50" if tag == "a050"
+                                             else "1.00")]
+            pls.append(float(np.mean([r["mean"] for r in rows
+                                      if r["f"] >= 6.0])))
+            if ib is not None:
+                ibs.append(float(ib))
+        if ibs:
+            m["RunIn" + vk] = fmt(float(np.mean(ibs)))
+        if pls:
+            m["RunPlat" + vk] = fmt(float(np.mean(pls)))
+    if bx:
+        for tag, vk in (("a050", "Mid"), ("a100", "Strong")):
+            rec = bx["arms"].get(tag)
+            if not rec:
+                continue
+            m["BaxIn" + vk] = fmt(rec["bax"]["in_band"])
+            m["BaxPlat" + vk] = fmt(rec["bax"]["plateau"])
+            m["BaxPlatRatio" + vk] = fmt(rec["plateau_over_main"], 2)
+            m["BaxOverHead" + vk] = fmt(rec["plateau_over_ls_full"], 2)
+            m["BaxVerdict" + vk] = rec["verdict"]
+            if vk == "Strong":
+                main_in = rec["main"]["in_band"]
+                m["BaxInWorsePctStrong"] = fmt(
+                    100.0 * (rec["bax"]["in_band"] - main_in) / main_in, 0)
+            t = rec.get("paired_bax_vs_main", {})
+            for what, pre in (("in_band", "In"), ("plateau", "Plat")):
+                s = t.get(what)
+                if s:
+                    m["BaxVsMain%sP%s" % (pre, vk)] = "%.3f" % s["p"]
+                    m["BaxVsMain%sLo%s" % (pre, vk)] = "%+.3g" % s["ci"][0]
+                    m["BaxVsMain%sHi%s" % (pre, vk)] = "%+.3g" % s["ci"][1]
+    for k in keys:
+        out.append("\\newcommand{\\%s}{%s}" % (k, m.get(k, "--")))
     return out
 
 
@@ -3131,6 +4361,8 @@ def build(lang):
     mac += "\n".join(banddown_macros(ev)) + "\n"
     mac += "\n".join(conv_macros()) + "\n"
     mac += "\n".join(plateau_macros(ev)) + "\n"
+    mac += "\n".join(res_macros()) + "\n"
+    mac += "\n".join(bax_macros()) + "\n"
     tabs = {
         "main": table_main(ev, arms, cap),
         "summary": s[0],
@@ -3148,6 +4380,11 @@ def build(lang):
         "c1": table_c1(cap),
         "disc": table_disc(cap),
         "anchor": table_anchor(cap),
+        "deep": table_deep(cap),
+        "gridthree": table_gridthree(cap),
+        "ci": table_ci(cap),
+        "locators": table_locators(cap),
+        "res": table_res(cap),
     }
     return mac, tabs
 
@@ -3192,7 +4429,8 @@ def main():
 
 TAB_ORDER = ("main", "summary", "banddown", "propnorm", "paired", "arch", "band",
              "mode", "data", "born", "cost", "realgeo", "arms", "c1", "disc",
-             "anchor")
+             "anchor", "deep", "gridthree", "ci",
+             "locators", "res")
 
 
 if __name__ == "__main__":

@@ -1,7 +1,42 @@
 # Author: Longgang Wang <longgangwang@163.com>
 # Affiliation: Luoyang Institute of Science and Technology, Luoyang 471000, Henan, China
 
-"""Paper figures (IEEE: vector PDF, Okabe-Ito, >=7pt)."""
+"""Paper figures -- design system v2.
+
+Rules every figure in the manuscript follows, and why each exists:
+
+1. TWO natural widths only.  FULL is the MDPI text block (16.6 cm = 470 pt);
+   HALF is a half column (8.1 cm).  A figure is emitted at its natural width
+   and included at \\textwidth (FULL) or 0.49\\textwidth (HALF) in BOTH
+   language versions, so the effective type size is identical in EN and CN
+   and equals the declared rcParams size.  The previous generation emitted
+   widths between 228 and 454 pt and included them at 0.52--1.0 \\textwidth,
+   which scaled the EN type down to ~6.5 pt (below print legibility) and the
+   CN type up to ~120% -- the two versions of one figure did not even agree
+   with each other.  code/fig_widths.py re-derives the inclusion widths from
+   the emitted MediaBoxes and asserts EN == CN, so this cannot drift again.
+
+2. ONE style registry (SERIES) per physical object.  A curve keeps its
+   colour and marker in every figure it appears in.  The earlier figures let
+   the same model be blue in one panel and vermilion in the next.
+
+3. DIRECT end labels.  Series are named at the right edge of the axes at the
+   height of their own curve.  In-panel legends are used only where end
+   labels would collide; they used to float over the data region and, in two
+   panels, over the band-edge rule they were meant to explain.
+
+4. ONE band convention.  The training band is shaded, its edge is a dotted
+   rule, and the shading is drawn by band() everywhere -- earlier figures
+   used a dotted line in some panels, a shaded span in others, and a pink
+   span in one.
+
+5. Decade ticks on log axes with the minor formatter suppressed; explicit
+   round ticks when the span is under two decades.
+
+6. Every curve is read from the JSON archives that also feed the tables and
+   the manuscript macros -- nothing is re-derived here, so a figure cannot
+   disagree with the number printed next to it.
+"""
 import os
 import re
 import sys
@@ -14,40 +49,56 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle, Patch
 from matplotlib.lines import Line2D
-from matplotlib.ticker import LogLocator, NullFormatter
+from matplotlib.ticker import LogLocator, NullFormatter, FixedLocator
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import common as C
 
+CM = 1.0 / 2.54
+FULL_W = 16.6 * CM          # MDPI text block, included at \textwidth
+HALF_W = 8.1 * CM           # half column, included at 0.49\textwidth
+
 OKABE = ["#000000", "#E69F00", "#56B4E9", "#009E73", "#0072B2", "#D55E00",
          "#CC79A7", "#999999"]
-MK = ["o", "s", "^", "v", "D", "P", "X", "*"]
+K, ORANGE, SKY, GREEN, BLUE, VERMILION, PINK, GREY = OKABE
+INK = "#222222"             # analytic references
+FAINT = "#8c8c8c"           # trivial baseline
+
+# ---- one style per physical object, shared by every figure -----------------
+SERIES = {
+    "FNO":              dict(c=BLUE,      m="o", ls="-"),
+    "U-Net (base)":     dict(c=ORANGE,    m="s", ls="-"),
+    "U-Net (matched)":  dict(c=GREEN,     m="^", ls="-"),
+    "DeepONet":         dict(c=PINK,      m="v", ls="-"),
+    "anchor":           dict(c=VERMILION, m="D", ls="-"),
+    "head":             dict(c=VERMILION, m="D", ls="-"),
+    "Born":             dict(c=INK,       m="",  ls="--"),
+    "trivial":          dict(c=FAINT,     m="",  ls=":"),
+}
+# local palettes for objects that live in a single figure
+ARMS5 = [ORANGE, SKY, GREEN, BLUE, VERMILION]           # contrast arms
+MODES6 = [GREY, ORANGE, SKY, GREEN, BLUE, VERMILION]    # retained-mode budgets
 
 
-def set_style(width="single"):
-    # The A4 single-column block is 21 - 2*2.2 = 16.6 cm = 6.53 in wide, so a
-    # figure declared "wide" must not exceed that or \includegraphics[width=
-    # \textwidth] silently scales the type down to ~7 pt and the labels stop
-    # being legible at print size.  A half-width single panel stays at 3.5 in.
-    w = 3.5 if width == "single" else 6.5
+def set_style():
     plt.rcParams.update({
         "pdf.fonttype": 42, "ps.fonttype": 42,
         "font.family": "serif", "font.serif": ["Times New Roman", "DejaVu Serif"],
         "mathtext.fontset": "stix",
-        "font.size": 9, "axes.labelsize": 10, "axes.titlesize": 10,
-        "legend.fontsize": 8, "xtick.labelsize": 8, "ytick.labelsize": 8,
-        "axes.linewidth": 0.8, "lines.linewidth": 1.5, "lines.markersize": 4.5,
+        "font.size": 9, "axes.labelsize": 9.5, "axes.titlesize": 9.5,
+        "legend.fontsize": 8, "xtick.labelsize": 8.5, "ytick.labelsize": 8.5,
+        "axes.linewidth": 0.8, "lines.linewidth": 1.4, "lines.markersize": 4.2,
         "xtick.direction": "in", "ytick.direction": "in",
         "xtick.major.width": 0.8, "ytick.major.width": 0.8,
-        "xtick.major.size": 3.5, "ytick.major.size": 3.5,
+        "xtick.major.size": 3.2, "ytick.major.size": 3.2,
         "legend.frameon": False, "savefig.dpi": 600, "figure.dpi": 150,
+        "axes.axisbelow": True, "axes.labelpad": 3.0,
     })
-    return w
 
 
 def save(fig, path):
-    fig.savefig(path + ".pdf", bbox_inches="tight", pad_inches=0.04)
-    fig.savefig(path + ".png", dpi=400, bbox_inches="tight", pad_inches=0.04)
+    fig.savefig(path + ".pdf", bbox_inches="tight", pad_inches=0.03)
+    fig.savefig(path + ".png", dpi=400, bbox_inches="tight", pad_inches=0.03)
     plt.close(fig)
     # Guard against a degenerate axis (e.g. a log scale fed an exact zero):
     # matplotlib happily emits a PDF thousands of points tall, and the failure
@@ -67,13 +118,13 @@ def save(fig, path):
     print("wrote", path + warn)
 
 
-def panel_label(ax, letter, text="", dy=-16, fontsize=8.5, weight="bold"):
+def panel_label(ax, letter, text="", dy=-13, fontsize=8.5, weight="bold"):
     """Put the sub-figure identifier (a)(b)... BELOW the panel (scientific
     convention) instead of as a top title, so it never sits on top of the data
     curves.  When the panel carries an x-axis label, the identifier is sunk
-    BELOW the whole xlabel band (tick labels + label text, ~14 pt extra), so
-    the two never share one horizontal line.  The decision is re-evaluated at
-    DRAW time, so the call order of panel_label()/set_xlabel() does not matter.
+    BELOW the whole xlabel band, so the two never share one horizontal line.
+    The decision is re-evaluated at DRAW time, so the call order of
+    panel_label()/set_xlabel() does not matter.
     """
     s = "(%s)" % letter if not text else "(%s) %s" % (letter, text)
     ann = ax.annotate(s, xy=(0.5, 0.0), xycoords="axes fraction",
@@ -82,7 +133,7 @@ def panel_label(ax, letter, text="", dy=-16, fontsize=8.5, weight="bold"):
                       fontweight=weight)
 
     def _sink(_evt=None):
-        off = dy - 14 if ax.get_xlabel().strip() else dy
+        off = dy - 13 if ax.get_xlabel().strip() else dy
         ann.set_position((0, off))
 
     _sink()
@@ -132,57 +183,153 @@ def mean_curve(evals, names, vmax):
 
 
 # ---------------------------------------------------------------------------
+# drawing primitives shared by every figure
+# ---------------------------------------------------------------------------
+def band(ax, lo=1.0, hi=4.0, shade=True, rule=True):
+    """The training band, drawn the same way in every figure."""
+    if shade:
+        ax.axvspan(lo, hi, color="#7a828c", alpha=0.12, lw=0, zorder=0)
+    if rule:
+        ax.axvline(hi, color=INK, lw=0.7, ls=(0, (1.1, 1.5)), zorder=1)
+
+
+def decades(ax, axis="y", numticks=4):
+    """Decade ticks only; minor labels suppressed (they collide in narrow
+    panels and interleave '6 x 10^-2' between round values)."""
+    a = ax.yaxis if axis == "y" else ax.xaxis
+    a.set_major_locator(LogLocator(base=10.0, numticks=numticks))
+    a.set_minor_formatter(NullFormatter())
+
+
+def round_ticks(ax, axis, ticks, labels=None):
+    a = ax.yaxis if axis == "y" else ax.xaxis
+    a.set_major_locator(FixedLocator(ticks))
+    if labels is not None:
+        a.set_ticklabels(labels)
+
+
+def despine(ax):
+    ax.spines[["top", "right"]].set_visible(False)
+
+
+def sweep_axis(ax, xlabel="frequency $f$"):
+    """Frequency axis common to every sweep panel."""
+    ax.set_xlabel(xlabel)
+    ax.set_xticks([2, 4, 6, 8, 10, 12])
+    ax.set_xlim(1, 12.2)
+    despine(ax)
+
+
+def end_labels(ax, entries, fs=7.4, dx=3.5, min_sep=9.5, bold=True,
+               side="right"):
+    """Direct series labels just outside an edge of the axes.
+
+    entries: [(y_data, text, colour), ...].  Labels are ordered by height and
+    nudged apart in DISPLAY points, so two curves that converge out of band
+    still get two readable labels.  The nudge moves the text, never the data.
+    side="left" places them at the left edge, which is the right choice when
+    the curves are separated where they enter the panel (a purchase curve)
+    and coincident where they leave it.
+    """
+    if not entries:
+        return
+    entries = sorted(entries, key=lambda e: e[0])
+    fig = ax.figure
+    fig.canvas.draw()
+    tr = ax.transData
+    inv = tr.inverted()
+    x0 = 0.0 if side == "left" else 1.0
+    sgn = -1.0 if side == "left" else 1.0
+    ys = [tr.transform((0.0, y))[1] for y, _, _ in entries]
+    # min_sep is specified in points (it must stay legible against the fs of
+    # the labels), but transData works in display pixels at the canvas dpi --
+    # comparing the two directly made every nudge a factor dpi/72 too small,
+    # which is how the stacked labels at a converging right edge kept
+    # overprinting each other.
+    sep_px = min_sep * fig.dpi / 72.0
+    for i in range(1, len(ys)):
+        if ys[i] - ys[i - 1] < sep_px:
+            ys[i] = ys[i - 1] + sep_px
+    for (y, text, col), yd in zip(entries, ys):
+        back = inv.transform((0.0, yd))[1]
+        ax.annotate(text, xy=(x0, back), xycoords=("axes fraction", "data"),
+                    xytext=(sgn * dx, 0), textcoords="offset points",
+                    fontsize=fs, color=col, va="center",
+                    ha="right" if side == "left" else "left",
+                    fontweight="bold" if bold else "normal",
+                    annotation_clip=False)
+
+
+def badge(ax, x, y, text, fs=7.0, ha="left", va="top", color="#333333"):
+    """Small note that stays legible over both ends of a colour map."""
+    ax.text(x, y, text, transform=ax.transAxes, fontsize=fs, ha=ha, va=va,
+            color=color, bbox=dict(facecolor="white", alpha=0.78,
+                                   edgecolor="none", pad=1.4))
+
+
+def ratio_arrow(ax, x, y0, y1, text, fs=7.6, color="#333333", side="right"):
+    """Vertical double arrow between two levels with the ratio beside it."""
+    ax.annotate("", xy=(x, y0), xytext=(x, y1),
+                arrowprops=dict(arrowstyle="<->", lw=0.8, color=color))
+    ymid = np.sqrt(y0 * y1) if (y0 > 0 and y1 > 0) else 0.5 * (y0 + y1)
+    dx = 4 if side == "right" else -4
+    ax.annotate(text, xy=(x, ymid), xytext=(dx, 0),
+                textcoords="offset points", fontsize=fs, va="center",
+                ha="left" if side == "right" else "right", color=color)
+
+
+def arm_names(ev, tag):
+    return sorted(n for n in ev if n.startswith("main_fno_%s_" % tag))
+
+
+def born_order1(d, vmax):
+    return np.array([r["mean"] for r in d["born_order1"]["%.2f" % vmax]])
+
+
+# ---------------------------------------------------------------------------
+# Figure 1 -- the paired benchmark: the cliff at five contrasts
+# ---------------------------------------------------------------------------
 def fig_main(evals, out):
     """Error vs frequency, one panel per contrast arm (FNO).
 
-    The y axis is shared.  The point of the strip is that the cliff sits at the
-    same frequency for every contrast while the plateau height moves by a factor
-    of nine, and a separate axis per panel would rescale that difference away.
+    The y axis is shared.  The point of the strip is that the cliff sits at
+    the same frequency for every contrast while the plateau height moves by a
+    factor of nine, and a separate axis per panel would rescale that
+    difference away.
     """
-    w = set_style("double")
+    set_style()
     arms = C.VMAX_LIST
-    fig, axes = plt.subplots(1, len(arms), figsize=(w, w * 0.30), sharey=True)
+    fig, axes = plt.subplots(1, len(arms), figsize=(FULL_W, FULL_W * 0.42),
+                             sharey=True, layout="constrained")
     for k, (ax, vmax) in enumerate(zip(axes, arms)):
         tag = "a%03d" % int(round(vmax * 100))
-        names = [n for n in evals if n.startswith("main_fno_%s_" % tag)]
+        names = arm_names(evals, tag)
         if not names:
             continue
-        F, M, S = mean_curve(evals, sorted(names), vmax)
-        ax.errorbar(F, M, yerr=S, color=OKABE[4], marker=MK[0], capsize=2,
-                    label="FNO", clip_on=False)
-        b1 = np.array([r["mean"] for r in evals[sorted(names)[0]]["born_order1"]["%.2f" % vmax]])
-        ax.plot(F, b1, color=OKABE[1], marker=MK[1], ls="--", lw=1.2,
-                label="Born $n{=}1$")
-        ax.axvspan(1.0, 4.0, color="#888888", alpha=0.13, lw=0)
-        ax.axvline(4.0, color="k", lw=0.8, ls=":")
+        F, M, S = mean_curve(evals, names, vmax)
+        b1 = born_order1(evals[names[0]], vmax)
+        ax.errorbar(F, M, yerr=S, color=BLUE, marker="o", ms=3.4, lw=1.2,
+                    capsize=1.6, clip_on=False, zorder=3)
+        ax.plot(F, b1, color=INK, lw=1.1, ls=(0, (4, 2)), clip_on=False,
+                zorder=2)
+        band(ax)
         ax.set_yscale("log")
         ax.set_ylim(0.008, 4.5)
-        # Narrow five-panel strip: matplotlib's default log locator labels every
-        # 1..9 mantissa, and in a panel this narrow the labels collide.  Decade
-        # ticks only.
-        ax.yaxis.set_major_locator(LogLocator(base=10.0, numticks=3))
-        ax.yaxis.set_minor_formatter(NullFormatter())
+        decades(ax, numticks=3)
+        sweep_axis(ax)
         panel_label(ax, "abcde"[k], r"$v_{\max}=%.2f$" % vmax)
-        ax.set_xlabel("frequency $f$")
-        ax.set_xticks([2, 4, 6, 8, 10, 12])
-        ax.set_xlim(1, 12.2)
-        ax.spines[["top", "right"]].set_visible(False)
         if k == 0:
             ax.set_ylabel(r"relative $L_2$ error")
         else:
-            # Setting the major locator on a shared axis re-enables its tick
-            # labels; they are turned off again here so the strip keeps a
-            # single y scale label on the left.
             ax.tick_params(labelleft=False)
-    # One legend above the strip: inside panel 0 it collides with the Born
-    # curve, which is exactly the thing panel 0 is there to show.
-    handles, labels = axes[0].get_legend_handles_labels()
-    if handles:
-        fig.legend(handles, labels, loc="lower center", ncol=len(handles),
-                   frameon=False, fontsize=8, bbox_to_anchor=(0.5, 1.005))
+    end_labels(axes[-1], [(float(M[-1]), "FNO", BLUE),
+                          (float(b1[-1]), r"Born $n{=}1$", INK)])
     save(fig, os.path.join(out, "fig_main_cliff"))
 
 
+# ---------------------------------------------------------------------------
+# Figure -- architecture families at matched budget
+# ---------------------------------------------------------------------------
 def fig_arch(evals, out):
     """Architecture comparison at both contrast levels, plus the normalised view.
 
@@ -196,50 +343,42 @@ def fig_arch(evals, out):
     decays smoothly never reaches it -- and that is a statement about shape that
     survives the plateau being lower.
     """
+    set_style()
     # Labels come from common.ARCH_GROUPS, the same single definition that
-    # fills Table III, so the legend and the table rows cannot disagree.
-    # The two U-Nets used to be orange and vermilion, which is a pair a reader
-    # cannot separate at 8 pt; base and matched are now orange and green.
-    styles = [(OKABE[4], MK[0], "-"), (OKABE[1], MK[1], "-"),
-              (OKABE[3], MK[2], "-"), (OKABE[6], MK[3], "-")]
-    series = [(p % "a025", p % "a100", lab, col, mk, ls)
-              for (p, lab), (col, mk, ls) in zip(C.ARCH_GROUPS, styles)]
-    w = set_style("double")
-    fig, axes = plt.subplots(1, 3, figsize=(w, w * 0.30), sharey=False)
+    # fills the architecture table, so the end labels and the table rows
+    # cannot disagree.
+    styles = [(BLUE, "o"), (ORANGE, "s"), (GREEN, "^"), (PINK, "v")]
+    series = [(p % "a025", p % "a100", lab, col, mk)
+              for (p, lab), (col, mk) in zip(C.ARCH_GROUPS, styles)]
+    fig, axes = plt.subplots(1, 3, figsize=(FULL_W, FULL_W * 0.40),
+                             layout="constrained")
     for k, (ax, vmax) in enumerate(zip(axes[:2], (0.25, 1.00))):
-        for pref0, pref1, lab, col, mk, ls in series:
+        for pref0, pref1, lab, col, mk in series:
             pref = pref0 if abs(vmax - 0.25) < 1e-9 else pref1
             names = sorted(n for n in evals if n.startswith(pref))
             if not names:
                 continue
             F, M, S = mean_curve(evals, names, vmax)
-            ax.errorbar(F, M, yerr=S, color=col, marker=mk, ls=ls, capsize=2,
-                        label=lab, clip_on=False)
-        ax.axvspan(1, 4, color="#888888", alpha=0.13, lw=0)
-        ax.axvline(4, color="k", lw=0.8, ls=":")
+            ax.errorbar(F, M, yerr=S, color=col, marker=mk, ms=3.0, lw=1.2,
+                        capsize=1.6, clip_on=False, zorder=3)
+        band(ax)
         ax.set_yscale("log")
-        # Same y range as Fig. 2, so the plateau heights of the two figures can
-        # be read against each other without a mental rescaling.  The lower
-        # limit catches the 1e-3 plateaus; the upper one catches the Born curve
-        # in the strong-contrast panel, which is the topmost point drawn here.
-        ax.set_ylim(0.008, 4.5)
-        ax.yaxis.set_major_locator(LogLocator(base=10.0, numticks=3))
-        ax.yaxis.set_minor_formatter(NullFormatter())
+        # Same y range as Fig. 1, so the plateau heights of the two figures can
+        # be read against each other without a mental rescaling.  The upper
+        # limit catches the strongest-contrast Born reference, which is the
+        # topmost point drawn here; an earlier cap clipped it out of frame.
+        ax.set_ylim(0.008, 9.0)
+        decades(ax, numticks=3)
+        sweep_axis(ax)
         panel_label(ax, "ab"[k], r"$v_{\max}=%.2f$" % vmax)
-        ax.set_xlabel("frequency $f$")
-        ax.set_xticks([2, 4, 6, 8, 10, 12])
-        ax.set_xlim(1, 12.2)
-        ax.spines[["top", "right"]].set_visible(False)
         if k == 0:
             ax.set_ylabel(r"relative $L_2$ error")
         else:
-            # sharey hides the labels by construction, but re-setting the major
-            # locator per axis brings them back; turn them off explicitly.
             ax.tick_params(labelleft=False)
 
     # ---- panel (c): each curve divided by its own plateau ------------------
     axn = axes[2]
-    for pref0, pref1, lab, col, mk, ls in series:
+    for pref0, pref1, lab, col, mk in series:
         names = sorted(n for n in evals if n.startswith(pref0))
         if not names:
             continue
@@ -247,70 +386,73 @@ def fig_arch(evals, out):
         pl = M[F >= 6.0]
         if not pl.size or pl.mean() <= 0:
             continue
-        axn.plot(F, M / pl.mean(), color=col, marker=mk, ls=ls, ms=3,
-                 lw=1.2, label=lab, clip_on=False)
-    axn.axhline(1.0, color="k", lw=0.8, ls=":")
-    axn.axvspan(1, 4, color="#888888", alpha=0.13, lw=0)
-    axn.axvline(4, color="k", lw=0.8, ls=":")
-    axn.set_ylim(0.0, 1.7)
+        axn.plot(F, M / pl.mean(), color=col, marker=mk, ms=2.6, lw=1.2,
+                 clip_on=False, zorder=3)
+    axn.axhline(1.0, color="#666666", lw=0.8, ls=(0, (1.1, 1.5)), zorder=1)
+    band(axn)
+    axn.set_ylim(0.0, 1.75)
     panel_label(axn, "c", r"$v_{\max}=0.25$, own plateau")
-    axn.set_xlabel("frequency $f$")
+    sweep_axis(axn)
     axn.set_ylabel(r"$\varepsilon(f)\,/\,\varepsilon_{\infty}$")
-    axn.set_xticks([2, 4, 6, 8, 10, 12])
-    axn.set_xlim(1, 12.2)
-    axn.spines[["top", "right"]].set_visible(False)
-    # Four long family names do not fit inside a 3.25 in panel, so the legend
-    # goes under the strip, where it also cannot be mistaken for a curve label.
-    handles, labels = axes[0].get_legend_handles_labels()
-    if handles:
-        fig.legend(handles, labels, loc="lower center", ncol=len(handles),
-                   frameon=False, fontsize=8, handlelength=2.0,
-                   columnspacing=1.6, bbox_to_anchor=(0.5, 1.02))
+    # The four families are separated at the right edge of every panel, so the
+    # legend row above the strip is replaced by direct labels -- one per panel
+    # would repeat four names three times, and one panel's labels would not
+    # name the curves drawn in the other two.
+    handles = [Line2D([], [], color=col, marker=mk, ls="-", lw=1.2, ms=3.0)
+               for _, _, _, col, mk in series]
+    labels = [lab for _, _, lab, _, _ in series]
+    fig.legend(handles, labels, loc="lower center", ncol=len(handles),
+               frameon=False, fontsize=8, handlelength=2.0,
+               columnspacing=1.8, bbox_to_anchor=(0.5, 1.01))
     save(fig, os.path.join(out, "fig_arch"))
 
 
+# ---------------------------------------------------------------------------
+# Figure -- training-band width: the gain sits just beyond the new edge
+# ---------------------------------------------------------------------------
 def fig_band(evals, out):
-    w = set_style("single")
-    fig, ax = plt.subplots(figsize=(w, w * 0.72))
-    specs = [("A025", "band_a025", 4.0, OKABE[0]), ("A025_b2", "band_b2", 2.0, OKABE[1]),
-             ("A025_b3", "band_b3", 3.0, OKABE[2]), ("A025_b6", "band_b6", 6.0, OKABE[3]),
-             ("A025_b12", "band_b12", 12.0, OKABE[5])]
+    set_style()
+    fig, ax = plt.subplots(figsize=(HALF_W, HALF_W * 0.92), layout="constrained")
+    specs = [("A025", "band_a025", 4.0, ARMS5[0]),
+             ("A025_b2", "band_b2", 2.0, ARMS5[1]),
+             ("A025_b3", "band_b3", 3.0, ARMS5[2]),
+             ("A025_b6", "band_b6", 6.0, ARMS5[3]),
+             ("A025_b12", "band_b12", 12.0, ARMS5[4])]
+    ends = []
     for lab, pref, fedge, col in specs:
         if pref == "band_a025":
-            names = sorted(n for n in evals if n.startswith("main_fno_a025"))
+            names = arm_names(evals, "a025")
         else:
             names = sorted(n for n in evals if n.startswith(pref))
         if not names:
             continue
         F, M, S = mean_curve(evals, names, 0.25)
-        ax.errorbar(F, M, yerr=S, color=col, marker=MK[0], capsize=2,
-                    label=r"train band $[1,%.0f]$" % fedge, clip_on=False)
-        # Each arm has its own training edge, so a single shared vertical line
-        # would mark only one of the five.  Marking the edge with a ring on the
-        # arm's own curve locates it without the five full-height dotted rules
-        # that used to cut the panel into six stripes.
+        ax.errorbar(F, M, yerr=S, color=col, marker="o", ms=3.2, lw=1.3,
+                    capsize=1.6, clip_on=False, zorder=3)
+        # Each arm has its own training edge, so a single shared vertical rule
+        # would mark only one of the five.  Marking the edge with a ring on
+        # the arm's own curve locates it without five full-height rules
+        # cutting the panel into stripes.
         k = int(np.argmin(np.abs(F - fedge)))
-        ax.plot([F[k]], [M[k]], marker="o", ms=9.5, mfc="none", mec=col,
-                mew=1.3, clip_on=False)
+        ax.plot([F[k]], [M[k]], marker="o", ms=9.0, mfc="none", mec=col,
+                mew=1.3, clip_on=False, zorder=4)
+        ends.append((float(M[-1]), r"train $[1,%.0f]$" % fedge, col))
+    band(ax)
     ax.set_yscale("log")
     ax.set_ylim(0.008, 4.5)
-    ax.yaxis.set_major_locator(LogLocator(base=10.0, numticks=3))
-    ax.yaxis.set_minor_formatter(NullFormatter())
-    ax.set_xlabel("frequency $f$")
+    decades(ax, numticks=3)
+    sweep_axis(ax)
     ax.set_ylabel(r"relative $L_2$ error")
-    ax.set_xticks([2, 4, 6, 8, 10, 12])
-    ax.set_xlim(1, 12.2)
-    ax.spines[["top", "right"]].set_visible(False)
-    ax.legend(fontsize=7, ncol=3, loc="upper center", bbox_to_anchor=(0.5, -0.16),
-              handlelength=1.6, columnspacing=1.2, labelspacing=0.3)
-    ax.text(0.985, 0.03, "ring: train band edge", transform=ax.transAxes,
-            fontsize=6.5, ha="right", va="bottom", color="#444444")
+    end_labels(ax, ends, fs=7.0, min_sep=10.5)
+    badge(ax, 0.985, 0.035, r"ring: train band edge", ha="right", va="bottom")
     save(fig, os.path.join(out, "fig_bandwidth"))
 
 
+# ---------------------------------------------------------------------------
+# Figure -- heat map over (retained modes M, frequency f)
+# ---------------------------------------------------------------------------
 def fig_mode_phase(evals, out, band_tag, train_edge, fname):
-    """Heatmap of test error over (mode budget M, frequency f)."""
-    w = set_style("single")
+    set_style()
     # M = 32 is deliberately excluded: on the 64x64 grid it spans every
     # representable mode, so its band-limitation bound is vacuous.
     modes = [2, 4, 8, 12, 20, 24]
@@ -332,112 +474,139 @@ def fig_mode_phase(evals, out, band_tag, train_edge, fname):
                 Mat[i, j] = m_[k[0]]
     if np.all(np.isnan(Mat)):
         print("no mode sweep data"); return
-    fig, ax = plt.subplots(figsize=(w, w * 0.72))
+    # Half a column is too narrow for a 6 x 15 matrix with the values printed
+    # in every cell: at the old 8.1 cm natural width a 5.8 pt value sat inside
+    # an ~10 pt cell.  The figure is emitted wider instead, and fig_widths
+    # derives the larger inclusion fraction from the MediaBox, so the 1:1
+    # type-size rule still holds.
+    fig, ax = plt.subplots(figsize=(10.4 * CM, 10.4 * CM * 0.62),
+                           layout="constrained")
     vmax_c = np.nanmax(Mat)
     im = ax.imshow(Mat, cmap="viridis", aspect="auto", origin="lower",
                    vmin=np.nanmin(Mat), vmax=vmax_c)
+    # Cell borders: without them adjacent cells of similar value merge into
+    # one blotch and the M direction of the map stops being readable.
+    ax.set_xticks(np.arange(-0.5, len(F), 1), minor=True)
+    ax.set_yticks(np.arange(-0.5, len(modes), 1), minor=True)
+    ax.grid(which="minor", color="w", lw=0.5)
+    ax.tick_params(which="minor", length=0)
     ax.set_xticks(range(len(F)))
-    ax.set_xticklabels(["%.1f" % f for f in F], rotation=60, ha="right", fontsize=6.5)
+    ax.set_xticklabels(["%.2g" % f for f in F], rotation=45, ha="right",
+                       fontsize=7)
     ax.set_yticks(range(len(modes)))
     ax.set_yticklabels([str(m) for m in modes])
-    ax.set_xlabel("frequency $f$"), ax.set_ylabel("retained modes $M$")
+    ax.set_xlabel("frequency $f$")
+    ax.set_ylabel("retained modes $M$")
     xb = np.searchsorted(F, train_edge - 1e-9)
-    ax.axvline(xb - 0.5, color="w", lw=1.2, ls="--")
+    ax.axvline(xb - 0.5, color="w", lw=1.2, ls=(0, (4, 2)))
     # Above the axes, not inside: rotated inside, the label sat on top of the
     # cell annotations it is there to help read.
     ax.annotate("training edge", xy=(xb - 0.5, 1.0),
                 xycoords=("data", "axes fraction"),
                 xytext=(0, 3), textcoords="offset points",
-                ha="center", va="bottom", fontsize=6.5, color="#333333",
+                ha="center", va="bottom", fontsize=7, color="#333333",
                 annotation_clip=False)
     for i, m in enumerate(modes):
         for j in range(len(F)):
             if np.isnan(Mat[i, j]):
                 continue
-            ax.text(j, i, "%.2f" % Mat[i, j], ha="center", va="center", fontsize=5.6,
+            ax.text(j, i, "%.2f" % Mat[i, j], ha="center", va="center",
+                    fontsize=7.0,
                     color="k" if Mat[i, j] > 0.5 * vmax_c else "w")
     cb = fig.colorbar(im, ax=ax, fraction=0.046, pad=0.03)
     cb.outline.set_linewidth(0.5)
-    cb.ax.tick_params(labelsize=7)
+    cb.ax.tick_params(labelsize=7.5)
+    cb.set_label(r"relative $L_2$ error", fontsize=7.5)
     save(fig, os.path.join(out, fname))
 
 
+# ---------------------------------------------------------------------------
+# Figure -- onset collapse: the rise begins at the same relative frequency
+# ---------------------------------------------------------------------------
 def fig_scaling(evals, out):
     """Where the rise starts, and how far past the plateau it goes.
 
-    Dividing each arm by its own plateau removes the contrast dependence of the
-    height by construction, so the collapse that survives is a statement about
-    the *onset*: the rise begins at the same relative frequency for every
-    contrast.  It is deliberately not drawn as a collapse onto one step -- the
-    high-contrast arms overshoot their plateau at f/f_train ~ 1.25 and relax back
-    by ~1.75, and an axis that stops just above 1.0 (as this one used to) renders
-    the overshoot outside the frame, where it reads as noise rather than as the
-    non-monotonicity it is.
+    Dividing each arm by its own plateau removes the contrast dependence of
+    the height by construction, so the collapse that survives is a statement
+    about the *onset*: the rise begins at the same relative frequency for
+    every contrast.  It is deliberately not drawn as a collapse onto one step
+    -- the high-contrast arms overshoot their plateau at f/f_train ~ 1.25 and
+    relax back by ~1.75, and an axis that stops just above 1.0 (as this one
+    used to) renders the overshoot outside the frame, where it reads as noise
+    rather than as the non-monotonicity it is.
     """
-    w = set_style("single")
-    fig, ax = plt.subplots(figsize=(w, w * 0.76))
-    stats = {}
+    set_style()
+    fig, ax = plt.subplots(figsize=(HALF_W, HALF_W * 0.95), layout="constrained")
     for i, vmax in enumerate(C.VMAX_LIST):
         tag = "a%03d" % int(round(vmax * 100))
-        names = sorted(n for n in evals if n.startswith("main_fno_%s_" % tag))
+        names = arm_names(evals, tag)
         if not names:
             continue
         F, M, S = mean_curve(evals, names, vmax)
         plateau = float(M[F >= 6].mean())
-        e4 = float(M[np.isclose(F, 4.0)][0])
-        m = F >= 2.0
-        top = float(np.max(M[m] / plateau))
-        ax.plot(F[m] / 4.0, M[m] / plateau, color=OKABE[i], marker=MK[i],
-                ms=3.2, lw=1.4, label=r"$v_{\max}=%.2f$" % vmax, clip_on=False)
-        stats[vmax] = dict(edge_ratio=e4 / plateau, plateau=plateau,
-                           overshoot=top)
-    ax.axvspan(0.25, 1.0, color="#888888", alpha=0.13, lw=0)
-    ax.axvline(1.0, color="k", lw=0.8, ls=":")
-    ax.axhline(1.0, color="#666666", lw=0.8, ls="-", zorder=0)
+        ax.plot(F / 4.0, M / plateau, color=ARMS5[i], marker="o", ms=3.0,
+                lw=1.3, clip_on=False, zorder=3,
+                label=r"$v_{\max}=%.2f$" % vmax)
+    ax.axvspan(0.25, 1.0, color="#7a828c", alpha=0.12, lw=0, zorder=0)
+    ax.axvline(1.0, color=INK, lw=0.7, ls=(0, (1.1, 1.5)), zorder=1)
+    ax.axhline(1.0, color="#666666", lw=0.8, ls=(0, (1.1, 1.5)), zorder=1)
     ax.set_xscale("log")
     ax.set_xlim(0.4, 3.2)
-    # Headroom for the overshoot.  The previous cap of 1.25 sat below the peak of
-    # three of the five arms.
+    # Plain tick labels: the default log formatter printed "4 x 10^-1" and
+    # "2 x 10^0" under an axis that spans barely one decade.
+    ax.set_xticks([0.5, 1, 1.5, 2, 3])
+    ax.set_xticklabels(["0.5", "1", "1.5", "2", "3"])
+    # The minor locator still labels 4e-1 and 6e-1 in mantissa notation on
+    # top of the plain ticks unless it is silenced explicitly.
+    ax.xaxis.set_minor_formatter(NullFormatter())
+    # Headroom for the overshoot.  The previous cap of 1.25 sat below the peak
+    # of three of the five arms.
     ax.set_ylim(0.0, 1.7)
     ax.set_xlabel(r"relative frequency $f/f_{\mathrm{train}}$")
     ax.set_ylabel(r"$\varepsilon(f)/\varepsilon_{\infty}$")
-    ax.spines[["top", "right"]].set_visible(False)
-    ax.legend(fontsize=6.5, ncol=2, loc="lower right", handlelength=1.5,
-              columnspacing=0.9, labelspacing=0.25)
+    despine(ax)
+    # All five curves converge to the same plateau, so right-edge direct
+    # labels stacked on one point collided; the region below the plateau on
+    # the right is empty, which is where the legend goes instead.
+    ax.legend(fontsize=7.0, loc="lower right", frameon=False,
+              handlelength=1.6, labelspacing=0.32)
     save(fig, os.path.join(out, "fig_scaling"))
-    return stats
+    return {}
 
 
+# ---------------------------------------------------------------------------
+# Figure -- out-of-band energy fraction per retained-mode budget
+# ---------------------------------------------------------------------------
 def fig_spectrum(out):
+    set_style()
     p = os.path.join(C.RES, "spectrum.json")
     if not os.path.exists(p):
         print("no spectrum.json"); return
     d = json.load(open(p, encoding="utf-8"))
     modes = d["modes"]; F = d["f"]
-    w = set_style("single")
-    fig, ax = plt.subplots(figsize=(w, w * 0.72))
-    # M = 32 is excluded for the same reason as in fig_mode_phase: on the 64x64
-    # grid it spans every representable mode, so delta_32 == 0 identically and a
-    # log axis has nothing to display.  The floor below is a rendering guard
-    # only -- it never bites for a non-vacuous budget.
+    fig, ax = plt.subplots(figsize=(HALF_W, HALF_W * 0.92), layout="constrained")
+    # M = 32 is excluded for the same reason as in the mode heat map: on the
+    # 64x64 grid it spans every representable mode, so delta_32 == 0
+    # identically and a log axis has nothing to display.  The floor below is
+    # a rendering guard only -- it never bites for a non-vacuous budget.
     shown = [2, 4, 8, 12, 20, 24]
+    ends = []
     for i, M in enumerate(shown):
         y = np.maximum(np.array([d["data"]["0.25"]["f=%g" % f]["psi"][str(M)]
                                  for f in F], dtype=float), 1e-6)
-        ax.semilogy(F, y, color=OKABE[i], marker=MK[i], label=r"$M=%d$" % M,
-                    clip_on=False)
-    ax.set_xlabel("frequency $f$")
-    ax.set_ylabel("out-of-band energy fraction $\\delta_M$")
-    ax.axvspan(1.0, 4.0, color="#888888", alpha=0.13, lw=0)
-    ax.axvline(4.0, color="k", lw=0.8, ls=":")
-    ax.set_xticks([2, 4, 6, 8, 10, 12])
-    ax.set_xlim(1, 12.2)
-    ax.spines[["top", "right"]].set_visible(False)
-    ax.legend(fontsize=7, ncol=3, loc="upper center", bbox_to_anchor=(0.5, -0.17),
-              handlelength=1.6, columnspacing=1.1, labelspacing=0.3)
+        ax.semilogy(F, y, color=MODES6[i], marker="o", ms=2.8, lw=1.2,
+                    clip_on=False, zorder=3)
+        ends.append((float(y[-1]), r"$M=%d$" % M, MODES6[i]))
+    band(ax)
+    sweep_axis(ax)
+    ax.set_ylabel("out-of-band energy fraction $\delta_M$")
+    end_labels(ax, ends, fs=7.0, min_sep=10.5)
     save(fig, os.path.join(out, "fig_spectrum"))
 
 
+# ---------------------------------------------------------------------------
+# Figure (SI) -- field panels: reference, prediction, corrections
+# ---------------------------------------------------------------------------
 def fig_fields(out, device=None):
     """Reference, prediction, and the two corrections, in and out of band.
 
@@ -445,19 +614,23 @@ def fig_fields(out, device=None):
     one.  A plateau at the incident-field baseline can come from a correction
     that has collapsed toward zero or from one that is present but
     phase-incoherent; comparing |u_hat| against |u| on a SHARED colour scale
-    separates them by eye, which the pointwise error panel it replaced could not.
+    separates them by eye, which the pointwise error panel it replaced could
+    not.
+
+    Forced onto the CPU: the figure needs four forward passes of a 64x64 FNO,
+    which is seconds of CPU work, and allocating a CUDA context here would
+    evict a concurrent training job from the only GPU.
     """
     import torch
     import physics as P
     import data as D
-    if device is None:
-        device = "cuda" if torch.cuda.is_available() else "cpu"
+    device = "cpu"
     ck = os.path.join(C.RUNS, "main_fno_a025_s0", "checkpoint.pt")
     if not os.path.exists(ck):
         print("no ckpt for fields"); return
     from evaluate import load_model
     model, _ = load_model(ck, device)
-    w = set_style("double")
+    set_style()
     freqs = [1.5, 4.0, 6.0, 12.0]
     n = 4
 
@@ -467,8 +640,8 @@ def fig_fields(out, device=None):
     # a field that is uniformly right.
     got = []
     for f in freqs:
-        d = D.sample_batch(n, 60000, device, vmax_lo=0.25, vmax_hi=0.25, f_fixed=f,
-                           return_info=True)
+        d = D.sample_batch(n, 60000, device, vmax_lo=0.25, vmax_hi=0.25,
+                           f_fixed=f, return_info=True)
         psi = d["psi"][0].cpu().numpy()
         x, psi_inc = build_in(C.N, d["k"], d["theta"], d["v"], device)
         with torch.no_grad():
@@ -493,10 +666,8 @@ def fig_fields(out, device=None):
     # imshow, so the figure has to be tall enough for four of them; the previous
     # three-row height would have shrunk the panels until the labels were
     # unreadable at print size.
-    fig, axes = plt.subplots(4, len(freqs), figsize=(w, w * 0.80))
-    # Tighten the gaps between the four frequency columns and the four rows:
-    # the earlier default spacing left the middle sub-plots too far apart.
-    fig.subplots_adjust(wspace=0.05, hspace=0.05, right=0.86)
+    fig, axes = plt.subplots(4, len(freqs), figsize=(FULL_W, FULL_W * 0.80))
+    fig.subplots_adjust(wspace=0.05, hspace=0.05, right=0.87)
     rows = [("reference $\\psi$", "RdBu_r", v_field, -v_field, lambda g: g[1].real),
             ("FNO $\\hat\\psi$", "RdBu_r", v_field, -v_field, lambda g: g[2].real),
             ("pred. corr. $|\\hat u|$", "magma", v_corr, 0.0,
@@ -504,15 +675,16 @@ def fig_fields(out, device=None):
             ("true corr. $|u|$", "magma", v_corr, 0.0, lambda g: np.abs(g[4]))]
     for j, g in enumerate(got):
         f = g[0]
-        band = "in band" if f <= 4.0 else "out of band"
+        band_tag = "in band" if f <= 4.0 else "out of band"
         for r, (ttl, cmap, vmax_c, vmin_c, pick) in enumerate(rows):
             ax = axes[r, j]
-            ax.imshow(pick(g), cmap=cmap, vmin=vmin_c, vmax=vmax_c, origin="lower")
+            ax.imshow(pick(g), cmap=cmap, vmin=vmin_c, vmax=vmax_c,
+                      origin="lower")
             ax.set_xticks([]); ax.set_yticks([])
             for s in ax.spines.values():
                 s.set_linewidth(0.6)
             if r == 0:
-                ax.set_title(r"$f=%.1f$ (%s)" % (f, band), fontsize=8)
+                ax.set_title(r"$f=%.1f$ (%s)" % (f, band_tag), fontsize=8)
             if j == 0:
                 ax.set_ylabel(ttl, fontsize=8)
             # Per-panel metric stamp in the top-right corner, the way the
@@ -530,7 +702,7 @@ def fig_fields(out, device=None):
                 stamp = None
             if stamp:
                 ax.text(0.97, 0.97, stamp, transform=ax.transAxes,
-                        ha="right", va="top", fontsize=6.5,
+                        ha="right", va="top", fontsize=6.8,
                         bbox=dict(facecolor="white", alpha=0.75,
                                   edgecolor="none", pad=1.2))
     # One colourbar per physical quantity, not per panel and not per row: the
@@ -543,11 +715,14 @@ def fig_fields(out, device=None):
                           ax=list(axes[rr, :].ravel()),
                           fraction=0.030, pad=0.012)
         cb.outline.set_linewidth(0.5)
-        cb.ax.tick_params(labelsize=7)
+        cb.ax.tick_params(labelsize=7.5)
         cb.set_label(lab, fontsize=7.5, labelpad=2)
     save(fig, os.path.join(out, "fig_fields"))
 
 
+# ---------------------------------------------------------------------------
+# Figure -- measured error against the two reference scales
+# ---------------------------------------------------------------------------
 def fig_bound(evals, out):
     """Measured error against two reference scales, and why only one applies.
 
@@ -565,6 +740,7 @@ def fig_bound(evals, out):
     (P_M u_theta - P_M u) is in band and (P_M u - u) is out of band, so the two
     are orthogonal and the residual is at least as large as the second.
     """
+    set_style()
     p = os.path.join(C.RES, "spectrum.json")
     if not os.path.exists(p):
         print("no spectrum.json"); return
@@ -573,10 +749,10 @@ def fig_bound(evals, out):
     spec = d["data"]["0.25"]
     rows = [spec["f=%g" % f] for f in F]
     have_u = "u_out_rel" in rows[0]
-    cols = ["#666666", OKABE[1], OKABE[2], OKABE[3], OKABE[4], OKABE[5]]
+    cols = MODES6
     budgets = [2, 4, 8, 12, 20, 24]
-    w = set_style("double")
-    fig, axes = plt.subplots(1, 2, figsize=(w, w * 0.40), sharex=True)
+    fig, axes = plt.subplots(1, 2, figsize=(FULL_W, FULL_W * 0.42),
+                             sharex=True, layout="constrained")
     any_ = False
     for col, Mb in zip(cols, budgets):
         key = str(Mb)
@@ -594,20 +770,16 @@ def fig_bound(evals, out):
         if names:
             Fv, Mv, Sv = mean_curve(evals, names, 0.25)
             for ax in axes:
-                ax.errorbar(Fv, Mv, yerr=Sv, color=col, marker=MK[0], ls="-",
-                            ms=2.8, lw=1.0, capsize=1.2, clip_on=False)
+                ax.errorbar(Fv, Mv, yerr=Sv, color=col, marker="o", ms=2.8,
+                            lw=1.1, capsize=1.2, clip_on=False, zorder=3)
             any_ = True
     for ax in axes:
-        ax.axvspan(1.0, 4.0, color="#888888", alpha=0.13, lw=0)
-        ax.axvline(4.0, color="k", lw=0.8, ls=":")
+        band(ax)
         ax.set_yscale("log")
         ax.set_xlim(1, 12.3)
-        ax.set_xticks([2, 4, 6, 8, 10, 12])
-        ax.set_xlabel("frequency $f$")
-        ax.set_ylabel(r"relative $L_2$ error", fontsize=8.5)
-        ax.spines[["top", "right"]].set_visible(False)
-        ax.yaxis.set_major_locator(LogLocator(base=10.0, numticks=4))
-        ax.yaxis.set_minor_formatter(NullFormatter())
+        sweep_axis(ax)
+        ax.set_ylabel(r"relative $L_2$ error")
+        decades(ax, numticks=4)
     axes[0].set_ylim(0.03, 5.0)
     panel_label(axes[0], "a", fontsize=8)
     axes[1].set_ylim(1e-5, 3.0)
@@ -615,53 +787,52 @@ def fig_bound(evals, out):
     if any_:
         h, l = [], []
         for col, Mb in zip(cols, budgets):
-            h.append(Line2D([], [], color=col, marker=MK[0], ls="-", lw=1.0,
+            h.append(Line2D([], [], color=col, marker="o", ls="-", lw=1.1,
                             ms=2.8))
             l.append(r"$M=%d$" % Mb)
         h.append(Line2D([], [], color="k", ls="-", lw=1.3))
         l.append("measured error")
         # Seven entries in one row.  Legend entries for the dashed and dotted
         # reference curves are deliberately absent: each belongs to one panel
-        # only, so it is named in that panel's title instead of in a legend that
-        # would imply it appears in both.
-        # The family/reference legend sits at the TOP: the (a)/(b) descriptors
-        # now live below the panels, so a bottom legend would collide with them.
-        fig.legend(h, l, fontsize=7, ncol=7, loc="upper center",
-                   bbox_to_anchor=(0.5, 1.02), handlelength=1.6,
-                   columnspacing=1.0, labelspacing=0.3)
-    fig.tight_layout()
+        # only, so it is named in that panel's caption instead of in a legend
+        # that would imply it appears in both.
+        fig.legend(h, l, fontsize=7.5, ncol=7, loc="lower center",
+                   bbox_to_anchor=(0.5, 1.005), handlelength=1.7,
+                   columnspacing=1.1, labelspacing=0.3)
     save(fig, os.path.join(out, "fig_bound"))
 
 
+# ---------------------------------------------------------------------------
+# Figure -- solver validation: dense cross-check and the freezing ablation
+# ---------------------------------------------------------------------------
 def fig_solver(out):
-    """Solver validation: dense cross-check and the freezing ablation."""
+    set_style()
     p = os.path.join(C.RES, "solver_fig.json")
     if not os.path.exists(p):
         print("no solver_fig.json"); return
     d = json.load(open(p, encoding="utf-8"))
-    w = set_style("double")
-    fig, axes = plt.subplots(1, 2, figsize=(w, w * 0.32))
+    fig, axes = plt.subplots(1, 2, figsize=(FULL_W, FULL_W * 0.42),
+                             layout="constrained")
 
     # (a) dense direct solve vs batched Bi-CGSTAB on a 10x10 grid
     ax = axes[0]
     diffs = np.array(d["dense"]["diffs"])
     x = np.arange(1, len(diffs) + 1)
-    ax.bar(x, diffs, color=OKABE[4], width=0.62)
-    ax.axhline(1e-12, color=OKABE[5], ls="--", lw=1.0)
+    ax.bar(x, diffs, color=BLUE, width=0.62, zorder=3)
+    ax.axhline(1e-12, color=VERMILION, ls="--", lw=1.0, zorder=2)
     ax.set_yscale("log")
     ax.set_ylim(max(1e-15, diffs.min() / 3), max(1e-11, diffs.max() * 3))
     ax.set_xticks(x)
     ax.set_xlabel("test medium")
     ax.set_ylabel(r"rel. difference vs dense solve")
+    decades(ax, numticks=6)
     v = d["dense"]["max_diff"]
     e = int(np.floor(np.log10(v)))
     m = v / (10.0 ** e)
-    ax.text(0.97, 0.93, r"max $=%.1f\times10^{%d}$" % (m, e),
-            transform=ax.transAxes, ha="right", va="top", fontsize=8)
-    ax.text(0.97, 0.80, r"$10^{-12}$ ref.", transform=ax.transAxes,
-            ha="right", va="top", fontsize=7, color=OKABE[5])
-    ax.set_title("(a) $10\\times10$ grid, dense cross-check", fontsize=8.5)
-    ax.spines[["top", "right"]].set_visible(False)
+    badge(ax, 0.97, 0.94, r"max $=%.1f\times10^{%d}$" % (m, e), ha="right")
+    badge(ax, 0.97, 0.80, r"$10^{-12}$ ref.", ha="right", color=VERMILION)
+    panel_label(ax, "a", r"$10\times10$ grid, dense cross-check")
+    despine(ax)
 
     # (b) freezing ablation: three implementations of the shared loop
     ax = axes[1]
@@ -673,48 +844,45 @@ def fig_solver(out):
     sil = np.array([100.0 * c["silent"] / c["n"] for c in conds])
     # "silent" is a subset of "naive" (the corrupted labels the in-loop check
     # cannot see), so it is drawn as a narrower bar on top of the plain-loop
-    # bar instead of beside it.  Both used to be shades of red, which made the
-    # containment -- the whole point of the panel -- invisible.
-    ax.bar(idx, naive, width=0.66, color=OKABE[5], alpha=0.45,
+    # bar instead of beside it.  Both used to be shades of red, which made
+    # the containment -- the whole point of the panel -- invisible.
+    ax.bar(idx, naive, width=0.66, color=VERMILION, alpha=0.45, zorder=3,
            label="unfrozen (plain loop)")
-    ax.bar(idx, sil, width=0.32, color=OKABE[6],
+    ax.bar(idx, sil, width=0.32, color=PINK, zorder=4,
            label="of which silent to the in-loop check")
-    ax.axhline(0.0, color=OKABE[3], lw=2.2)
-    ax.plot([], [], color=OKABE[3], lw=2.2, label="frozen (both variants)")
+    ax.axhline(0.0, color=GREEN, lw=2.2, zorder=2)
+    ax.plot([], [], color=GREEN, lw=2.2, label="frozen (both variants)")
     ax.set_xticks(idx)
-    ax.set_xticklabels(["%d" % (c["batch"] + 1) for c in conds], fontsize=7)
+    ax.set_xticklabels(["%d" % (c["batch"] + 1) for c in conds])
     ax.set_xlabel("batch index")
     ax.set_ylabel("% corrupted labels")
     # The frozen bars are identically zero, so they are stated rather than
     # drawn: an invisible bar would leave the reader guessing whether the
-    # condition was missing or measured at zero.  The wording gives the maximum
-    # over batches, which stays true if a batch ever becomes non-zero -- an
-    # "is zero" claim would silently go stale.
-    ax.text(0.5, 0.965,
-            "frozen variants: max %.1f%% and %.1f%% over all batches"
-            % (float(frozen.max()), float(zmask.max())),
-            transform=ax.transAxes, ha="center", va="top", fontsize=6.6,
-            color=OKABE[3])
-    ax.set_ylim(0, max(naive.max() * 1.28, 1.0))
-    ax.legend(fontsize=6.4, loc="upper center", bbox_to_anchor=(0.5, -0.20),
-              ncol=1, handlelength=1.5, labelspacing=0.28)
-    ax.set_title("(b) corrupted labels, %d heterogeneous batches"
-                 % len(conds), fontsize=8.5)
-    ax.spines[["top", "right"]].set_visible(False)
+    # condition was missing or measured at zero.  The wording gives the
+    # maximum over batches, which stays true if a batch ever becomes
+    # non-zero -- an "is zero" claim would silently go stale.
+    badge(ax, 0.5, 0.965,
+          "frozen variants: max %.1f%% and %.1f%% over all batches"
+          % (float(frozen.max()), float(zmask.max())),
+          ha="center", color=GREEN)
+    ax.set_ylim(0, max(naive.max() * 1.30, 1.0))
+    # Legend row ABOVE the panel: below the axes it used to sit on top of the
+    # "(b)" panel identifier, which shares that band.
+    ax.legend(fontsize=6.6, loc="lower center", bbox_to_anchor=(0.5, 1.03),
+              ncol=3, handlelength=1.4, columnspacing=1.1, labelspacing=0.3)
+    panel_label(ax, "b", r"%d heterogeneous batches" % len(conds))
+    despine(ax)
     save(fig, os.path.join(out, "fig_solver"))
 
 
+# ---------------------------------------------------------------------------
+# Figure (SI) -- training curves: the in-band floor is contrast-sensitive
+# ---------------------------------------------------------------------------
 def fig_training(out):
-    """In-band validation error vs epoch, one curve per contrast arm.
-
-    Read straight from runs/*/train_log.csv, so the figure cannot drift from the
-    logs.  The point it makes is the contrast-sensitivity of the in-band floor:
-    the ordering of the curves at the last epoch is the same as the ordering of
-    the plateau in Fig. 1.
-    """
-    w = set_style("single")
-    fig, ax = plt.subplots(figsize=(w, w * 0.74))
+    set_style()
+    fig, ax = plt.subplots(figsize=(HALF_W, HALF_W * 0.95), layout="constrained")
     any_ = False
+    ends = []
     for i, vmax in enumerate(C.VMAX_LIST):
         tag = "a%03d" % int(round(vmax * 100))
         curves, seeds = [], []
@@ -736,85 +904,99 @@ def fig_training(out):
         ep = np.arange(1, n + 1)
         if A.shape[0] > 1:
             ax.fill_between(ep, A.min(axis=0), A.max(axis=0),
-                            color=OKABE[i], alpha=0.16, lw=0)
-        ax.semilogy(ep, A.mean(axis=0), color=OKABE[i], marker=MK[i],
-                    markevery=max(1, n // 8), ms=3.0, lw=1.3,
+                            color=ARMS5[i], alpha=0.16, lw=0, zorder=1)
+        ax.semilogy(ep, A.mean(axis=0), color=ARMS5[i], marker="o",
+                    markevery=max(1, n // 8), ms=3.0, lw=1.3, zorder=3,
                     label=r"$v_{\max}=%.2f$ ($n{=}%d$)" % (vmax, len(seeds)))
+        ends.append((float(A.mean(axis=0)[-1]),
+                     r"$v_{\max}=%.2f$" % vmax, ARMS5[i]))
         any_ = True
     if not any_:
         print("no training logs"); return
     ax.set_xlabel("epoch")
-    ax.set_ylabel("in-band validation relative $L_2$")
+    ax.set_ylabel("in-band validation rel. $L_2$")
     # The span of this axis is under two decades, so the default log locator
     # labels every mantissa and the tick column becomes unreadable.  Round
     # values only, spanning the actual data range.
     ax.set_ylim(0.015, 0.8)
-    ax.set_yticks([0.02, 0.05, 0.1, 0.2, 0.4])
-    ax.set_yticklabels(["0.02", "0.05", "0.10", "0.20", "0.40"])
-    # semilogy labels the minor ticks as well when the axis spans fewer than
-    # two decades, which interleaved "6 x 10^-2" between the round values.
+    round_ticks(ax, "y", [0.02, 0.05, 0.1, 0.2, 0.4],
+                ["0.02", "0.05", "0.10", "0.20", "0.40"])
     ax.yaxis.set_minor_formatter(NullFormatter())
-    ax.spines[["top", "right"]].set_visible(False)
-    # Seven entries in two columns used to sit on top of the descending curves,
-    # and the "shaded" note was placed over the v_max = 0.05 curve.  The span is
-    # now a legend entry of its own and the whole legend is below the axis.
-    h, l = ax.get_legend_handles_labels()
-    h += [Patch(facecolor="0.5", alpha=0.25, lw=0)]
-    l += ["seed span"]
-    ax.legend(h, l, fontsize=6.5, ncol=3, loc="upper center",
-              bbox_to_anchor=(0.5, -0.17), handlelength=1.8,
-              columnspacing=1.0, labelspacing=0.35)
+    despine(ax)
+    end_labels(ax, ends, fs=7.0)
+    badge(ax, 0.03, 0.05, "band: seed span", ha="left", va="bottom")
     save(fig, os.path.join(out, "fig_training"))
 
 
+# ---------------------------------------------------------------------------
+# Figure -- cross-contrast evaluation: the cliff is read arm-matched
+# ---------------------------------------------------------------------------
 def fig_crosscontrast(evals, out):
     """Why a cliff ratio must be read arm-matched.
 
     Each trained model already carries a full sweep over all five evaluation
-    contrasts, so the cross-contrast reading costs nothing extra.  It shows that
-    the cliff is a property of a model measured *at the contrast it was trained
-    on*: evaluate the weak-contrast model at strong contrast and the error is
-    already at plateau level inside the training band, so the band edge leaves no
-    signature at all.
+    contrasts, so the cross-contrast reading costs nothing extra.  It shows
+    that the cliff is a property of a model measured *at the contrast it was
+    trained on*: evaluate the weak-contrast model at strong contrast and the
+    error is already at plateau level inside the training band, so the band
+    edge leaves no signature at all.
     """
+    set_style()
     pairs = [("main_fno_a005_s0", 0.05, r"trained at $v_{\max}=0.05$"),
              ("main_fno_a100_s0", 1.00, r"trained at $v_{\max}=1.00$")]
     pairs = [(n, v, t) for n, v, t in pairs if n in evals]
     if not pairs:
         print("no cross-contrast models available"); return
-    w = set_style("double")
-    fig, axes = plt.subplots(1, len(pairs), figsize=(w, w * 0.32),
-                             sharex=True, sharey=True)
+    fig, axes = plt.subplots(1, len(pairs), figsize=(FULL_W, FULL_W * 0.40),
+                             sharex=True, sharey=True, layout="constrained")
     if len(pairs) == 1:
         axes = [axes]
     for k, (ax, (name, own, ttl)) in enumerate(zip(axes, pairs)):
         d = evals[name]
         for i, vmax in enumerate(C.VMAX_LIST):
             F, M, S = curve(d, vmax)
-            style = dict(color=OKABE[i], marker=MK[i], ms=3.0, lw=1.3)
-            if abs(vmax - own) < 1e-9:
-                style["lw"] = 2.4
-            ax.semilogy(F, M, label=r"eval $v_{\max}=%.2f$" % vmax,
-                        clip_on=False, **style)
-        ax.axvspan(1.0, 4.0, color="#888888", alpha=0.13, lw=0)
-        ax.axvline(4.0, color="k", lw=0.8, ls=":")
-        panel_label(ax, "ab"[k], ttl, fontsize=8.5)
-        ax.set_xlabel("frequency $f$")
-        ax.set_xticks([2, 4, 6, 8, 10, 12])
-        ax.set_xlim(1, 12.2)
+            own_curve = abs(vmax - own) < 1e-9
+            ax.errorbar(F, M, color=ARMS5[i], marker="o", ms=3.0,
+                        lw=2.4 if own_curve else 1.2,
+                        zorder=4 if own_curve else 3, clip_on=False,
+                        label=r"eval $v_{\max}=%.2f$" % vmax)
+            if own_curve:
+                # The arm's own contrast is the one the band edge is read on;
+                # ring its band-edge point so the reader finds it without a
+                # second legend entry.
+                k4 = int(np.argmin(np.abs(F - 4.0)))
+                ax.plot([F[k4]], [M[k4]], marker="o", ms=10, mfc="none",
+                        mec=ARMS5[i], mew=1.4, zorder=5, clip_on=False)
+        band(ax)
+        ax.set_yscale("log")
         ax.set_ylim(0.012, 5.0)
-        ax.spines[["top", "right"]].set_visible(False)
+        decades(ax, numticks=3)
+        sweep_axis(ax)
+        panel_label(ax, "ab"[k], ttl, fontsize=8.5)
         if k:
             ax.tick_params(labelleft=False)
     axes[0].set_ylabel(r"relative $L_2$ error")
-    # The eval-contrast legend must appear on BOTH panels: panel (a) previously
-    # carried it and panel (b) did not, which is the asymmetry the review flagged.
-    for ax0 in axes:
-        ax0.legend(fontsize=6.0, ncol=1, loc="lower right", handlelength=1.4,
-                   labelspacing=0.22)
+    # One legend row for the strip: the eval contrast is the same set in both
+    # panels, and the previous per-panel legends repeated five entries twice
+    # inside the data region.  Short labels on purpose -- the long form made
+    # the strip wider than the text block, which forced a down-scale on
+    # inclusion and put the type below print size.
+    h = [Line2D([], [], color=ARMS5[i], marker="o", ls="-", lw=1.2, ms=3.0)
+         for i in range(len(C.VMAX_LIST))]
+    l = [r"$v_{\max}=%.2f$" % v for v in C.VMAX_LIST]
+    h.append(Line2D([], [], color="none", marker="o", ms=8, mfc="none",
+                    mec="#555555", mew=1.3))
+    l.append("own contrast")
+    fig.legend(h, l, fontsize=7.5, ncol=len(h), loc="lower center",
+               bbox_to_anchor=(0.5, 1.005), handlelength=1.6,
+               columnspacing=1.0, labelspacing=0.3,
+               title="eval contrast", title_fontsize=7.5)
     save(fig, os.path.join(out, "fig_crosscontrast"))
 
 
+# ---------------------------------------------------------------------------
+# Figure -- conditioning confound: the cliff survives re-conditioning
+# ---------------------------------------------------------------------------
 def fig_c1(out):
     """Conditioning-confound discriminating experiment (Section sec:c1).
 
@@ -826,84 +1008,89 @@ def fig_c1(out):
           shaded, cliff-onset interval marked.  Both arms step inside the
           same grid interval.
       (b) the manipulated quantity -- the attained operator norm at the same
-          test frequencies.  The baseline's non-monotone spread collapses to a
-          constant that sits below the baseline's band-edge value, i.e. the
+          test frequencies.  The baseline's non-monotone spread collapses to
+          a constant that sits below the baseline's band-edge value, i.e. the
           compensated arm is the better-conditioned one at every frequency.
     Everything is read from results/c1_verdict.json (written by
     code/analyze_c1.py), so the figure and the table cannot drift apart.
     No GPU: the curves are evaluation records plus a 64x64 symbol norm.
     """
+    set_style()
     p = os.path.join(C.RES, "c1_verdict.json")
     if not os.path.exists(p):
         print("no c1_verdict.json -- run code/analyze_c1.py"); return
     d = json.load(open(p, encoding="utf-8"))
     v = d["verdict"]
-    w = set_style("double")
-    fig, axes = plt.subplots(1, 2, figsize=(w, w * 0.38))
-    specs = [("baseline", OKABE[4], MK[0],
+    fig, axes = plt.subplots(1, 2, figsize=(FULL_W, FULL_W * 0.42),
+                             layout="constrained")
+    specs = [("baseline", BLUE, "o",
               r"baseline, $\gamma=0.05$ ($%.2f$--$%.2f$)"
               % (v["attained_baseline_lo"], v["attained_baseline_hi"])),
-             ("compensated", OKABE[1], MK[1],
+             ("compensated", ORANGE, "s",
               r"compensated, $\gamma(f)$ ($%.2f$ const.)"
               % v["attained_compensated"])]
-    # ---- (a) measured error curves
-    ax = axes[0]
 
     def _fl(x):
         # 4.0 must not print as "4": the whole argument rests on the 0.25
         # grid spacing at the band edge.
         return "%.1f" % x if abs(x - round(x)) < 1e-9 else "%.2f" % x
 
+    # ---- (a) measured error curves
+    ax = axes[0]
     for key, col, mk, lab in specs:
         arm = d["arms"][key]
         ax.errorbar(arm["f"], arm["mean"], yerr=arm["sd"], color=col,
-                    marker=mk, capsize=2, lw=1.3, label=lab, clip_on=False)
-    ax.axvspan(1.0, 4.0, color="#888888", alpha=0.13, lw=0)
+                    marker=mk, ms=3.4, lw=1.3, capsize=2, clip_on=False,
+                    zorder=3)
     lo, hi = d["arms"]["baseline"]["onset"]
-    ax.axvspan(lo, hi, color="#CC79A7", alpha=0.30, lw=0)
-    ax.axvline(4.0, color="k", lw=0.8, ls=":")
+    # The onset interval is a property of the grid, so it is drawn where it
+    # lives -- at the band edge -- and not parked in a corner of the panel.
+    ax.axvspan(lo, hi, color=PINK, alpha=0.30, lw=0, zorder=0)
+    band(ax)
     ax.set_yscale("log")
     ax.set_ylim(0.008, 4.5)
-    ax.yaxis.set_major_locator(LogLocator(base=10.0, numticks=3))
-    ax.yaxis.set_minor_formatter(NullFormatter())
-    ax.set_xlabel("frequency $f$")
+    decades(ax, numticks=3)
+    sweep_axis(ax)
     ax.set_ylabel(r"relative $L_2$ error")
-    ax.set_xticks([2, 4, 6, 8, 10, 12])
-    ax.set_xlim(1, 12.2)
-    ax.spines[["top", "right"]].set_visible(False)
-    ax.legend(fontsize=6.5, loc="upper left", frameon=False, handlelength=1.6,
-              labelspacing=0.25)
-    ax.text(0.985, 0.045, "onset $[%s,%s]$\n$\\pm1$ SD, %d seeds"
-            % (_fl(lo), _fl(hi), d["arms"]["baseline"]["seeds"]),
-            transform=ax.transAxes, fontsize=6.5, ha="right", va="bottom",
-            color="#444444")
+    end_labels(ax, [(float(d["arms"]["baseline"]["mean"][-1]),
+                     "baseline", BLUE),
+                    (float(d["arms"]["compensated"]["mean"][-1]),
+                     "compensated", ORANGE)], fs=7.2)
+    badge(ax, 0.5, 0.955,
+          r"onset $[%s,%s]$, $\pm1$ SD, %d seeds -- identical in both arms"
+          % (_fl(lo), _fl(hi), d["arms"]["baseline"]["seeds"]),
+          ha="center", fs=6.8)
     panel_label(ax, "a")
+
     # ---- (b) the manipulated quantity: attained operator norm
     ax = axes[1]
     F = d["arms"]["baseline"]["f"]
     for key, col, mk, lab in specs:
         ax.plot(F, d["arms"][key]["attained"], color=col, marker=mk, ls="-",
-                lw=1.3, clip_on=False)
-    ax.axvspan(1.0, 4.0, color="#888888", alpha=0.13, lw=0)
-    ax.axvline(4.0, color="k", lw=0.8, ls=":")
+                lw=1.3, clip_on=False, zorder=3)
+    band(ax)
     ax.set_ylim(2.0, 11.0)
-    ax.set_xlabel("frequency $f$")
+    sweep_axis(ax)
     ax.set_ylabel(r"attained $\max|\kappa^{2}\widehat{G}_{\kappa}|$")
-    ax.set_xticks([2, 4, 6, 8, 10, 12])
-    ax.set_xlim(1, 12.2)
-    ax.spines[["top", "right"]].set_visible(False)
-    ax.text(0.985, 0.05, "spread $%.1f\\times$ $\\rightarrow$ const."
-            % v["attained_baseline_spread"], transform=ax.transAxes,
-            fontsize=6.5, ha="right", va="bottom", color="#444444")
+    end_labels(ax, [(float(d["arms"]["baseline"]["attained"][-1]),
+                     "baseline", BLUE),
+                    (float(d["arms"]["compensated"]["attained"][-1]),
+                     "compensated", ORANGE)], fs=7.2)
+    badge(ax, 0.5, 0.955,
+          r"spread $%.1f\times$ $\rightarrow$ constant" % v["attained_baseline_spread"],
+          ha="center", fs=6.8)
     panel_label(ax, "b")
     save(fig, os.path.join(out, "fig_c1"))
 
 
+# ---------------------------------------------------------------------------
+# Figure -- the analytic anchor: no cliff out of band, at every contrast
+# ---------------------------------------------------------------------------
 def fig_anchor(out):
     """The analytic anchor against the trained operator (Section sec:anchor).
 
-    Two panels, because the claim is not "the anchor is more accurate" but "the
-    anchor has no cliff", and a single accuracy curve cannot show that:
+    Two panels, because the claim is not "the anchor is more accurate" but
+    "the anchor has no cliff", and a single accuracy curve cannot show that:
       (a) the four predictors at v_max = 0.25: the trained FNO (seed mean,
           one seed SD, from the evaluation records), the anchor (two complex
           coefficients fitted on the training cache), the raw first-order Born
@@ -913,82 +1100,221 @@ def fig_anchor(out):
           objects, which is where the complementarity lives: the trained
           operator wins inside the band and the anchor wins outside it.
     Read from results/anchor_baseline.json and the evaluation records, so the
-    figure and Table tab:anchor cannot drift apart.  No GPU.
+    figure and the anchor table cannot drift apart.  No GPU.
     """
+    set_style()
     p = os.path.join(C.RES, "anchor_baseline.json")
     if not os.path.exists(p):
         print("no anchor_baseline.json -- run code/anchor_baseline.py"); return
     d = json.load(open(p, encoding="utf-8"))
     ev = load_evals()
-    w = set_style("double")
-    fig, axes = plt.subplots(1, 2, figsize=(w, w * 0.38))
+    fig, axes = plt.subplots(1, 2, figsize=(FULL_W, FULL_W * 0.42),
+                             layout="constrained")
     F = np.array(d["f_test"])
 
     # ---- (a) v_max = 0.25
     ax = axes[0]
     a = d["arms"]["0.25"]
-    tag = "a025"
-    names = [n for n in sorted(ev) if n.startswith("main_fno_%s_" % tag)]
+    names = arm_names(ev, "a025")
     if names:
         Fm, M, S = mean_curve(ev, names, 0.25)
-        ax.errorbar(Fm, M, yerr=S, color=OKABE[5], marker=MK[0], capsize=2,
-                    lw=1.3, label="trained FNO", clip_on=False)
-    ax.plot(F, [r["mean"] for r in a["sweep"]], color=OKABE[2], marker=MK[1],
-            lw=1.3, label="anchor, $aB_1+bB_2$", clip_on=False)
-    ax.plot(F, a["born1"], color=OKABE[0], marker=MK[2], lw=1.0, ls="--",
-            label="Born series, order 1", clip_on=False)
-    ax.plot(F, a["trivial"], color="#888888", marker=MK[3], lw=1.0, ls=":",
-            label="trivial, $\\hat u\\equiv0$", clip_on=False)
-    ax.axvspan(1.0, 4.0, color="#888888", alpha=0.13, lw=0)
-    ax.axvline(4.0, color="k", lw=0.8, ls=":")
+        ax.errorbar(Fm, M, yerr=S, color=BLUE, marker="o", ms=3.4, lw=1.3,
+                    capsize=2, clip_on=False, zorder=3,
+                    label="trained FNO")
+    anch = np.array([r["mean"] for r in a["sweep"]])
+    ax.plot(F, anch, color=VERMILION, marker="D", ms=3.4, lw=1.3,
+            clip_on=False, zorder=3, label="anchor, $aB_1+bB_2$")
+    ax.plot(F, a["born1"], color=INK, lw=1.0, ls=(0, (4, 2)), clip_on=False,
+            zorder=2, label="Born series, order 1")
+    ax.plot(F, a["trivial"], color=FAINT, lw=1.0, ls=(0, (1.5, 1.6)),
+            clip_on=False, zorder=2, label="trivial, $\\hat u\\equiv0$")
+    band(ax)
     ax.set_yscale("log")
-    ax.set_xlabel("frequency $f$")
+    ax.set_ylim(0.008, 4.5)
+    decades(ax, numticks=3)
+    sweep_axis(ax)
     ax.set_ylabel(r"relative $L_2$ error")
-    ax.set_xticks([2, 4, 6, 8, 10, 12])
-    ax.set_xlim(1, 12.2)
-    ax.spines[["top", "right"]].set_visible(False)
-    ax.legend(fontsize=6.5, loc="lower right", frameon=False, handlelength=1.6,
-              labelspacing=0.25)
-    ax.text(0.03, 0.97, "$v_{\\max}=0.25$", transform=ax.transAxes,
-            fontsize=6.5, ha="left", va="top", color="#444444")
-    panel_label(ax, "a")
+    end_labels(ax, [(float(M[-1]), "trained FNO", BLUE),
+                    (float(anch[-1]), "anchor", VERMILION),
+                    (float(np.asarray(a["born1"])[-1]), "Born $n{=}1$", INK),
+                    (float(np.asarray(a["trivial"])[-1]), "trivial", FAINT)],
+                fs=7.2)
+    # The decisive reading of the panel: the anchor's plateau sits below the
+    # trained operator's by a constant factor, so the two never cross.
+    pl_a = float(np.mean(anch[F >= 6.0]))
+    pl_f = float(np.mean(M[F >= 6.0]))
+    if pl_a > 0 and pl_f > pl_a:
+        ratio_arrow(ax, 11.55, pl_a, pl_f,
+                    r"$%.1f\times$" % (pl_f / pl_a), fs=7.6)
+    panel_label(ax, "a", r"$v_{\max}=0.25$")
 
     # ---- (b) plateau against contrast
     ax = axes[1]
     vm = np.array([float(k) for k in sorted(d["arms"])])
-    anch = np.array([d["arms"]["%.2f" % v]["plateau"] for v in vm])
-    triv = np.array([d["arms"]["%.2f" % v]["trivial_plateau"] for v in vm])
-    ax.plot(vm, anch, color=OKABE[2], marker=MK[1], lw=1.3,
-            label="anchor", clip_on=False)
-    ax.plot(vm, triv, color="#888888", marker=MK[3], lw=1.0, ls=":",
-            label="trivial, $\\hat u\\equiv0$", clip_on=False)
+    anchp = np.array([d["arms"]["%.2f" % v]["plateau"] for v in vm])
+    trivp = np.array([d["arms"]["%.2f" % v]["trivial_plateau"] for v in vm])
+    ax.plot(vm, anchp, color=VERMILION, marker="D", ms=4.0, lw=1.3,
+            clip_on=False, zorder=3, label="anchor")
+    ax.plot(vm, trivp, color=FAINT, lw=1.0, ls=(0, (1.5, 1.6)),
+            clip_on=False, zorder=2, label="trivial, $\\hat u\\equiv0$")
     fno, keep = [], []
     for v in vm:
-        tag = "a%03d" % int(round(v * 100))
-        ns = [n for n in sorted(ev) if n.startswith("main_fno_%s_" % tag)]
+        ns = arm_names(ev, "a%03d" % int(round(v * 100)))
         if not ns:
             continue
-        _, M, _ = mean_curve(ev, ns, float(v))
-        fno.append(float(np.mean(M[np.array(d["f_test"]) >= 6])))
+        _, Mv, _ = mean_curve(ev, ns, float(v))
+        fno.append(float(np.mean(Mv[np.array(d["f_test"]) >= 6])))
         keep.append(float(v))
     if fno:
-        ax.plot(np.array(keep), np.array(fno), color=OKABE[5], marker=MK[0],
-                lw=1.3, label="trained FNO", clip_on=False)
+        ax.plot(np.array(keep), np.array(fno), color=BLUE, marker="o",
+                ms=4.0, lw=1.3, clip_on=False, zorder=3, label="trained FNO")
     ax.set_yscale("log")
     ax.set_xscale("log")
     ax.set_xlabel("$v_{\\max}$")
     ax.set_ylabel(r"plateau $\varepsilon_{\infty}$")
     ax.set_xticks([0.05, 0.1, 0.25, 0.5, 1.0])
     ax.set_xticklabels(["0.05", "0.10", "0.25", "0.50", "1.00"])
-    ax.spines[["top", "right"]].set_visible(False)
-    ax.legend(fontsize=6.5, loc="upper left", frameon=False, handlelength=1.6,
-              labelspacing=0.25)
-    panel_label(ax, "b")
+    ax.set_xlim(0.04, 1.25)
+    despine(ax)
+    end_labels(ax, [(float(fno[-1]), "trained FNO", BLUE),
+                    (float(anchp[-1]), "anchor", VERMILION),
+                    (float(trivp[-1]), "trivial", FAINT)], fs=7.2)
+    # The anchor stays below the trivial baseline across the whole contrast
+    # range: two fitted coefficients carry real out-of-band information at
+    # every contrast, which is the claim the trained operator cannot make.
+    if anchp[-1] < trivp[-1]:
+        badge(ax, 0.03, 0.05,
+              "anchor below the trivial baseline at every contrast",
+              ha="left", va="bottom", fs=6.8)
+    panel_label(ax, "b", r"out-of-band plateau")
     save(fig, os.path.join(out, "fig_anchor"))
 
 
+# ---------------------------------------------------------------------------
+# Figure -- head depth and the residual on top of it
+# ---------------------------------------------------------------------------
+def fig_deep(out):
+    """The analytic head's depth and the residual on top of it (sec:deep).
+
+    Two panels, matching the two claims that are easy to overstate:
+      (a) plateau against the number of Born corrections summed, at the
+          contrast where the series converges and at the one where it does
+          not.  The point of plotting both is the turning point: at
+          v_max = 1.00 the curve is not monotone, so "deeper is better" is
+          false and the manuscript does not say it.  Orders whose fit was
+          refused on conditioning grounds are not plotted at all -- a hole in
+          the curve is honest, a point invented from a singular solve is not.
+      (b) the four objects at v_max = 0.25 on the frequency axis: the trained
+          operator, the head alone, the shallow head with a learned residual,
+          and the deep head with one.  This is the panel that carries the
+          method claim, and it is drawn from the same evaluation records as
+          the tables so the figure cannot drift from the numbers.
+    No GPU.
+    """
+    set_style()
+    ph = os.path.join(C.RES, "anchor_higher_order.json")
+    ps = os.path.join(C.RES, "anchor_order_selection.json")
+    if not (os.path.exists(ph) and os.path.exists(ps)):
+        print("no anchor_higher_order/order_selection json -- run "
+              "code/anchor_higher_order.py and code/anchor_order_selection.py")
+        return
+    ho = json.load(open(ph, encoding="utf-8"))
+    sel = json.load(open(ps, encoding="utf-8"))
+    ev = load_evals()
+    fig, axes = plt.subplots(1, 2, figsize=(FULL_W, FULL_W * 0.42),
+                             layout="constrained")
+
+    # ---- (a) plateau against head depth
+    ax = axes[0]
+    ends_a = []
+    for vk, col, mk, lab in (("0.25", VERMILION, "D", r"$v_{\max}=0.25$"),
+                             ("1.00", INK, "^", r"$v_{\max}=1.00$")):
+        ms, ps_ = [], []
+        for M in range(1, 9):
+            o = ho["arms"][vk]["orders"].get(str(M), {})
+            if not o.get("fitted"):
+                continue
+            ms.append(M)
+            ps_.append(o["plateau"])
+        if not ms:
+            continue
+        ax.plot(ms, ps_, color=col, marker=mk, ms=3.6, lw=1.3,
+                clip_on=False, zorder=3, label=lab)
+        msel = sel["arms"][vk]["M_sel"]
+        if msel in ms:
+            ax.plot([msel], [ps_[ms.index(msel)]], color=col, marker="o",
+                    markersize=7, mfc="none", mew=1.2, clip_on=False, zorder=4)
+        ends_a.append((float(ps_[-1]), lab, col))
+    ax.plot([], [], color="#444444", marker="o", markersize=7, mfc="none",
+            mew=1.2, ls="none", label="$M_{\\mathrm{sel}}$, chosen in band")
+    ax.set_yscale("log")
+    # Under two decades: round ticks, not the default mantissa ladder that
+    # used to print "6 x 10^-1" style labels into each other.
+    ax.set_ylim(0.015, 1.0)
+    round_ticks(ax, "y", [0.02, 0.05, 0.1, 0.2, 0.5],
+                ["0.02", "0.05", "0.10", "0.20", "0.50"])
+    ax.yaxis.set_minor_formatter(NullFormatter())
+    ax.set_xlabel("Born corrections summed, $M$")
+    ax.set_ylabel(r"plateau $\varepsilon_{\infty}$")
+    ax.set_xticks(range(1, 9))
+    despine(ax)
+    # Lower left, not upper right: the upper-right corner is where the
+    # v_max = 1.00 curve runs, and the legend box used to sit on the curve.
+    ax.legend(fontsize=6.8, loc="lower left", frameon=False,
+              handlelength=1.6, labelspacing=0.25)
+    panel_label(ax, "a")
+
+    # ---- (b) the objects at v_max = 0.25
+    ax = axes[1]
+    F = np.array(sel.get("f_test") or [1.5, 2.5, 3.5, 4.0, 4.25, 4.5, 4.75,
+                                       5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0,
+                                       12.0])
+    ns = arm_names(ev, "a025")
+    ends_b = []
+    if ns:
+        Fm, M, S = mean_curve(ev, ns, 0.25)
+        ax.errorbar(Fm, M, yerr=S, color=BLUE, marker="o", ms=3.2, lw=1.3,
+                    capsize=1.8, clip_on=False, zorder=3, label="trained FNO")
+        ends_b.append((float(M[-1]), "trained FNO", BLUE))
+    # the head curve comes from the order scan, which is the instrument that
+    # records a sweep per (contrast, order); the order-selection record only
+    # keeps the plateau it selected on.
+    msel = sel["arms"]["0.25"]["M_sel"]
+    sweep = ho["arms"]["0.25"]["orders"].get(str(msel), {}).get("sweep") or []
+    if sweep:
+        Fh = np.array([r["f"] for r in sweep])
+        hv = np.array([r["mean"] for r in sweep])
+        ax.plot(Fh, hv, color=VERMILION, marker="D", ms=3.2, lw=1.3,
+                clip_on=False, zorder=3, label="head, $M=M_{\\mathrm{sel}}$")
+        ends_b.append((float(hv[-1]), "head", VERMILION))
+    for pref, col, mk, lab in (("ba_fno_a025_m8_s", GREEN, "P",
+                                "head $+$ residual, $M=8$"),
+                               ("ba_fno_a025_s", ORANGE, "X",
+                                "head $+$ residual, $M=2$")):
+        ns = [n for n in sorted(ev) if n.startswith(pref)]
+        if not ns:
+            continue
+        Fm, M, S = mean_curve(ev, ns, 0.25)
+        ax.errorbar(Fm, M, yerr=S, color=col, marker=mk, ms=3.2, lw=1.3,
+                    capsize=1.8, clip_on=False, zorder=3, label=lab)
+        ends_b.append((float(M[-1]), lab.replace("head $+$ residual, ", ""),
+                       col))
+    band(ax)
+    ax.set_yscale("log")
+    ax.set_ylim(0.008, 4.5)
+    decades(ax, numticks=3)
+    sweep_axis(ax)
+    ax.set_ylabel(r"relative $L_2$ error")
+    end_labels(ax, ends_b, fs=7.0)
+    panel_label(ax, "b", r"$v_{\max}=0.25$")
+    save(fig, os.path.join(out, "fig_deep"))
+
+
+# ---------------------------------------------------------------------------
+# Figure -- few-shot purchase curve
+# ---------------------------------------------------------------------------
 def fig_fewshot(out):
-    """Few-shot purchase curve (supplementary experiment 1, Section sec:interv).
+    """Few-shot purchase curve (supplementary experiment, Section sec:interv).
 
     The baseline FNO (trained on f in [1,4]) is fine-tuned on n in
     {64, 256, 1024} samples drawn from f in [5,8] at v_max = 0.25 and scored
@@ -996,33 +1322,43 @@ def fig_fewshot(out):
     The covered band is purchased monotonically while the uncovered frequency
     is flat -- labels buy coverage, not extrapolation.
     """
+    set_style()
     p = os.path.join(C.RES, "fewshot_purchase.json")
     if not os.path.exists(p):
         print("no fewshot_purchase.json -- run code/run_fewshot.py"); return
     d = C.load_json(p)
     ns = [0, 64, 256, 1024]
-    w = set_style("single")
-    fig, ax = plt.subplots(figsize=(w, w * 0.78))
-    specs = [(5.0, OKABE[0], "f = 5 (fine-tune band)"),
-             (8.0, OKABE[1], "f = 8 (fine-tune band)"),
-             (12.0, OKABE[2], "f = 12 (uncovered)")]
+    fig, ax = plt.subplots(figsize=(HALF_W, HALF_W * 0.95), layout="constrained")
+    specs = [(5.0, ARMS5[0], "f = 5 (fine-tune band)"),
+             (8.0, ARMS5[1], "f = 8 (fine-tune band)"),
+             (12.0, ARMS5[2], "f = 12 (uncovered)")]
+    ends = []
     for f, col, lab in specs:
-        ys = [d["rows"][str(n)][str(float(f))] for n in ["0", "64", "256", "1024"]]
-        ax.plot(ns, ys, color=col, marker="o", ls="-", lw=1.4, ms=4.5,
-                label=lab, clip_on=False)
-    ax.axvspan(64, 1024, color="#888888", alpha=0.10, lw=0)
+        ys = [d["rows"][str(n)][str(float(f))] for n in
+              ["0", "64", "256", "1024"]]
+        ax.plot(ns, ys, color=col, marker="o", ls="-", lw=1.4, ms=4.2,
+                clip_on=False, zorder=3)
+        ends.append((float(ys[-1]), lab, col))
+    ax.axvspan(64, 1024, color="#7a828c", alpha=0.10, lw=0, zorder=0)
     ax.set_xlabel("out-of-band labels $n$")
     ax.set_ylabel(r"relative $L_2$ error")
     ax.set_xticks(ns)
+    # Linear x: the rungs include n = 0 (the zero-shot baseline), which a log
+    # axis cannot place.
     ax.set_ylim(0.3, 1.25)
-    ax.spines[["top", "right"]].set_visible(False)
-    ax.legend(fontsize=6.5, loc="upper right", frameon=False, handlelength=1.6,
-              labelspacing=0.25)
-    ax.text(0.03, 0.97, "$v_{\\max}=0.25$", transform=ax.transAxes,
-            fontsize=6.5, ha="left", va="top", color="#444444")
+    despine(ax)
+    # Left edge, not right: the two fine-tune-band curves CONVERGE at
+    # n = 1024 (both reach the same floor) and are separated where they enter
+    # the panel, so a right-edge label stack would name two curves at one
+    # height.
+    end_labels(ax, ends, fs=7.0, side="left")
+    badge(ax, 0.97, 0.955, r"$v_{\max}=0.25$", ha="right")
     save(fig, os.path.join(out, "fig_fewshot"))
 
 
+# ---------------------------------------------------------------------------
+# Figure -- loss-shaping discriminators (C3/C3b): energy probe
+# ---------------------------------------------------------------------------
 def fig_c3probe(out):
     """Loss-shaping discriminators (C3/C3b): energy probe of Section sec:disc.
 
@@ -1034,43 +1370,49 @@ def fig_c3probe(out):
     each vs f for the baseline, the in-band energy penalty (C3) and the
     out-of-band Born-anchored penalty (C3b).  The out-of-band arm recovers the
     ENERGY (that is what its penalty targets) while its ALIGNMENT drops to
-    ~0.01 and its error gets WORSE (Table tab:disc): the pessimistic-collapse
-    hypothesis is excluded -- what the model lacks out of band is phase
-    information, not output energy.
+    ~0.01 and its error gets WORSE (the discriminator table): the
+    pessimistic-collapse hypothesis is excluded -- what the model lacks out of
+    band is phase information, not output energy.
     """
+    set_style()
     p = os.path.join(C.RES, "c3_verdict.json")
     if not os.path.exists(p):
         print("no c3_verdict.json -- run code/analyze_c3.py"); return
     d = json.load(open(p, encoding="utf-8"))
-    w = set_style("double")
-    fig, axes = plt.subplots(1, 2, figsize=(w, w * 0.38))
-    specs = [("baseline", OKABE[4], MK[0], "baseline"),
-             ("energy", OKABE[1], MK[1], "in-band penalty (C3)"),
-             ("energy_ob", OKABE[6], MK[2], "out-of-band anchor (C3b)")]
+    fig, axes = plt.subplots(1, 2, figsize=(FULL_W, FULL_W * 0.42),
+                             layout="constrained")
+    specs = [("baseline", BLUE, "o", "baseline"),
+             ("energy", ORANGE, "s", "in-band penalty (C3)"),
+             ("energy_ob", PINK, "^", "out-of-band anchor (C3b)")]
     for pi, (field, ylab) in enumerate(
             [("energy_ratio", r"$\|\widehat{u}\|/\|u\|$"),
-             ("alignment", r"$|\langle\widehat{u},u\rangle|/( \|\widehat{u}\|\|u\| )$")]):
+             ("alignment",
+              r"$|\langle\widehat{u},u\rangle|/( \|\widehat{u}\|\|u\| )$")]):
         ax = axes[pi]
         for key, col, mk, lab in specs:
             arm = d["arms"][key]
             fs = sorted(float(k) for k in arm["energy"])
             ys = [arm["energy"]["%.2f" % f][field] for f in fs]
-            ax.plot(fs, ys, color=col, marker=mk, ls="-", lw=1.3, label=lab,
-                    clip_on=False)
-        ax.axvspan(1.0, 4.0, color="#888888", alpha=0.13, lw=0)
-        ax.axvline(4.0, color="k", lw=0.8, ls=":")
+            ax.plot(fs, ys, color=col, marker=mk, ls="-", lw=1.3,
+                    clip_on=False, zorder=3)
+        band(ax, lo=1.0, hi=4.0)
         ax.set_xlabel("frequency $f$")
         ax.set_ylabel(ylab)
         ax.set_xticks([4, 5, 6, 8, 10, 12])
         ax.set_xlim(3.6, 12.4)
         ax.set_ylim(0.0, 1.75)
-        ax.spines[["top", "right"]].set_visible(False)
+        despine(ax)
         panel_label(ax, "ab"[pi])
-        if pi == 0:
-            ax.legend(fontsize=6.0, loc="upper left", frameon=False,
-                      handlelength=1.6, labelspacing=0.25)
-    axes[0].text(0.03, 0.06, "training band", transform=axes[0].transAxes,
-                 fontsize=6.5, ha="left", va="bottom", color="#444444")
+    # No end labels here: the whole point of the right panel is that the three
+    # arms CONVERGE (alignment collapses to the same floor for all of them),
+    # so a right-edge label stack would print three names at one height.  One
+    # legend row for the strip, with the short arm names the tables use.
+    h = [Line2D([], [], color=col, marker=mk, ls="-", lw=1.3, ms=3.4)
+         for _, col, mk, _ in specs]
+    fig.legend(h, [lab for _, _, _, lab in specs], fontsize=7.5, ncol=3,
+               loc="lower center", bbox_to_anchor=(0.5, 1.005),
+               handlelength=1.8, columnspacing=1.6)
+    badge(axes[0], 0.03, 0.05, "training band", ha="left", va="bottom")
     save(fig, os.path.join(out, "fig_c3probe"))
 
 
@@ -1082,6 +1424,9 @@ def build_in(n_grid, k, theta, v, device):
     return D.build_inputs(v.float(), psi_inc, (k / (2 * np.pi))), psi_inc
 
 
+# ---------------------------------------------------------------------------
+# Figure -- third evidence rung: real geological structure
+# ---------------------------------------------------------------------------
 def fig_realgeo(out):
     """Third evidence rung: the same boundary on real geological structure.
 
@@ -1091,6 +1436,7 @@ def fig_realgeo(out):
         two families apart before any network is involved: the out-of-band
         energy of the contrast field itself.
     """
+    set_style()
     import make_realgeo as RG
     p = os.path.join(C.RES, "realgeo.json")
     if not os.path.exists(p):
@@ -1099,9 +1445,10 @@ def fig_realgeo(out):
     c, x, z = RG.load_marmousi()
     wins, rough = RG.pick_windows(c, x, z)
 
-    w = set_style("double")
-    fig = plt.figure(figsize=(w, w * 0.30))
-    gs = fig.add_gridspec(1, 3, width_ratios=[1.7, 1.0, 1.0], wspace=0.34)
+    fig = plt.figure(figsize=(FULL_W, FULL_W * 0.40))
+    # wspace wide enough that panel (b)'s y-axis label clears the colourbar
+    # of panel (a); at 0.30 the two printed on top of each other.
+    gs = fig.add_gridspec(1, 3, width_ratios=[1.55, 1.0, 1.0], wspace=0.45)
 
     # ---- (a) the model and where the windows were taken --------------------
     ax = fig.add_subplot(gs[0, 0])
@@ -1123,16 +1470,14 @@ def fig_realgeo(out):
     ax.set_xticklabels(["0", "2", "4", "6", "8"])
     ax.set_yticks([0, 1000, 2000, 3000])
     ax.set_yticklabels(["0", "1", "2", "3"])
-    panel_label(ax, "a")
+    panel_label(ax, "a", r"Marmousi, windows i--iii")
     # Colourbar OUTSIDE panel (a): an in-panel bar occludes the velocity image,
     # and an axis-label collision with panel (b) was the earlier failure mode.
-    # Placing it to the right of panel (a) keeps the image intact and the gap
-    # to panel (b) clear.
     cb = fig.colorbar(im, ax=ax, location="right", pad=0.03, shrink=0.85,
                       aspect=20)
-    cb.set_label("$c$ (m/s)", fontsize=6.5, labelpad=1)
+    cb.set_label("$c$ (m/s)", fontsize=6.8, labelpad=1)
     cb.set_ticks([2000, 3500, 5000])
-    cb.ax.tick_params(labelsize=6.5, length=1.6)
+    cb.ax.tick_params(labelsize=6.8, length=1.6)
     cb.outline.set_linewidth(0.5)
 
     # ---- (b) the sweep, real against synthetic ----------------------------
@@ -1141,12 +1486,13 @@ def fig_realgeo(out):
     F = d["f_test"]
     ax = fig.add_subplot(gs[0, 1])
     for fam, names, col, ls, lab in (
-            ("real", [g for g in d["order"] if g.startswith("geo_")], OKABE[5], "-", "real geology"),
-            ("syn", [g for g in d["order"] if g.startswith("syn_")], OKABE[4], "--", "synthetic")):
+            ("real", [g for g in d["order"] if g.startswith("geo_")],
+             VERMILION, "-", "real geology"),
+            ("syn", [g for g in d["order"] if g.startswith("syn_")],
+             BLUE, "--", "synthetic")):
         # Collapse the three windows of each family to a mean curve with a
         # min--max band over windows (and their seed spans).  This reduces the
-        # six raw curves to the two families the legend names: the review noted
-        # six curves but only two legend entries.
+        # six raw curves to the two families the labels name.
         Mm, Lo, Hi = [], [], []
         for j in range(len(F)):
             vals = []
@@ -1161,21 +1507,24 @@ def fig_realgeo(out):
             Lo.append(min(v[1] for v in vals))
             Hi.append(max(v[2] for v in vals))
         Mm, Lo, Hi = np.array(Mm), np.array(Lo), np.array(Hi)
-        ax.plot(F, Mm, ls, color=col, lw=1.6, label=lab)
-        ax.fill_between(F, Lo, Hi, color=col, alpha=0.15, lw=0)
-    ax.axvspan(1.0, 4.0, color="#888888", alpha=0.13, lw=0)
-    ax.axvline(4.0, color="k", lw=0.8, ls=":")
+        ax.plot(F, Mm, ls, color=col, lw=1.6, clip_on=False, zorder=3,
+                label=lab)
+        ax.fill_between(F, Lo, Hi, color=col, alpha=0.15, lw=0, zorder=1)
+    band(ax)
     ax.set_yscale("log")
     ax.set_ylim(0.02, 2.2)
-    ax.yaxis.set_major_locator(LogLocator(base=10.0, numticks=3))
-    ax.yaxis.set_minor_formatter(NullFormatter())
+    decades(ax, numticks=3)
     ax.set_xlim(1, 12.2)
     ax.set_xticks([2, 4, 6, 8, 10, 12])
     ax.set_xlabel("frequency $f$")
     ax.set_ylabel(r"relative $L_2$ error")
+    # In-panel legend instead of right-edge end labels: the labels used to
+    # land in the inter-panel gap and on top of panel (c)'s axis label.  The
+    # region below the plateau on the right is empty.
+    ax.legend(fontsize=7.2, loc="lower right", frameon=False,
+              handlelength=2.6, labelspacing=0.35)
     panel_label(ax, "b", r"$v_{\max}=%.2f$, FNO" % VMAX)
-    ax.legend(loc="lower right", fontsize=7.5)
-    ax.spines[["top", "right"]].set_visible(False)
+    despine(ax)
 
     # ---- (c) the input fields themselves ---------------------------------
     ax = fig.add_subplot(gs[0, 2])
@@ -1183,25 +1532,33 @@ def fig_realgeo(out):
     # fraction there is zero by construction and a log axis would render the
     # last segment as a spurious cliff.
     Md = [M for M in d["modes"] if M < 32]
+    ends = []
     for fam, names, col, ls in (
-            ("real", [g for g in d["order"] if g.startswith("geo_")], OKABE[5], "-"),
-            ("syn", [g for g in d["order"] if g.startswith("syn_")], OKABE[4], "--")):
+            ("real", [g for g in d["order"] if g.startswith("geo_")],
+             VERMILION, "-"),
+            ("syn", [g for g in d["order"] if g.startswith("syn_")],
+             BLUE, "--")):
         for g in names:
             y = [d["bands"][g][str(M)] for M in Md]
-            ax.plot(Md, y, ls, color=col, lw=1.3)
-    ax.legend([Line2D([], [], color=OKABE[5], ls="-", lw=1.3),
-               Line2D([], [], color=OKABE[4], ls="--", lw=1.3)],
-              ["real geology", "synthetic"], loc="lower left",
-              fontsize=7, frameon=False)
+            # clip_on: the synthetic fractions run many decades below the
+            # 1e-6 floor, and unclipped the curves left the axes and crossed
+            # the whole figure.
+            ax.plot(Md, y, ls, color=col, lw=1.3, clip_on=True, zorder=2)
+        y_end = float(np.mean([d["bands"][g][str(Md[-1])] for g in names]))
+        # The label rides at the height of its own curve, but a curve that
+        # has exited through the floor must not drag its label out of the
+        # panel with it: clamp into the axes from both sides.
+        ends.append((min(max(y_end, 3e-6), 0.5),
+                     "real geology" if fam == "real" else "synthetic", col))
     ax.set_yscale("log")
     ax.set_ylim(1e-6, 1.0)
-    ax.yaxis.set_major_locator(LogLocator(base=10.0, numticks=8))
-    ax.yaxis.set_minor_formatter(NullFormatter())
+    decades(ax, numticks=7)
     ax.set_xlabel("mode index $M$")
     ax.set_ylabel("field energy outside $M$")
     panel_label(ax, "c", "contrast field")
     ax.set_xticks([4, 8, 12, 16, 20, 24])
-    ax.spines[["top", "right"]].set_visible(False)
+    despine(ax)
+    end_labels(ax, ends, fs=7.2)
     b4g = max(d["bands"][g]["4"] for g in d["order"] if g.startswith("geo_"))
     b4s = max(d["bands"][g]["4"] for g in d["order"] if g.startswith("syn_"))
     # The gap is a single vertical distance at M = 4, so draw it as one: an
@@ -1209,11 +1566,14 @@ def fig_realgeo(out):
     # refers to.
     ax.annotate("", xy=(4, b4g), xytext=(4, b4s),
                 arrowprops=dict(arrowstyle="<->", lw=0.8, color="#333333"))
-    ax.text(5.4, np.sqrt(b4g * b4s), "%.0f$\\times$" % (b4g / b4s),
+    ax.text(4.8, np.sqrt(b4g * b4s), "%.0f$\\times$" % (b4g / b4s),
             fontsize=8, va="center")
     save(fig, os.path.join(out, "fig_realgeo"))
 
 
+# ---------------------------------------------------------------------------
+# Figure -- two-sided boundary: the curves below the training band
+# ---------------------------------------------------------------------------
 def fig_banddown(evals, out):
     """Two-sided boundary: extend the FNO error curves below the training band.
 
@@ -1224,20 +1584,21 @@ def fig_banddown(evals, out):
     elevation (model several times above baseline) and the above-band
     saturation-at-baseline is visible in one panel.
     """
+    set_style()
     p = os.path.join(C.RES, "banddown.json")
     if not os.path.exists(p):
         print("no banddown.json"); return
     d = json.load(open(p, encoding="utf-8"))
     spec = json.load(open(os.path.join(C.RES, "spectrum.json"),
                           encoding="utf-8"))
-    w = set_style("single")
-    fig, ax = plt.subplots(figsize=(w, w * 0.62))
-    ax.axvspan(1.0, 4.0, color="#888888", alpha=0.13, lw=0)
-    ax.axvline(1.0, color="k", lw=0.8, ls=":")
-    ax.axvline(4.0, color="k", lw=0.8, ls=":")
+    fig, ax = plt.subplots(figsize=(HALF_W, HALF_W * 0.88), layout="constrained")
+    ax.axvspan(1.0, 4.0, color="#7a828c", alpha=0.12, lw=0, zorder=0)
+    ax.axvline(1.0, color=INK, lw=0.7, ls=(0, (1.1, 1.5)), zorder=1)
+    ax.axvline(4.0, color=INK, lw=0.7, ls=(0, (1.1, 1.5)), zorder=1)
+    ends = []
     for k, (vk, vmax) in enumerate(zip(("a005", "a010", "a025", "a050", "a100"),
                                        C.VMAX_LIST)):
-        col = OKABE[k + 1]
+        col = ARMS5[k]
         key = "%.2f" % vmax
         Fb = np.array(d["f_test"])
         rows = np.mean([[d["runs"]["main_fno_%s_s%d" % (vk, s)]
@@ -1246,9 +1607,8 @@ def fig_banddown(evals, out):
         triv = np.mean([[d["runs"]["main_fno_%s_s%d" % (vk, s)]
                          ["sweep"][key][i]["triv_mean"]
                          for i in range(len(Fb))] for s in range(3)], axis=0)
-        ax.plot(Fb, rows, "-", color=col, lw=1.5,
-                label="FNO, $v_{\\max}=%.2f$" % vmax)
-        ax.plot(Fb, triv, "--", color=col, lw=1.0, alpha=0.65)
+        ax.plot(Fb, rows, "-", color=col, lw=1.5, clip_on=False, zorder=3)
+        ax.plot(Fb, triv, "--", color=col, lw=1.0, alpha=0.65, zorder=2)
         # above band from the eval sweeps (seed means of the same checkpoints)
         Fa, Ma = [], []
         for s in range(3):
@@ -1260,40 +1620,43 @@ def fig_banddown(evals, out):
         if Fa:
             Fa = np.mean(Fa, axis=0)
             Ma = np.mean(Ma, axis=0)
-            ax.plot(Fa, Ma, "-", color=col, lw=1.5)
+            ax.plot(Fa, Ma, "-", color=col, lw=1.5, clip_on=False, zorder=3)
             Ta = np.array([spec["data"][str(vmax)]["f=%g" % f]["triv"]
                            for f in C.F_TEST])
-            ax.plot(Fa, Ta, "--", color=col, lw=1.0, alpha=0.65)
-    ax.plot([], [], "-", color="#444444", lw=1.5, label="FNO")
-    ax.plot([], [], "--", color="#444444", lw=1.0, alpha=0.65,
-            label="trivial baseline")
+            ax.plot(Fa, Ta, "--", color=col, lw=1.0, alpha=0.65, zorder=2)
+            ends.append((float(Ma[-1]), r"$v_{\max}=%.2f$" % vmax, col))
     ax.set_xscale("log")
     ax.set_yscale("log")
     ax.set_xlim(0.22, 13.0)
     ax.set_ylim(0.01, 3.0)
     ax.set_xticks([0.25, 0.5, 1, 2, 4, 8, 12])
     ax.set_xticklabels(["0.25", "0.5", "1", "2", "4", "8", "12"])
-    ax.yaxis.set_major_locator(LogLocator(base=10.0, numticks=4))
-    ax.yaxis.set_minor_formatter(NullFormatter())
+    decades(ax, numticks=4)
     ax.set_xlabel("frequency $f$")
     ax.set_ylabel(r"relative $L_2$ error")
-    ax.legend(loc="upper left", fontsize=7, ncol=2)
-    ax.spines[["top", "right"]].set_visible(False)
+    despine(ax)
+    end_labels(ax, ends, fs=7.0)
+    badge(ax, 0.03, 0.045,
+          "solid: FNO   dashed: trivial baseline (same colour)",
+          ha="left", va="bottom")
     save(fig, os.path.join(out, "fig_banddown"))
 
 
+# ---------------------------------------------------------------------------
+# Figure -- the plateau tracks the trivial baseline across the coupling range
+# ---------------------------------------------------------------------------
 def fig_plateau_coupling(evals, out):
     """Out-of-band plateau against the same-arm trivial baseline, vs coupling.
 
     The plateau is the seed-mean error over f >= 6; the baseline comes from
-    spectrum.json; the coupling is v_max/(2 gamma).  One log-log panel shows the
-    model tracking the baseline across the 20x coupling range, with the excess
-    (model over baseline) growing slowly with coupling.
+    spectrum.json; the coupling is v_max/(2 gamma).  One log-log panel shows
+    the model tracking the baseline across the 20x coupling range, with the
+    excess (model over baseline) growing slowly with coupling.
     """
+    set_style()
     spec = json.load(open(os.path.join(C.RES, "spectrum.json"),
                           encoding="utf-8"))
-    w = set_style("single")
-    fig, ax = plt.subplots(figsize=(w, w * 0.72))
+    fig, ax = plt.subplots(figsize=(HALF_W, HALF_W * 0.92), layout="constrained")
     coups, plats, trivs = [], [], []
     for vk, vmax in zip(("a005", "a010", "a025", "a050", "a100"), C.VMAX_LIST):
         plateau = []
@@ -1311,30 +1674,41 @@ def fig_plateau_coupling(evals, out):
              for f in C.F_TEST if f >= 6])))
         coups.append(vmax / (2 * C.GAMMA))
     coups, plats, trivs = np.array(coups), np.array(plats), np.array(trivs)
-    ax.plot(coups, plats, "-o", color=OKABE[4], lw=1.5, ms=5,
-            label="FNO plateau")
-    ax.plot(coups, trivs, "--s", color=OKABE[2], lw=1.5, ms=4,
-            label="trivial baseline")
-    ax.annotate("$\\times{%.2f}$" % (plats[0] / trivs[0]),
-                xy=(coups[0], plats[0]), xytext=(1.4, 0.30),
-                fontsize=7.5, va="center",
-                arrowprops=dict(arrowstyle="->", lw=0.7, color="#333333"))
-    ax.annotate("$\\times{%.2f}$" % (plats[-1] / trivs[-1]),
-                xy=(coups[-1], plats[-1]), xytext=(4.2, 2.35),
-                fontsize=7.5, va="center",
-                arrowprops=dict(arrowstyle="->", lw=0.7, color="#333333"))
+    ax.plot(coups, plats, "-o", color=BLUE, lw=1.5, ms=4.6, clip_on=False,
+            zorder=3, label="FNO plateau")
+    ax.plot(coups, trivs, "--s", color=VERMILION, lw=1.5, ms=4.2,
+            clip_on=False, zorder=3, label="trivial baseline")
     ax.set_xscale("log")
     ax.set_yscale("log")
     ax.set_xlim(0.4, 12)
     ax.set_ylim(0.15, 3.2)
     ax.set_xticks([0.5, 1, 2.5, 5, 10])
     ax.set_xticklabels(["0.5", "1", "2.5", "5", "10"])
-    ax.yaxis.set_major_locator(LogLocator(base=10.0, numticks=4))
-    ax.yaxis.set_minor_formatter(NullFormatter())
+    decades(ax, numticks=4)
     ax.set_xlabel(r"coupling $v_{\max}/(2\gamma)$")
     ax.set_ylabel(r"mean relative $L_2$ error, $f \geq 6$")
-    ax.legend(loc="upper left", fontsize=7.5)
-    ax.spines[["top", "right"]].set_visible(False)
+    despine(ax)
+    # The value of every point is printed: the figure carries the plateau
+    # numbers the text quotes, and a log axis without printed values makes
+    # the reader measure distances to guess them.
+    for x, y in zip(coups, plats):
+        ax.annotate("%.2f" % y, xy=(x, y), xytext=(0, 5.5),
+                    textcoords="offset points", ha="center", va="bottom",
+                    fontsize=6.8, color=BLUE)
+    for x, y in zip(coups, trivs):
+        ax.annotate("%.2f" % y, xy=(x, y), xytext=(0, -6.5),
+                    textcoords="offset points", ha="center", va="top",
+                    fontsize=6.8, color=VERMILION)
+    end_labels(ax, [(float(plats[-1]), "FNO", BLUE),
+                    (float(trivs[-1]), "trivial", VERMILION)], fs=7.4)
+    # The excess is the quantity of interest and is stated twice: per point,
+    # in the printed values above, and summarised for the whole range in the
+    # badge.  The old ratio arrow sat at the low-coupling end, where the two
+    # curves coincide, and rendered as a degenerate zero-length glyph.
+    badge(ax, 0.03, 0.955,
+          r"excess over baseline: $%.2f\times$ $\rightarrow$ $%.2f\times$ "
+          r"across the range" % (plats[0] / trivs[0], plats[-1] / trivs[-1]),
+          ha="left", fs=6.9)
     save(fig, os.path.join(out, "fig_plateau_coupling"))
 
 
@@ -1360,7 +1734,7 @@ if __name__ == "__main__":
     if a.only in ("all", "mode"):
         fig_mode_phase(ev, a.out, "b1_4", 4.0, "fig_mode_phase_b4")
     if a.only in ("all", "scaling"):
-        print(fig_scaling(ev, a.out))
+        fig_scaling(ev, a.out)
     if a.only in ("all", "banddown"):
         fig_banddown(ev, a.out)
     if a.only in ("all", "plateau"):
@@ -1381,5 +1755,7 @@ if __name__ == "__main__":
         fig_c3probe(a.out)
     if a.only in ("all", "anchor"):
         fig_anchor(a.out)
+    if a.only in ("all", "deep"):
+        fig_deep(a.out)
     if a.only in ("all", "fewshot"):
         fig_fewshot(a.out)

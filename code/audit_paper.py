@@ -468,7 +468,14 @@ def main():
         check_figures(folder)
         if lang == "en":
             check_rederived(folder)
-        check_pdf(os.path.join(folder, "main.pdf"))
+        # The PDF that matters is the delivered one.  paper/<lang>/main.pdf is
+        # a by-product of a local build and went stale once already (29 pages
+        # audited against a 42-page delivery), so the submission copy is
+        # preferred whenever it exists.
+        _delivered = os.path.join(C.ROOT, "submission", "paper_%s" % lang,
+                                  "main.pdf")
+        check_pdf(_delivered if os.path.exists(_delivered)
+                  else os.path.join(folder, "main.pdf"))
     print("\n=== summary ===")
     if FAIL:
         print("  %d FAILURES:" % len(FAIL))

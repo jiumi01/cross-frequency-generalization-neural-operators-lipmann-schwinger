@@ -146,26 +146,37 @@ class CachedSet(torch.utils.data.Dataset):
 # survives, it is not caused by representation starvation.
 FF_K = 7
 
-def in_channels(emb="none", anchor="none"):
+def in_channels(emb="none", anchor="none", order=2, channels=None):
     """Input channel count for a given frequency embedding / anchor.
 
     base 4 = [v, Re psi_inc, Im psi_inc, f/F_MAX];  "ff" appends 2*FF_K
-    frequency features (C2);  "born" appends Re/Im of the first two Born
-    corrections, i.e. the analytic part of the solution (anchored arm).
+    frequency features (C2);  "born" appends Re/Im of the first `order` Born
+    corrections, i.e. the analytic part of the solution (anchored arm).  The
+    default order=2 reproduces the original four-channel anchor, so every
+    existing checkpoint keeps loading with its original input width.
     """
     n = 4 if emb == "none" else 4 + 2 * FF_K
-    return n + 4 if anchor == "born" else n
+    if anchor != "born":
+        return n
+    return n + 2 * (order if channels is None else channels)
 
 
-def anchor_terms(v, k, theta, gamma=None, N=None):
-    """(B1, B2): the first two Born corrections of the incident field.
+def born_series(v, k, theta, order=2, gamma=None, N=None):
+    """[B1, ..., B_order]: successive Born corrections of the incident field.
 
-    One pass over the Neumann recursion, no linear solve, no label: B1 = kappa^2
-    G (v psi_inc) and B2 = kappa^2 G (v B1).  These carry the frequency
-    dependence of the propagator ANALYTICALLY -- the spectral locus of B1 moves
-    with k by construction -- which is exactly the part the trained operator
-    cannot extrapolate (C3b showed the model loses phase out of band, not
-    energy).  Computable at any frequency, including ones never trained on.
+    One pass over the Neumann recursion, no linear solve, no label:
+    B1 = kappa^2 G (v psi_inc) and B_{j+1} = kappa^2 G (v B_j).  These carry
+    the frequency dependence of the propagator ANALYTICALLY -- the spectral
+    locus of B1 moves with k by construction -- which is exactly the part the
+    trained operator cannot extrapolate (C3b showed the model loses phase out
+    of band, not energy).  Computable at any frequency, including ones never
+    trained on.
+
+    `order` is a hyperparameter, not a free lunch: code/anchor_higher_order.py
+    measures that the anchor's out-of-band plateau falls geometrically with it
+    while the Born contraction factor rho stays below one, and then TURNS
+    (v=1.00: 0.516 at M=5, 0.517 at M=6) once rho > 1 and the fit becomes an
+    asymptotic summation on a divergent series.
     """
     gamma = C.GAMMA if gamma is None else gamma
     N = C.N if N is None else N
@@ -178,9 +189,42 @@ def anchor_terms(v, k, theta, gamma=None, N=None):
         return kappa2 * torch.fft.ifft2(Ghat * torch.fft.fft2(vc * psi))
 
     psi_inc = P.incident_plane_wave(N, k, theta, dev).to(torch.complex128)
-    t1 = op(psi_inc)
-    t2 = op(t1)
-    return t1, t2
+    out, cur = [], op(psi_inc)
+    for _ in range(order):
+        out.append(cur)
+        cur = op(cur)
+    return out
+
+
+def anchor_terms(v, k, theta, gamma=None, N=None, order=2):
+    """(B1, ..., B_order); order=2 reproduces the original (B1, B2) pair."""
+    return tuple(born_series(v, k, theta, order=order, gamma=gamma, N=N))
+
+
+def fit_anchor_coeffs(v, k, theta, u, order, cond_ceiling=1e12):
+    """Least-squares complex coefficients on [B1..B_order], in-band.
+
+    Returns a real vector of length 2*order (Re/Im interleaved), or None when
+    the Gram matrix is singular past `cond_ceiling` -- in which case the fit
+    would be a rounding artefact dressed as a measurement and must be refused
+    rather than reported.
+    """
+    import numpy as _np
+    terms = born_series(v, k, theta, order=order)
+    n = u.shape[0]
+    y = u.reshape(n, -1)
+    m = torch.stack([t.reshape(n, -1) for t in terms], dim=1)
+    gram = torch.einsum("njd,nkd->jk", m.conj(), m).cpu().numpy()
+    rhs = torch.einsum("njd,nd->j", m.conj(), y).cpu().numpy()
+    cond = float(_np.linalg.cond(gram))
+    if not _np.isfinite(cond) or cond > cond_ceiling:
+        return None, cond
+    c = _np.linalg.solve(gram, rhs)
+    out = torch.zeros(2 * order, dtype=torch.float64)
+    for j, z in enumerate(c):
+        out[2 * j] = float(z.real)
+        out[2 * j + 1] = float(z.imag)
+    return out, cond
 
 def fourier_feats(f, K=FF_K):
     """NeRF-style embedding of the normalised frequency, returns (B, 2K)."""
@@ -192,9 +236,9 @@ def build_inputs(v, psi_inc, f, emb="none", anchor="none", born=None):
     """Network input tensor: [v, Re psi_inc, Im psi_inc, f/F_MAX].
 
     emb="ff" appends the Fourier-feature channels (in_channels("ff") total).
-    anchor="born" appends Re/Im of (B1, B2) from anchor_terms(); the pair is
-    passed in because the caller already has (k, theta) in hand, and recomputing
-    it would double the FFT work in the training step.
+    anchor="born" appends Re/Im of (B1..B_order) from born_series(); the terms
+    are passed in because the caller already has (k, theta) in hand, and
+    recomputing them would repeat the FFT work in the training step.
     """
     fin = (f / C.F_MAX).view(-1, 1, 1).expand(-1, v.shape[-2], v.shape[-1])
     base = torch.stack([v, psi_inc.real, psi_inc.imag, fin], dim=1)
@@ -208,29 +252,33 @@ def build_inputs(v, psi_inc, f, emb="none", anchor="none", born=None):
         return base
     if anchor == "born":
         if born is None:
-            raise ValueError("anchor='born' needs the Born pair")
-        b1, b2 = born
-        # anchor_terms returns (B, N, N); stack them as channel planes
-        ch = [t.to(base.dtype)[:, None] for t in (b1.real, b1.imag,
-                                                  b2.real, b2.imag)]
+            raise ValueError("anchor='born' needs the Born terms")
+        # born_series returns (B, N, N) per order; stack them as channel planes
+        ch = []
+        for term in born:
+            for part in (term.real, term.imag):
+                ch.append(part.to(base.dtype)[:, None])
         return torch.cat([base] + ch, dim=1)
     raise ValueError(anchor)
 
 
 def anchored_u(u_net, born, ab):
-    """u = a B1 + b B2 + u_net, the anchored residual operator.
+    """u = sum_j c_j B_j + u_net, the anchored residual operator.
 
-    `ab` is a length-4 real vector [Re a, Im a, Re b, Im b]; it is trained on
-    the band only, alongside the network, and shipped in the checkpoint, so the
-    analytic part is fixed before any out-of-band frequency is seen.  The
-    additive form is what makes the arm safe: if the learned residual collapses
-    out of band -- the failure mode C3b measured -- what is left is the anchor,
-    not the incident field.
+    `ab` is a real vector of length 2*order holding [Re c_1, Im c_1, ...]; the
+    coefficients are fitted (and then fine-tuned) on the band only and shipped
+    in the checkpoint, so the analytic part is fixed before any out-of-band
+    frequency is seen.  The additive form is what makes the arm safe: if the
+    learned residual collapses out of band -- the failure mode C3b measured --
+    what is left is the anchor, not the incident field.
+
+    With order=2 this is exactly the original a*B1 + b*B2 + u_net.
     """
-    b1, b2 = born
-    a = torch.complex(ab[0], ab[1])
-    b = torch.complex(ab[2], ab[3])
-    return a * b1 + b * b2 + u_net
+    out = u_net
+    for j, t in enumerate(born):
+        c = torch.complex(ab[2 * j], ab[2 * j + 1])
+        out = out + c * t
+    return out
 
 
 def incident(v, k, theta, device):

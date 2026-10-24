@@ -70,7 +70,14 @@ RULES_EN = [
     # aside body keeps the rule on running text and drops the cell markers.
     # What this gives up: an aside that spans a tabular alignment point -- the
     # `---` rule still catches one written with an em dash.
-    ("en-dash-aside", r"[ \t]--[ \t][^-&]{1,140}[ \t]--[ \t]", 0,
+    #
+    # The delimiters accept a newline as well as a blank.  An earlier version
+    # required `[ \t]` on both sides of each dash, so an aside whose opening
+    # dash started a line (or whose closing dash ended one) was invisible --
+    # measured 2026-10-23: one such aside sat in the English introduction
+    # while the gate reported clean.  `(?:^|\n|[ \t])` opens, `[ \t\n]`
+    # closes, and the body still excludes `-` and `&`.
+    ("en-dash-aside", r"(?:^|\n|[ \t])--[ \t\n][^-&]{1,140}[ \t\n]--[ \t\n]", 0,
      "en-dash pair used as a parenthetical aside; use `---` or restructure"),
     ("explanatory-paren",
      r"\((?:i\.e\.|e\.g\.|which|that is|the same|so that|not |see |but )",
@@ -95,11 +102,11 @@ RULES_CN = [
     # so those are carried over rather than re-declared.
     ("em-dash-aside", r"---(?!original draft|review and editing)[^-]{1,140}---", 0,
      "em-dash pair used as a parenthetical aside"),
-    ("en-dash-aside", r"[ \t]--[ \t][^-&]{1,140}[ \t]--[ \t]", 0,
+    ("en-dash-aside", r"(?:^|\n|[ \t])--[ \t\n][^-&]{1,140}[ \t\n]--[ \t\n]", 0,
      "en-dash pair used as a parenthetical aside; use `---` or restructure"),
     ("citation-after-space", r"[a-zA-Z0-9\u4e00-\u9fff]\s+\\cite\{", 0,
      "citation separated from its subject by a space without a tie"),
-    ("cn-em-dash-aside", r"——[^—]{1,60}——", 0,
+    ("cn-em-dash-aside", r"——[^—]{1,140}——", 0,
      "中文破折号插入语"),
     ("cn-explanatory-paren",
      r"（(?:即|亦即|也就是|也就是说|换言之|换句话说|因为|由于|之所以|"

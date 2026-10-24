@@ -306,6 +306,173 @@ def probe_label_uniqueness():
     return good, bad_dup, unref_only_warns
 
 
+
+def probe_delivery_parity():
+    """probe 14: the audited body must be the delivered body.
+
+    Reproduces the 2026-10-22 defect in a sandbox: paper/en/main.tex four days
+    behind submission/paper_en/main.tex.  Expected: identical bodies pass,
+    divergent bodies are reported.  Without this the four gates that read
+    paper/ can all be green about a manuscript nobody will submit.
+    """
+    import guards_gridstats as G
+    d = tempfile.mkdtemp(prefix="_delivery_probe_")
+    try:
+        for lang in ("en",):
+            os.makedirs(os.path.join(d, "paper", lang))
+            os.makedirs(os.path.join(d, "submission", "paper_%s" % lang))
+
+        def fires(a_body, b_body):
+            for rel, body in (("paper/en/main.tex", b_body),
+                              ("submission/paper_en/main.tex", a_body)):
+                with open(os.path.join(d, rel), "w", encoding="utf-8") as fh:
+                    fh.write(body)
+            del G.FAIL[:]
+            with contextlib.redirect_stdout(io.StringIO()):
+                G.delivery_guard(d)
+            return bool(G.FAIL)
+
+        same = fires("body with the deep section\n", "body with the deep section\n")
+        stale = fires("body with the deep section\n", "body without it\n")
+        del G.FAIL[:]
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+    return (not same), stale
+
+
+def probe_text_residue():
+    """probe 17: a macro that never expanded must not reach the reader.
+
+    Reproduces the 2026-10-22 defect in a sandbox: the delivered sentence read
+    ``not small:/n//delta64//to256 = //GridDeltaTop at f = 12``, so the reader
+    saw the macro's name where its value belonged.  Expected: a properly
+    referenced macro passes, both residue shapes are rejected, and a URL that
+    legitimately contains ``//`` is not mistaken for residue.
+    """
+    import guards_text as T
+    d = tempfile.mkdtemp(prefix="_text_probe_")
+    try:
+        os.makedirs(os.path.join(d, "submission", "paper_en"))
+        folder = os.path.join(d, "submission", "paper_en")
+        with open(os.path.join(folder, "gen_macros.tex"), "w", encoding="utf-8") as fh:
+            fh.write("\\newcommand{\\GridDeltaTop}{0.415}\n"
+                     "\\newcommand{\\CIPlatLo}{0.933}\n")
+
+        def fires(body):
+            with open(os.path.join(folder, "main.tex"), "w", encoding="utf-8") as fh:
+                fh.write(body)
+            del T.FAIL[:]
+            with contextlib.redirect_stdout(io.StringIO()):
+                T.text_residue_guard(d, langs=("en",))
+            return bool(T.FAIL)
+
+        res = dict(
+            clean=not fires("The difference is $\\delta_{64\\to256}=\\GridDeltaTop$ "
+                            "at $f=12$.\n"),
+            name_leak=fires("The difference is //GridDeltaTop at $f=12$.\n"),
+            newline=fires("The difference is not small:/n$\\GridDeltaTop$.\n"),
+            url_ok=not fires("Published as https://doi.org/10.3390/app16125997.\n"),
+        )
+        del T.FAIL[:]
+
+        # a figure rendered into the delivery tree but never into the build tree
+        # is a fatal compile error waiting to happen; assert the asymmetry is
+        # reported, not only the absence
+        os.makedirs(os.path.join(folder, "figs"))
+        os.makedirs(os.path.join(d, "paper", "en", "figs"))
+        open(os.path.join(folder, "figs", "fig_x.pdf"), "w").close()
+
+        def fig_fires(body, in_build_tree):
+            # the gate reads the BUILD tree, so the probe must write there --
+            # writing to submission/ and reading paper/ is the very split the
+            # gate exists to detect, and it would make the probe a no-op
+            with open(os.path.join(d, "paper", "en", "main.tex"), "w",
+                      encoding="utf-8") as fh:
+                fh.write(body)
+            p = os.path.join(d, "paper", "en", "figs", "fig_x.pdf")
+            if in_build_tree and not os.path.exists(p):
+                open(p, "w").close()
+            if not in_build_tree and os.path.exists(p):
+                os.remove(p)
+            del T.FAIL[:]
+            with contextlib.redirect_stdout(io.StringIO()):
+                T.figure_guard(d, langs=("en",))
+            return bool(T.FAIL)
+
+        res["fig_ok"] = not fig_fires("\\includegraphics{fig_x.pdf}\n", True)
+        res["fig_missing"] = fig_fires("\\includegraphics{fig_x.pdf}\n", False)
+        del T.FAIL[:]
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+    return res
+
+
+def probe_grid_guard():
+    """probe 15: the three-grid guard must fire on the claims it protects.
+
+    Three tampers, each of the kind that would make a flattering but false
+    sentence true: an order p that is second-order, a plateau that moves by
+    half under refinement, and a quadrature bound that holds everywhere
+    (which would contradict the text's explicit in-band counterexample).
+    Expected: the delivered archive passes, all three tampers are rejected.
+    """
+    import guards_gridstats as G
+    src = os.path.join(K.RES, "grid_conv_three.json")
+    if not os.path.exists(src):
+        return (False, False, False, False)
+    base = json.load(open(src, encoding="utf-8"))
+    d = tempfile.mkdtemp(prefix="_grid_probe_")
+
+    def fires(obj):
+        with open(os.path.join(d, "grid_conv_three.json"), "w",
+                  encoding="utf-8") as fh:
+            json.dump(obj, fh)
+        del G.FAIL[:]
+        with contextlib.redirect_stdout(io.StringIO()):
+            G.grid_guard(d)
+        return bool(G.FAIL)
+
+    try:
+        clean = not fires(base)
+
+        o1 = json.loads(json.dumps(base))
+        o1["ref_0.25"]["rows"][0]["p"] = 2.4
+        bad_order = fires(o1)
+
+        o2 = json.loads(json.dumps(base))
+        for r in o2["model_0.25"]["rows"]:
+            if r["f"] >= 6.0:
+                r["e256"] = r["e64"] * 1.5
+        bad_plateau = fires(o2)
+
+        o3 = json.loads(json.dumps(base))
+        for r in o3["model_0.25"]["rows"]:
+            if r["f"] == 4.0:
+                r["e256"] = 0.10          # inside the quadrature bound
+        bad_quad = fires(o3)
+        del G.FAIL[:]
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+    return clean, bad_order, bad_plateau, bad_quad
+
+
+
+def probe_doi_placeholder():
+    """probe 16: a synthesised DOI must not reach the rendered text.
+
+    The MDPI class prints a DOI derived from \articlenumber on every page; with
+    \articlenumber{0} that is 10.3390/app1010000.  Expected: a page carrying
+    only bibliography DOIs passes, and the placeholder is reported.
+    """
+    import guards_gridstats as G
+    bib = "  doi = {10.3390/app16125997}\n"
+    clean = not G._doi_offenders(
+        "Appl. Sci. 2026, 16, 5997. https://doi.org/10.3390/app16125997", bib)[2]
+    bad = bool(G._doi_offenders(
+        "Version submitted. https://doi.org/10.3390/app1010000", bib)[2])
+    return clean, bad
+
+
 def main():
     d = tempfile.mkdtemp(prefix="_gate_probe_")
     try:
@@ -358,12 +525,13 @@ def main():
                                 % (b_ok, b_lit, b_drift)))
 
     print("-- probe 8 (third level: real geology) --")
-    r_ok, r_drift, r_word, r_float, r_over = probe_realgeo_gate()
-    if all((r_ok, r_drift, r_word, r_float, r_over)):
-        print("PROBE 8: honest record accepted and all four defects rejected")
+    r_ok, r_drift, r_word, r_float, r_over, r_half = probe_realgeo_gate()
+    if all((r_ok, r_drift, r_word, r_float, r_over, r_half)):
+        print("PROBE 8: honest record accepted and all five defects rejected")
     else:
         print("PROBE 8: MISBEHAVED accepted=%s drift=%s wording=%s float=%s "
-              "overclaim=%s" % (r_ok, r_drift, r_word, r_float, r_over))
+              "overclaim=%s half=%s"
+              % (r_ok, r_drift, r_word, r_float, r_over, r_half))
 
     print("-- probe 9 (macro spacing after a control word) --")
     msp = probe_macro_spacing()
@@ -409,18 +577,332 @@ def main():
         print("PROBE 13: MISBEHAVED clean=%s dup=%s unref=%s"
               % (l_clean, l_dup, l_unref))
 
+    print("-- probe 14 (audited body vs delivered body) --")
+    d_ok, d_stale = probe_delivery_parity()
+    if d_ok and d_stale:
+        print("PROBE 14: matching bodies accepted, a stale audited body rejected")
+    else:
+        print("PROBE 14: MISBEHAVED clean=%s stale=%s" % (d_ok, d_stale))
+
+    print("-- probe 15 (three-grid claims) --")
+    g_clean, g_order, g_plat, g_quad = probe_grid_guard()
+    if all((g_clean, g_order, g_plat, g_quad)):
+        print("PROBE 15: delivered archive accepted; a second-order p, a "
+              "half-shifted plateau and an everywhere-valid quadrature bound "
+              "all rejected")
+    else:
+        print("PROBE 15: MISBEHAVED clean=%s order=%s plateau=%s quad=%s"
+              % (g_clean, g_order, g_plat, g_quad))
+
+    print("-- probe 16 (fabricated DOI in the rendered text) --")
+    p_clean, p_bad = probe_doi_placeholder()
+    if p_clean and p_bad:
+        print("PROBE 16: bibliography DOIs accepted, the class placeholder "
+              "rejected")
+    else:
+        print("PROBE 16: MISBEHAVED clean=%s bad=%s" % (p_clean, p_bad))
+
+    print("-- probe 17 (a macro that never expanded / a figure in the wrong tree) --")
+    t_res = probe_text_residue()
+    if all(t_res.values()):
+        print("PROBE 17: referenced macro, DOI URL and present figure accepted; "
+              "an unexpanded macro name, a /n residue and a figure missing from "
+              "the build tree all rejected")
+    else:
+        print("PROBE 17: MISBEHAVED %s" % t_res)
+
+    print("-- probe 18 (a baseline that is not on the evaluation media) --")
+    bb = probe_baseline_pairing()
+    if all(bb.values()):
+        print("PROBE 18: paired ratio, tight interval and consistent macros "
+              "accepted; an unpaired draw, a ratio outside its interval, a "
+              "decoration-only pairing, an unchanged denominator and a "
+              "false 'every' all rejected")
+    else:
+        print("PROBE 18: MISBEHAVED %s" % bb)
+
+    print("-- probe 19 (a ladder table that does not come from its curves) --")
+    lp = probe_locator_ladders()
+    if all(lp.values()):
+        print("PROBE 19: the reproducible ladder table and its caveat accepted; "
+              "a fabricated rung, a moved mode step, a boundary on the widest "
+              "band, a flattened onset, an everywhere-firing f* and a drifted "
+              "macro all rejected")
+    else:
+        print("PROBE 19: MISBEHAVED %s" % lp)
+
+    print("-- probe 20 (a range typeset as subtraction) --")
+    rd = probe_range_dash()
+    if all(rd.values()):
+        print("PROBE 20: a true en dash and a figure-extracted '--' both stay "
+              "quiet; the two-minus signature is rejected")
+    else:
+        print("PROBE 20: MISBEHAVED %s" % rd)
+
+    print("-- probe 21 (a resolution check that does not come from its curves) --")
+    rs = probe_resolution_study()
+    if all(rs.values()):
+        print("PROBE 21: the reproducible resolution table accepted; a moved "
+              "boundary, a seed-dependent shift, an inflated jump, a broken "
+              "paired control, both cross-path checks and a grid-dependent band "
+              "fraction all rejected")
+    else:
+        print("PROBE 21: MISBEHAVED %s" % rs)
+
+    print("-- probe 22 (the prose's verdicts against the archive) --")
+    rc = probe_resolution_claims()
+    if all(rc.values()):
+        print("PROBE 22: all six verdicts accepted on the real archive; a moved "
+              "boundary, an overlapping jump range, a lost order reversal and a "
+              "premature plateau separation all reported as contradictions")
+    else:
+        print("PROBE 22: MISBEHAVED %s" % rc)
+
+    print("-- probe 23 (spectrum-matched control and the per-sample bound) --")
+    su = probe_surrogate_gate()
+    if su.get("skipped"):
+        print("PROBE 23: SKIPPED (archive missing)")
+        su = dict(clean=True)
+    elif all(su.values()):
+        print("PROBE 23: the real archive accepted; a flipped plateau sign, an "
+              "inflated jump, a broken per-sample bound, a broken aggregate case, "
+              "an unmatched spectrum, a hidden pointwise violation and a "
+              "restored 'the bound holds' sentence all rejected")
+    else:
+        print("PROBE 23: MISBEHAVED %s" % su)
+
+    print("-- probe 24 (fit-depth/sum-depth correction) --")
+    bx = probe_bax_gate()
+    if all(bx.values()):
+        print("PROBE 24: the corrected tree accepted; a broken PASS gate, a "
+              "perturbed a025 invariant, a stripped protocol key and a "
+              "restored 'fails at v>=0.50' sentence all rejected")
+    else:
+        print("PROBE 24: MISBEHAVED %s" % bx)
+
+    sr = probe_si_refs()
+    if all(sr.values()):
+        print("PROBE 25: the real quotes accepted; a redirected table number "
+              "and an out-of-range number both rejected")
+    else:
+        print("PROBE 25: MISBEHAVED %s" % sr)
+
     good = (caught and ignored and named and duped and good3 and bad3 and fin3
             and good4 and bad4t and bad4c and all(sty.values())
             and fresh_stale and fresh_ok
             and b_ok and b_lit and b_drift
-            and r_ok and r_drift and r_word and r_float and r_over
+            and r_ok and r_drift and r_word and r_float and r_over and r_half
             and all(msp.values())
             and s_clean and s_long and s_dollar and s_bare
             and w_braced and w_bare and w_plain and w_caught
             and p_honest and p_fno and p_unet and p_mac
-            and l_clean and l_dup and l_unref)
+            and l_clean and l_dup and l_unref
+            and d_ok and d_stale
+            and g_clean and g_order and g_plat and g_quad
+            and p_clean and p_bad
+            and all(t_res.values())
+            and all(bb.values())
+            and all(lp.values())
+            and all(rd.values())
+            and all(rs.values())
+            and all(rc.values())
+            and all(su.values())
+            and all(bx.values())
+            and all(sr.values()))
     print("PROBE RESULT: %s" % ("all gates fire on known-bad input" if good else "GATE FAILED"))
     return 0 if good else 1
+
+
+def probe_baseline_pairing():
+    """probe 18: the plateau-to-baseline ratio must be paired, and shown to be.
+
+    Five ways for this to go wrong, each reproduced on a copy of the real
+    result files so that a passing run means the guard reads live data:
+
+    1. the test media stop being paired across frequency (two distinct `v`
+       digests in one contrast);
+    2. the ratio falls outside its own interval;
+    3. the paired interval is no narrower than the unpaired counterfactual,
+       i.e. the pairing carries no information and the word is decorative;
+    4. the 200- and 600-media denominators are identical, so the switch of
+       denominator changed nothing and its cost is unjustified;
+    5. the printed ratio and the interval table disagree, or `TrivRatioLo`
+       drops below one while the prose says every arm sits above its baseline.
+
+    Expected: the untouched copy passes; each mutation is rejected.
+    """
+    import guards_gridstats as G
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    src_res = os.path.join(root, "results")
+    d = tempfile.mkdtemp(prefix="_base_probe_")
+    try:
+        res = os.path.join(d, "results")
+        os.makedirs(res)
+        for fn in ("triv_paired.json", "ci_plateau.json"):
+            shutil.copy(os.path.join(src_res, fn), res)
+        os.makedirs(os.path.join(d, "paper", "en"))
+        gm_src = os.path.join(root, "paper", "en", "gen_macros.tex")
+        gm = os.path.join(d, "paper", "en", "gen_macros.tex")
+        shutil.copy(gm_src, gm)
+        tp = os.path.join(res, "triv_paired.json")
+        ci = os.path.join(res, "ci_plateau.json")
+        base_tp = json.load(open(tp, encoding="utf-8"))
+        base_ci = json.load(open(ci, encoding="utf-8"))
+        base_gm = open(gm, encoding="utf-8").read()
+
+        def fires(tp_mut=None, ci_mut=None, gm_mut=None):
+            json.dump(tp_mut or base_tp, open(tp, "w", encoding="utf-8"))
+            json.dump(ci_mut or base_ci, open(ci, "w", encoding="utf-8"))
+            open(gm, "w", encoding="utf-8").write(
+                base_gm if gm_mut is None else base_gm.replace(*gm_mut))
+            del G.FAIL[:]
+            with contextlib.redirect_stdout(io.StringIO()):
+                G.baseline_pairing_guard(res=res, root=d)
+            return bool(G.FAIL)
+
+        def mutate(obj, fn):
+            new = json.loads(json.dumps(obj))
+            fn(new)
+            return new
+
+        unpaired = mutate(base_tp, lambda o: o["data"]["0.25"].update(
+            _v_md5_unique=2))
+        outside = mutate(base_ci, lambda o: o["rows"][2].update(
+            ratio_hi=o["rows"][2]["ratio"] - 1e-3))
+        flat = mutate(base_ci, lambda o: o["rows"][2].update(
+            ratio_un_lo=o["rows"][2]["ratio_lo"],
+            ratio_un_hi=o["rows"][2]["ratio_hi"]))
+        same500 = mutate(base_tp, lambda o: o.update(
+            rel_diff_vs_600=dict(mean=0.0002, max=0.001)))
+        word = ("\\TrivRatioLo}{1.02", "\\TrivRatioLo}{0.98")
+        drift = ("\\PlatTrivMid}{1.027", "\\PlatTrivMid}{1.120")
+
+        res_d = dict(
+            clean=not fires(),
+            unpaired=fires(tp_mut=unpaired),
+            outside=fires(ci_mut=outside),
+            no_shrink=fires(ci_mut=flat),
+            same_size=fires(tp_mut=same500),
+            word=fires(gm_mut=word),
+            drift=fires(gm_mut=drift),
+        )
+        del G.FAIL[:]
+        return res_d
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
+
+def probe_locator_ladders():
+    """probe 19: the ladder table must be reproducible, and every claim in it.
+
+    Six ways for it to go wrong, each on a copy of the real table while the
+    curves underneath stay real:
+
+    1. a capacity rung is given a different f*, i.e. the table asserts a
+       movement the curves do not contain;
+    2. the mode ladder's largest step is moved on one rung, which would break
+       "the budget does not move the boundary";
+    3. the widest band is given a boundary at the last node, converting the
+       paper's stated absence into a fabricated measurement;
+    4. the half-plateau onset is flattened across the mode ladder, erasing the
+       one caveat the text admits;
+    5. f* is made to fire at every mode budget, contradicting the text;
+    6. the printed macro disagrees with the table.
+
+    Expected: the untouched copy passes; each mutation is rejected.
+    """
+    import guards_locators as LG
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    d = tempfile.mkdtemp(prefix="_loc_probe_")
+    try:
+        res = os.path.join(d, "results")
+        os.makedirs(res)
+        src = os.path.join(root, "results", "locators.json")
+        dst = os.path.join(res, "locators.json")
+        shutil.copy(src, dst)
+        os.makedirs(os.path.join(d, "paper", "en"))
+        gm = os.path.join(d, "paper", "en", "gen_macros.tex")
+        shutil.copy(os.path.join(root, "paper", "en", "gen_macros.tex"), gm)
+        base = json.load(open(dst, encoding="utf-8"))
+        base_gm = open(gm, encoding="utf-8").read()
+
+        def fires(mut=None, gm_sub=None):
+            json.dump(mut or base, open(dst, "w", encoding="utf-8"))
+            open(gm, "w", encoding="utf-8").write(
+                base_gm if gm_sub is None else base_gm.replace(*gm_sub))
+            del LG.FAIL[:]
+            with contextlib.redirect_stdout(io.StringIO()):
+                LG.locator_guard(res=res, root=d, eval_res=os.path.join(root, "results"))
+            return bool(LG.FAIL)
+
+        def mutate(fn):
+            new = json.loads(json.dumps(base))
+            fn(new)
+            return new
+
+        def cap_moves(o):
+            o["ladders"]["cap"]["rows"][1]["fstar"] = 4.25
+
+        def mode_step(o):
+            o["ladders"]["mode"]["rows"][0]["step"] = [3.50, 4.00]
+
+        def widest_band(o):
+            o["ladders"]["band"]["rows"][-1]["step"] = [11.00, 12.00]
+
+        def flat_onset(o):
+            for r in o["ladders"]["mode"]["rows"]:
+                if r["onset"] is not None:
+                    r["onset"] = 4.25
+
+        def all_fire(o):
+            for r in o["ladders"]["mode"]["rows"]:
+                if r["fstar"] is None:
+                    r["fstar"] = 4.50
+
+        got = dict(
+            clean=not fires(),
+            cap_moves=fires(mutate(cap_moves)),
+            mode_step=fires(mutate(mode_step)),
+            widest_band=fires(mutate(widest_band)),
+            flat_onset=fires(mutate(flat_onset)),
+            all_fire=fires(mutate(all_fire)),
+            macro=fires(gm_sub=("\\LocModeSilent}{4", "\\LocModeSilent}{0")),
+        )
+        del LG.FAIL[:]
+        return got
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
+
+def probe_range_dash():
+    """probe 20: a numeric range must not read as subtraction -- and must not
+    be reported when the extraction merely collapses an en dash.
+
+    Three inputs:
+      good      an en dash between two numbers, which is the correct output;
+      bad       the signature of a `--` typed inside $...$, i.e. two U+2212;
+      figeq     two ASCII hyphens, which is how pdftotext renders an en dash
+                inside a matplotlib legend, verified by rendering page 34.
+
+    The middle must fire and the other two must stay quiet.  Testing only the
+    bad input would leave the guard free to reject correct manuscripts, which
+    is the failure mode that costs more.
+    """
+    import guards_text as T
+    cases = dict(
+        good="the step occupies 4.00\u20134.25 on every rung\n",
+        bad="the step occupies 4.00 \u2212 \u22124.25 on every rung\n",
+        figeq="baseline, gamma=0.05 (4.53--10.02)\n",
+    )
+    out = {}
+    for k, v in cases.items():
+        del T.FAIL[:]
+        with contextlib.redirect_stdout(io.StringIO()):
+            T.range_dash_guard(texts={"en": v}, langs=("en",), root=".")
+        out[k] = bool(T.FAIL)
+    del T.FAIL[:]
+    return dict(good_quiet=not out["good"], bad_fires=out["bad"],
+                fig_quiet=not out["figeq"])
 
 
 def _synthetic_residual(gate=1e-9, refined_max=9.8e-13, shipped_max=3.7e-8,
@@ -462,6 +944,191 @@ def _synthetic_residual(gate=1e-9, refined_max=9.8e-13, shipped_max=3.7e-8,
             "injection": [dict(eta=e, batch=0, frac_flagged=f, median=1e-9)
                           for e, f in [(1e-3, 1.0), (1e-5, 1.0), (1e-7, 0.5)]]},
     }
+
+
+def probe_resolution_study():
+    """probe 21: the resolution check must be a measurement, not a slogan.
+
+    Eight ways for it to be wrong, each on a copy of the archive while the
+    stored curves stay real:
+
+    1. the refined arm's f* is moved, i.e. the table claims the boundary moved
+       while the text says it did not;
+    2. only one refined seed's f* moves, so the seed-mean is still stable and
+       the invariance would print as seed-robust when it is not;
+    3. the jump factor is inflated at the refined grid beyond the seed spread;
+    4. the paired-continuum control is given a shifted f* on one grid, turning
+       the media-held-fixed argument into its opposite;
+    5. the coarse Marmousi side is edited so it no longer reproduces
+       realgeo.json -- the cross-path check must notice;
+    6. the coarse synthetic curve is edited so it no longer reproduces the main
+       evaluator's sweep;
+    7. the 128^2 band fraction of the windows is moved, which would make the
+       real-vs-synthetic contrast grid-dependent;
+    8. a printed macro disagrees with the table.
+
+    Expected: the untouched copy passes; every mutation is rejected.
+    """
+    import guards_res as RG
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    d = tempfile.mkdtemp(prefix="_res_probe_")
+    try:
+        res = os.path.join(d, "results")
+        os.makedirs(res)
+        for nm in ("res_study.json", "realgeo.json", "eval_main_fno_a025_s0.json"):
+            shutil.copy(os.path.join(root, "results", nm), os.path.join(res, nm))
+        os.makedirs(os.path.join(d, "paper", "en"))
+        gm = os.path.join(d, "paper", "en", "gen_macros.tex")
+        shutil.copy(os.path.join(root, "paper", "en", "gen_macros.tex"), gm)
+        base = json.load(open(os.path.join(res, "res_study.json"), encoding="utf-8"))
+        base_gm = open(gm, encoding="utf-8").read()
+
+        def fires(mut=None, gm_sub=None):
+            json.dump(mut or base, open(os.path.join(res, "res_study.json"),
+                                        "w", encoding="utf-8"))
+            open(gm, "w", encoding="utf-8").write(
+                base_gm if gm_sub is None else base_gm.replace(*gm_sub))
+            del RG.FAIL[:]
+            with contextlib.redirect_stdout(io.StringIO()):
+                RG.res_guard(res=res, root=d)
+            return bool(RG.FAIL)
+
+        def mutate(fn):
+            new = json.loads(json.dumps(base))
+            fn(new)
+            return new
+
+        def shift_fstar(o):
+            o["part_a"]["grids"]["128"]["fstar"] = 5.00
+
+        def one_seed(o):
+            o["part_a"]["grids"]["128"]["fstar_seeds"][0] = 4.00
+
+        def inflate_jump(o):
+            o["part_a"]["grids"]["128"]["jump"] *= 1.5
+            o["part_a"]["grids"]["128"]["jump_seeds"] = [
+                o["part_a"]["grids"]["128"]["jump"]] * 3
+
+        def break_paired(o):
+            o["part_b"]["grids"]["64"]["fstar"] = 5.00
+
+        def break_realgeo(o):
+            o["part_c"]["grids"]["64"]["per_geometry"]["geo_west"]["fstar"] = 5.00
+
+        def break_eval(o):
+            o["part_a"]["curves"]["64"][3]["s0"]["mean"] *= 1.5
+
+        def move_band(o):
+            for w in ("west", "centre", "east"):
+                o["part_c"]["grids"]["128"]["per_geometry"]["geo_" + w]["bands"]["20"] += 0.05
+
+        got = dict(
+            clean=not fires(),
+            shift_fstar=fires(mutate(shift_fstar)),
+            one_seed=fires(mutate(one_seed)),
+            inflate_jump=fires(mutate(inflate_jump)),
+            break_paired=fires(mutate(break_paired)),
+            break_realgeo=fires(mutate(break_realgeo)),
+            break_eval=fires(mutate(break_eval)),
+            move_band=fires(mutate(move_band)),
+            macro=fires(gm_sub=("\\ResFstarFine}{", "\\ResFstarFine}{1")),
+        )
+        del RG.FAIL[:]
+        return got
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
+def probe_resolution_claims():
+    """probe 22: the verdicts in the prose must break when the data breaks.
+
+    probe 21 asks whether the table reproduces its curves.  This one asks the
+    complementary question, the one that failed in this paper's history: the
+    sentences read "the boundary does not move", "the jump rises", "the jump
+    reverses the two families' order", "the plateau separates them only at
+    128^2" -- and each of those is a *claim about the data*, so a re-run that
+    makes one of them false has to stop the gate rather than leave a paragraph
+    quietly wrong.
+
+    Four mutations, each applied to the per-seed curves so that nothing but the
+    verdict changes:
+
+    1. the refined arm's curve is flattened at 4.5, which moves f*;
+    2. the refined arm's f=5 level is set to the coarse one, so the jump ranges
+       overlap and the rise becomes seed noise;
+    3. the synthetic control's f=5 level at 128^2 is lowered, so the jump no
+       longer reverses the families' order;
+    4. the lowest-abundance synthetic control's plateau at 64^2 is raised, so
+       the plateau would separate the families at the coarse mesh too.
+
+    Expected: the untouched archive passes all six verdicts; every mutation is
+    reported as a contradiction.
+    """
+    import guards_res as RG
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    d = tempfile.mkdtemp(prefix="_res_claim_")
+    try:
+        res = os.path.join(d, "results")
+        os.makedirs(res)
+        shutil.copy(os.path.join(root, "results", "res_study.json"),
+                    os.path.join(res, "res_study.json"))
+        base = json.load(open(os.path.join(res, "res_study.json"), encoding="utf-8"))
+
+        def fires(fn=None):
+            obj = json.loads(json.dumps(base))
+            if fn is not None:
+                fn(obj)
+            json.dump(obj, open(os.path.join(res, "res_study.json"), "w",
+                                encoding="utf-8"))
+            del RG.FAIL[:]
+            with contextlib.redirect_stdout(io.StringIO()):
+                RG.claim_guard(res=res)
+            return bool(RG.FAIL)
+
+        def flat_edge(o):
+            for r in o["part_a"]["curves"]["128"]:
+                if abs(r["f"] - 4.5) < 1e-9:
+                    for k in ("s0", "s1", "s2"):
+                        r[k]["mean"] *= 0.4
+
+        def level_jump(o):
+            # Lowering the refined arm's f=5 level puts its per-seed jumps
+            # inside the coarse arm's range, which is the case the paper's
+            # "does not overlap" sentence would be wrong about.  Scaling rather
+            # than copying matters: the two grids have different f=4 levels, so
+            # copying the coarse value leaves the ratio above the coarse one
+            # and the mutation would be invisible for an honest reason.
+            for r in o["part_a"]["curves"]["128"]:
+                if abs(r["f"] - 5.0) < 1e-9:
+                    for k in ("s0", "s1", "s2"):
+                        r[k]["mean"] *= 0.93
+
+        def kill_flip(o):
+            for name, rows in o["part_c"]["curves"]["128"].items():
+                if not name.startswith("syn_"):
+                    continue
+                for r in rows:
+                    if abs(r["f"] - 5.0) < 1e-9:
+                        for k in ("s0", "s1", "s2"):
+                            r[k]["mean"] *= 0.75
+
+        def separate_coarse(o):
+            rows = o["part_c"]["curves"]["64"].get("syn_2") or []
+            for r in rows:
+                if r["f"] >= 6.0 - 1e-9:
+                    for k in ("s0", "s1", "s2"):
+                        r[k]["mean"] *= 1.10
+
+        got = dict(
+            clean=not fires(),
+            flat_edge=fires(flat_edge),
+            level_jump=fires(level_jump),
+            kill_flip=fires(kill_flip),
+            separate_coarse=fires(separate_coarse),
+        )
+        del RG.FAIL[:]
+        return got
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
 
 
 def probe_residual_guard():
@@ -645,6 +1312,25 @@ def probe_style_gate():
         en_dash_wrapped_ok=not scan_fails(
             "the level above it, measured\nfield data, is named as absent "
             "rather than as a finding.\n", "en"),
+        # The second blind spot, measured 2026-10-23: the delimiters required
+        # `[ \t]` on both sides of each dash, so an aside whose opening dash
+        # starts a line (or whose closing dash ends one) was invisible -- a
+        # line break is not a blank.  One such aside sat in the English
+        # introduction while the gate reported clean.
+        en_dash_linestart_bad=scan_fails(
+            "the step without training\n-- an analytic head fitted inside "
+            "the band plus a learned residual on top --\nearns its place.\n",
+            "en"),
+        en_dash_linestart_ok=not scan_fails(
+            "the step without training\nand an analytic head fitted inside "
+            "the band earns its place.\n", "en"),
+        # The Chinese em-dash rule capped the aside body at 60 characters
+        # while the English rule meters 140, so a long Chinese aside was
+        # invisible; the cap now matches.
+        cn_dash_long_bad=scan_fails(
+            "其他算子主干——消息传递\cite{brandstetter2022message} 与 "
+            "Transformer 式架构\cite{hao2024dpot}——同样可在本文数据上训练。\n",
+            "cn"),
         cn_bad=scan_fails(
             "该结论——在低频段尤其明显——并不新。值得注意的是它成立。\n", "cn"),
         cn_ok=not scan_fails("该结论并不新，且在该频段成立。\n", "cn"),
@@ -811,11 +1497,19 @@ def probe_realgeo_gate():
     old_res = K.RES
     K.RES = res
     try:
-        # (1) honest record, both sentences present -> accepted
+        # (1) honest record, all three sentences present -> accepted.  Three,
+        # not one: the level-3 verdict now rests on a spectrum-matched control,
+        # so the fixture has to carry the structural part of the plateau
+        # difference and the unresolved jump as well as the old refusal.
+        honest_en = ("the plateau does not separate the two families "
+                     "\\RealPlateauOverlapArms ; the plateau is higher on\n"
+                     "the geological window by $\\GeoSurPlatDelta$ ; the jump "
+                     "factor does not order the two families, $\\GeoJumpPCoarse$")
+        honest_cn = ("平台高度并不分离两者 \\RealPlateauOverlapArms；"
+                     "结构效应为 $\\GeoSurPlatDevPct$ 个百分点；"
+                     "跃变从未把两族排出次序 $\\GeoJumpPCoarse$")
         write_json(_synthetic_realgeo())
-        write_paper("the plateau does not separate the two families "
-                    "\\RealPlateauOverlapArms",
-                    "平台高度并不分离两者 \\RealPlateauOverlapArms")
+        write_paper(honest_en, honest_cn)
         del K.FAIL[:]
         run(d, K.realgeo_guard, d)
         honest_ok = not K.FAIL
@@ -836,30 +1530,39 @@ def probe_realgeo_gate():
         wording_rejected = bool(K.FAIL)
 
         # (4) the float is no longer referenced in either language
-        write_paper("the plateau does not separate the two families "
-                    "\\RealPlateauOverlapArms",
-                    "平台高度并不分离两者 \\RealPlateauOverlapArms",
-                    drop_float=True)
+        write_paper(honest_en, honest_cn, drop_float=True)
         del K.FAIL[:]
         run(d, K.realgeo_guard, d)
         float_rejected = bool(K.FAIL)
 
         # (5) the measurement no longer supports the non-separation sentence
         write_json(_synthetic_realgeo(overlap_arms=1))
+        write_paper(honest_en, honest_cn)
         del K.FAIL[:]
         run(d, K.realgeo_guard, d)
         overclaim_rejected = bool(K.FAIL)
+
+        # (6) the old half survives and the two new halves are dropped: the
+        # gate must not read this as "the refusal is present, all good".  This
+        # is the case the earlier one-sentence contract could not see.
+        write_json(_synthetic_realgeo())
+        write_paper("the plateau does not separate the two families "
+                    "\\RealPlateauOverlapArms",
+                    "平台高度并不分离两者 \\RealPlateauOverlapArms")
+        del K.FAIL[:]
+        run(d, K.realgeo_guard, d)
+        half_rejected = bool(K.FAIL)
         del K.FAIL[:]
     finally:
         K.RES = old_res
         shutil.rmtree(d, ignore_errors=True)
     print("   honest record accepted = %s ; protocol drift rejected = %s ; "
           "missing refusal rejected = %s ; unreferenced float rejected = %s ; "
-          "unsupported refusal rejected = %s"
+          "unsupported refusal rejected = %s ; half-verdict rejected = %s"
           % (honest_ok, drift_rejected, wording_rejected, float_rejected,
-             overclaim_rejected))
+             overclaim_rejected, half_rejected))
     return honest_ok, drift_rejected, wording_rejected, float_rejected, \
-        overclaim_rejected
+        overclaim_rejected, half_rejected
 
 
 def probe_freshness_gate():
@@ -958,6 +1661,277 @@ def probe_macro_spacing():
     return res
 
 
+
+def probe_bax_gate():
+    """probe 24: the fit-depth/sum-depth correction must be defended.
+
+    The corrected arms (bax) reversed a boundary the previous draft printed.
+    Four sentences rest on that reversal, so four mutations:
+
+    1. inflate one corrected arm's in-band entry past the trained operator's,
+       so the recomputed PASS verdict no longer follows from the gates;
+    2. perturb one re-scored a025 number, breaking the bit-for-bit invariance
+       that certifies the fix changed only the head's semantics;
+    3. strip head_semantics from a corrected archive, the shape that would
+       let a truncated-scored number sit beside a full-scored one;
+    4. put a withdrawn sentence -- "fails at v>=0.50" -- back into a copy of
+       each manuscript.
+
+    Expected: the untouched tree passes all four; every mutation is reported.
+    """
+    import guards_bax as GB
+    import common as C
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    d = tempfile.mkdtemp(prefix="_bax_probe_")
+    try:
+        res = os.path.join(d, "results")
+        shutil.copytree(os.path.join(root, "results"), res,
+                        ignore=shutil.ignore_patterns("_*log*", "*.log"))
+        sub = os.path.join(d, "submission")
+        for lang in ("en", "cn"):
+            os.makedirs(os.path.join(sub, "paper_%s" % lang))
+            shutil.copy(os.path.join(root, "submission", "paper_%s" % lang,
+                                     "main.tex"),
+                        os.path.join(sub, "paper_%s" % lang, "main.tex"))
+
+        def run(with_txt=None):
+            old_res, old_bak = C.RES, GB.BACKUP
+            C.RES, GB.BACKUP = res, os.path.join(res,
+                                                 "_archive_truncated_semantics")
+            try:
+                del GB.FAIL[:]
+                with contextlib.redirect_stdout(io.StringIO()):
+                    GB.bax_guard()
+                    # the archive guard reports through GB.FAIL, the text
+                    # guard through its return value (its own local list)
+                    fired = bool(GB.FAIL)
+                    if with_txt is not None:
+                        fired = GB.bax_text_guard(paths=with_txt) or fired
+                return fired
+            finally:
+                C.RES, GB.BACKUP = old_res, old_bak
+
+        def mut(path, fn):
+            o = json.load(open(path, encoding="utf-8"))
+            fn(o)
+            json.dump(o, open(path, "w", encoding="utf-8"))
+
+        def break_pass(o):
+            for r in o["in_band"]:
+                if abs(r["vmax"] - 0.50) < 1e-6:
+                    r["mean"] = 0.5  # far above the trained operator's 0.187
+
+        def break_invariant(o):
+            # sweep keys are contrasts, values are per-frequency records
+            o["sweep"]["0.50"][0]["mean"] *= 1.000001
+
+        def hide_protocol(o):
+            o.pop("head_semantics", None)
+
+        clean = not run()   # run() returns True when the guard fires
+        p = os.path.join(res, "eval_bax_fno_a050_m8_s0.json")
+        mut(p, break_pass); b1 = run(); mut(p, lambda o: None)
+        shutil.copy(os.path.join(root, "results",
+                                 "eval_bax_fno_a050_m8_s0.json"), p)
+        p2 = os.path.join(res, "eval_ba_fno_a025_m8_s0.json")
+        mut(p2, break_invariant); b2 = run()
+        shutil.copy(os.path.join(root, "results",
+                                 "eval_ba_fno_a025_m8_s0.json"), p2)
+        p3 = os.path.join(res, "eval_bax_fno_a100_m7_s0.json")
+        mut(p3, hide_protocol); b3 = run()
+        shutil.copy(os.path.join(root, "results",
+                                 "eval_bax_fno_a100_m7_s0.json"), p3)
+        txt = {}
+        for lang, sent in (("en", "the same arm fails at $v_{\max}\ge0.50$, "
+                                    "destroying the plateau."),
+                           ("cn", "同一臂在 $v_{\max}\ge0.50$ 失效。")):
+            mp = os.path.join(sub, "paper_%s" % lang, "main.tex")
+            t = open(mp, encoding="utf-8").read()
+            open(mp, "w", encoding="utf-8").write(
+                t.replace("\\begin{abstract}", sent + "\n\\begin{abstract}", 1)
+                 if "\\begin{abstract}" in t else sent + "\n" + t)
+            txt[lang] = mp
+        b4 = run(with_txt=txt)
+        out = dict(clean=clean, pass_broken=b1, invariant_broken=b2,
+                   protocol_hidden=b3, text_drift=b4)
+        del GB.FAIL[:]
+        return out
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
+
+def probe_surrogate_gate():
+    """probe 23: the spectrum-matched sentences must break when the archive does.
+
+    Three sentences were rewritten after the intervals were computed: the jump
+    is "not resolved beyond the window spread", the plateau "carries a
+    structural part of one to three percent with the same sign at both meshes",
+    and the quadrature sum "bounds the error in the mean, not sample by sample".
+    Each is a claim about the archive, so each must stop the gate when the
+    archive contradicts it.  Six mutations:
+
+    1. flip the sign of the plateau delta at 128^2, so the two meshes disagree
+       about the direction of the structure effect;
+    2. multiply every jump delta by five, so the interval excludes zero and
+       "not resolved" becomes false;
+    3. raise the per-sample bound's ratio above one, so the bound no longer
+       holds even in the mean at f=4;
+    4. raise the aggregate ratio above one at f=5, which the text presents as
+       the ordinary case;
+    5. coarsen the surrogate's spectrum, so "matched" is unearned;
+    6. hide the pointwise violation (viol_same := 0), the archive shape that
+       would make the RMS qualification unearned.
+
+    A seventh case tests the text side rather than the data side: a manuscript
+    that puts the withdrawn sentence back must be rejected by the text guard,
+    because the data guard cannot see prose.
+
+    Expected: the untouched archive passes; every mutation is reported.
+    """
+    import guards_surrogate as SG
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    d = tempfile.mkdtemp(prefix="_sur_probe_")
+    try:
+        res = os.path.join(d, "results")
+        os.makedirs(res)
+        names = ("geo_windows.json", "bound_cross.json", "p0_checks.json")
+        base = {}
+        for n in names:
+            src = os.path.join(root, "results", n)
+            if not os.path.exists(src):
+                return dict(skipped=True)
+            base[n] = json.load(open(src, encoding="utf-8"))
+            shutil.copy(src, os.path.join(res, n))
+
+        def reset():
+            for n in names:
+                json.dump(base[n], open(os.path.join(res, n), "w",
+                                        encoding="utf-8"))
+
+        def fires(mut=None, file=None):
+            reset()
+            if mut is not None:
+                obj = json.loads(json.dumps(base[file]))
+                mut(obj)
+                json.dump(obj, open(os.path.join(res, file), "w",
+                                    encoding="utf-8"))
+            del SG.FAIL[:]
+            with contextlib.redirect_stdout(io.StringIO()):
+                SG.surrogate_guard(os.path.join(res, "geo_windows.json"))
+                SG.bound_guard(os.path.join(res, "bound_cross.json"))
+                SG.paired_jump_guard(os.path.join(res, "p0_checks.json"))
+            return bool(SG.FAIL)
+
+        def text_fires(sentence=None):
+            """Re-run the text guard on a copy of the delivered manuscript."""
+            src = os.path.join(root, "submission", "paper_en", "main.tex")
+            if not os.path.exists(src):
+                return None
+            sub = os.path.join(d, "sub")
+            os.makedirs(os.path.join(sub, "paper_en"), exist_ok=True)
+            txt = open(src, encoding="utf-8").read()
+            if sentence:
+                # the front matter uses \abstract{...}, not the environment
+                assert "\\abstract{" in txt, "no anchor for the drift probe"
+                txt = txt.replace("\\abstract{",
+                                  sentence + "\n\\abstract{", 1)
+            open(os.path.join(sub, "paper_en", "main.tex"), "w",
+                 encoding="utf-8").write(txt)
+            del SG.FAIL[:]
+            with contextlib.redirect_stdout(io.StringIO()):
+                SG.bound_text_guard(sub)
+            return bool(SG.FAIL)
+
+        def flip_plat(o):
+            for p in o["by_grid"]["128"]["pairs"]:
+                p["delta_plat"] = -p["delta_plat"]
+
+        def big_jump(o):
+            # Scaling every delta leaves the t statistic unchanged, because mean
+            # and standard error scale together; a mutation that cannot move the
+            # p-value is not a test of the sentence.  Making the deltas nearly
+            # constant and positive is the mutation that does move it.
+            for g in o["by_grid"]:
+                for i, p in enumerate(o["by_grid"][g]["pairs"]):
+                    p["delta_jump"] = 0.5 + 0.001 * i
+
+        def break_bound(o):
+            o["rows"][0]["ratio_same"] = 1.05
+
+        def break_aggregate(o):
+            for r in o["rows"]:
+                if int(r["f"]) == 5:
+                    r["ratio_aggregate"] = 1.02
+
+        def coarse_spectrum(o):
+            for name, meta in o["by_grid"]["64"]["meta"].items():
+                if name.startswith("sur_"):
+                    meta["bands"] = {k: v * 0.5 for k, v in meta["bands"].items()}
+
+        def hide_violation(o):
+            r = o["rows"][0]
+            r["viol_same"] = 0.0
+            r["ratio_max_same"] = 1.0
+
+        out = dict(
+            clean=not fires(),
+            plat_sign=fires(flip_plat, "geo_windows.json"),
+            jump_resolved=fires(big_jump, "geo_windows.json"),
+            bound_broken=fires(break_bound, "bound_cross.json"),
+            aggregate_broken=fires(break_aggregate, "bound_cross.json"),
+            spectrum_unmatched=fires(coarse_spectrum, "geo_windows.json"),
+            violation_hidden=fires(hide_violation, "bound_cross.json"),
+        )
+        tf = text_fires("The inequality as written therefore holds at $f=4$.")
+        if tf is not None:
+            clean_text = text_fires()
+            out["text_drift"] = bool(tf) and not clean_text
+        del SG.FAIL[:]
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+    for k in sorted(out):
+        print("   %-18s %s" % (k, out[k]))
+    return out
+
+
+def probe_si_refs():
+    """probe 25: the hard-coded Supplementary Table numbers must break when a
+    quote points at the wrong table.
+
+    The gate recomputes the SI numbering from the SI source and requires each
+    quoted number to point at a caption that shares distinctive vocabulary
+    with the quoting sentence.  Three cases: the untouched manuscript passes;
+    a quote redirected at an unrelated table (15 -> 7, no shared vocabulary)
+    is rejected; a quote beyond the table count is rejected as well.
+    """
+    import subprocess
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    gate = os.path.join(root, "code", "check_si_refs.py")
+    main_tex = os.path.join(root, "submission", "paper_en", "main.tex")
+    src = open(main_tex, encoding="utf-8").read()
+
+    def run():
+        p = subprocess.run([sys.executable, gate], cwd=root,
+                           capture_output=True, text=True)
+        return p.returncode, p.stdout
+
+    out = {}
+    try:
+        rc, log = run()
+        out["clean"] = (rc == 0)
+        open(main_tex, "w", encoding="utf-8").write(
+            src.replace("(Supplementary Table~15)", "(Supplementary Table~7)"))
+        rc, log = run()
+        out["wrong_table"] = (rc != 0 and "Table~7" in log)
+        open(main_tex, "w", encoding="utf-8").write(
+            src.replace("(Supplementary Table~15)",
+                        "(Supplementary Table~99)"))
+        rc, log = run()
+        out["out_of_range"] = (rc != 0 and "only has" in log)
+    finally:
+        open(main_tex, "w", encoding="utf-8").write(src)
+    return out
+
+
 if __name__ == "__main__":
     sys.exit(main())
-
