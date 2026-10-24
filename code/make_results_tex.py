@@ -58,12 +58,17 @@ CAP = { "en": dict(
            "and $r$ of Table~\\ref{tab:summary}; both groups are means over the "
            "same \\RealWinN{} windows rather than the \\MainNMedia{} paired "
            "media of Table~\\ref{tab:main}, and differ only in geometry."),
-  paired=("Paired tests on the per-sample errors. $A$, $B$: the two "
-          "configurations of the first column; $n$: entries averaged (media "
-          "$\\times$ seeds $\\times$ frequency cells); $\\Delta$: mean paired "
-          "difference, its 95\\% interval resampling media; $p$: two-sided "
-          "sign-flip permutation, reported to one significant figure; $*$: "
-          "interval excluding zero."),
+  paired=("Paired tests on the per-sample errors. $n$: entries averaged; "
+          "$\\Delta=\\bar e_{A}-\\bar e_{B}$: mean paired difference, negative "
+          "when $A$ is the more accurate, 95\\% interval resampling media; $p$: "
+          "sign-flip; $d_z$: standardised paired effect size, $\\bar\\Delta/"
+          "\\mathrm{sd}(\\Delta)$; $*$: interval excluding zero."),
+  si_paired=("Paired tests on the per-sample errors. $n$: entries averaged; "
+             "$\\Delta=\\bar e_{A}-\\bar e_{B}$: mean paired difference, "
+             "negative when $A$ is the more accurate, 95\\% interval "
+             "resampling media; $p$: sign-flip; $d_z$: standardised paired "
+             "effect size, $\\bar\\Delta/\\mathrm{sd}(\\Delta)$; $*$: interval "
+             "excluding zero."),
   arms=("Complete inventory of the trained arms behind the seeding protocol. "
         "$\\varepsilon(f)$: seed-mean relative $L_2$; the last column averages "
         "$f\\ge6$. For the widened-band arms these lie inside their own "
@@ -833,6 +838,11 @@ def table_paired(cap):
     media that is, and ``n`` how many (medium, cell) entries their mean
     contains.  An earlier revision resampled the entries and one in-band row
     therefore carried a star that the media-level test does not support.
+
+    The last column is the standardised paired effect size (Cohen's d_z), the
+    mean paired difference in units of its own standard deviation: a p-value
+    says whether a difference is resolved, this says how large it is, and a
+    comparison can carry a small p with a large effect or the reverse.
     """
     p = os.path.join(C.RES, "paired.json")
     if not os.path.exists(p):
@@ -841,16 +851,47 @@ def table_paired(cap):
     lab = cap["paired_lab"]
     t = ("\\begin{table}[t]\n\\centering\n\\caption{%s}\n\\label{tab:paired}\n"
          "\\small\n\\setlength{\\tabcolsep}{3.6pt}\n"
-         "\\begin{tabular}{lrrrrr}\n\\toprule\n"
+         "\\begin{tabular}{lrrrrrr}\n\\toprule\n"
          " & $n$ & $\\bar e_{A}$ & $\\bar e_{B}$ & $\\Delta$ (95\\%% CI) & $p$ "
-         "\\\\\n\\midrule\n" % cap["paired"])
+         "& $d_z$ \\\\\n\\midrule\n" % cap["paired"])
     for c in d["cases"]:
         name = lab.get(c["label"], c["label"])
         star = "*" if c["lo"] > 0 or c["hi"] < 0 else ""
-        t += ("%s & %d & %s & %s & $%+.3f$ $[%+.3f,%+.3f]$ & $%s$%s \\\\\n"
+        t += ("%s & %d & %s & %s & $%+.3f$ $[%+.3f,%+.3f]$ & $%s$%s & $%+.2f$ "
+              "\\\\\n"
               % (name, c.get("n", c["n_units"]), fmt(c["mean_a"]),
                  fmt(c["mean_b"]), c["diff"],
-                 c["lo"], c["hi"], fmt_p(c["p"]), star))
+                 c["lo"], c["hi"], fmt_p(c["p"]), star, c.get("dz", 0.0)))
+    return t + "\\bottomrule\n\\end{tabular}\n\\end{table}\n"
+
+
+def table_si_paired(cap):
+    """The same paired table for the supplementary material, English labels.
+
+    The SI copy used to be hand-maintained inside SI_main.tex while this table
+    was generated from results/paired.json.  Measured 2026-10-24: the two
+    agreed by luck, and the seed extension of that day (W2) changes the
+    pooled rows of six of the twelve cases, so the hand copy would have
+    drifted silently.  One source, one rendering: the SI inputs this file.
+    """
+    p = os.path.join(C.RES, "paired.json")
+    if not os.path.exists(p):
+        return ""
+    d = json.load(open(p, encoding="utf-8"))
+    lab = cap["paired_lab"]
+    t = ("\\begin{table}[t]\n\\centering\n\\caption{%s}\n\\label{tab:si_paired}\n"
+         "\\small\n\\setlength{\\tabcolsep}{3.6pt}\n"
+         "\\begin{tabular}{lrrrrrr}\n\\toprule\n"
+         " & $n$ & $\\bar e_{A}$ & $\\bar e_{B}$ & $\\Delta$ (95\\%% CI) & $p$ "
+         "& $d_z$ \\\\\n\\midrule\n" % cap["si_paired"])
+    for c in d["cases"]:
+        name = lab.get(c["label"], c["label"])
+        star = "*" if c["lo"] > 0 or c["hi"] < 0 else ""
+        t += ("%s & %d & %s & %s & $%+.3f$ $[%+.3f,%+.3f]$ & $%s$%s & $%+.2f$ "
+              "\\\\\n"
+              % (name, c.get("n", c["n_units"]), fmt(c["mean_a"]),
+                 fmt(c["mean_b"]), c["diff"],
+                 c["lo"], c["hi"], fmt_p(c["p"]), star, c.get("dz", 0.0)))
     return t + "\\bottomrule\n\\end{tabular}\n\\end{table}\n"
 
 
@@ -955,6 +996,37 @@ def cache_samples(data_dir=None):
         return tot
     # No caches on this machine, so fall back to the frozen measurement.
     return _frozen_value(key)
+
+
+def dz_macros():
+    """Two standardised paired effect sizes quoted in the prose.
+
+    An external review asked that every paired comparison report an effect size
+    beside its p-value, because "resolved" and "large" are different statements
+    and, with the media as the paired unit, a small p can accompany a small
+    effect.  The two rows here are the pair the main text contrasts: a plateau
+    difference that is both resolved and large, and an in-band difference that
+    is neither.
+    """
+    rows = {"PairDzUnet": "unet_base_vs_fno_a025",
+            "PairDzWidth": "capw64_vs_fno_a025_in"}
+    keys = list(rows) + ["PairPWidth"]
+    p = os.path.join(C.RES, "paired.json")
+    if not os.path.exists(p):
+        return ["\\newcommand{\\%s}{--}" % k for k in keys]
+    d = json.load(open(p, encoding="utf-8"))
+    by = {c["label"]: c for c in d["cases"]}
+    L = []
+    for mac, label in rows.items():
+        c = by.get(label)
+        dz = None if c is None else c.get("dz")
+        L.append("\\newcommand{\\%s}{%s}"
+                 % (mac, "--" if dz is None or not np.isfinite(dz)
+                    else "%+.2f" % dz))
+    c = by.get(rows["PairDzWidth"])
+    L.append("\\newcommand{\\PairPWidth}{%s}"
+             % ("--" if c is None else fmt_p(c["p"])))
+    return L
 
 
 def seed_macros(ev):
@@ -2538,6 +2610,7 @@ def macros(ev, arms, res):
     L += precond_macros()
     L += residual_macros()
     L += paired_macros()
+    L += dz_macros()
     L += ndata_macros(ev)
     L += uband_macros(ev)
     L += seed_macros(ev)
@@ -4386,6 +4459,10 @@ def build(lang):
         "locators": table_locators(cap),
         "res": table_res(cap),
     }
+    if lang == "en":
+        # the supplementary material is English-only; its paired table used to
+        # be hand-maintained inside SI_main.tex and now shares this source
+        tabs["si_paired"] = table_si_paired(CAP["en"])
     return mac, tabs
 
 
@@ -4416,6 +4493,9 @@ def main():
         hdr = ("%% Auto-generated by code/make_results_tex.py (lang=%s) "
                "-- do not edit.\n" % lang)
         for label in TAB_ORDER:
+            if label not in tabs:
+                # a table only one language has (the SI is English-only)
+                continue
             p = os.path.join(d, "gen_tab_%s.tex" % label)
             open(p, "w", encoding="utf-8").write(hdr + tabs[label])
             print("wrote", p)
@@ -4430,7 +4510,7 @@ def main():
 TAB_ORDER = ("main", "summary", "banddown", "propnorm", "paired", "arch", "band",
              "mode", "data", "born", "cost", "realgeo", "arms", "c1", "disc",
              "anchor", "deep", "gridthree", "ci",
-             "locators", "res")
+             "locators", "res", "si_paired")
 
 
 if __name__ == "__main__":

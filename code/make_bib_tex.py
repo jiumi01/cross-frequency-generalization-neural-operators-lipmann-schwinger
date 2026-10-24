@@ -246,6 +246,15 @@ def render(e):
         if hp:
             s += " %s," % hp
         s += " %s." % y
+        # An eprint on a misc entry used to be dropped here: the entry carried
+        # archivePrefix+eprint, the article branch rendered them, and this
+        # branch ignored both, so a citation whose only locator is an arXiv
+        # number printed with no locator at all (measured 2026-10-24 on the
+        # APEX entry, whose rendered line ended at the bare year).  Render it
+        # the same way the article branch does.
+        ep = e.get("eprint")
+        if ep:
+            s += " %s:%s." % (e.get("archivePrefix") or "arXiv", ep)
         link = e.get("url", "")
         note = e.get("note", "")
         if link:

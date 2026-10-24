@@ -39,7 +39,17 @@ def seeds_of(kind):
     return names
 
 
-def pool(kind, vmax, sel):
+def seed_ids(kind):
+    """The seed numbers a family has archives for, as a set of ints."""
+    out = set()
+    for n in seeds_of(kind):
+        tail = n.rsplit("_s", 1)
+        if len(tail) == 2 and tail[1].isdigit():
+            out.add(int(tail[1]))
+    return out
+
+
+def pool(kind, vmax, sel, seeds=None):
     """Per-MEDIUM values for one model family, one row per (seed, cell).
 
     Returns an array of shape (n_seed * n_cell, n_media), or None.  Columns
@@ -59,6 +69,10 @@ def pool(kind, vmax, sel):
     rows = []
     n_seed = 0
     for name in seeds_of(kind):
+        if seeds is not None:
+            tail = name.rsplit("_s", 1)
+            if len(tail) != 2 or not tail[1].isdigit() or int(tail[1]) not in seeds:
+                continue
         d = PT.load_percell(name)
         if d is None:
             continue
@@ -139,28 +153,44 @@ def main():
 
     res = []
     for label, ka, kb, vmax, sa, sb in CASES:
-        Ma = pool(ka, vmax, sa)
-        Mb = pool(kb, vmax, sb)
+        # Compare on the seeds BOTH arms have.  A family that gained seeds
+        # later (the reference arms went from three to six on 2026-10-24) would
+        # otherwise drop out of every comparison against a family that still
+        # has three, because the pooled matrices no longer have the same row
+        # count -- and silently dropping the row is how a comparison the
+        # manuscript quotes disappears from the table without anything failing.
+        common = seed_ids(ka) & seed_ids(kb)
+        Ma = pool(ka, vmax, sa, seeds=common)
+        Mb = pool(kb, vmax, sb, seeds=common)
         if Ma is None or Mb is None or Ma.shape != Mb.shape:
             print("SKIP %-28s (missing or unpaired)" % label)
             continue
         # The paired unit is the medium; the rows inside a column are the
         # (seed, cell) replicates of it.
         ua, ub = media_mean(Ma), media_mean(Mb)
-        m, lo, hi = PT.cluster_bootstrap(ua - ub, n_boot=a.n_boot)
-        _, p = PT.cluster_signflip(ua - ub, n_perm=a.n_perm)
+        dd = ua - ub
+        m, lo, hi = PT.cluster_bootstrap(dd, n_boot=a.n_boot)
+        _, p = PT.cluster_signflip(dd, n_perm=a.n_perm)
+        # Standardised paired effect size (Cohen's d_z): the mean paired
+        # difference in units of its own standard deviation.  A p-value alone
+        # does not say how large the difference is, and with the paired unit
+        # being the medium this is the scale-free companion of the interval
+        # above.  Zero only when the paired differences are identical, which
+        # the interval already reports.
+        sd = float(dd.std(ddof=1)) if dd.size > 1 else float("nan")
+        dz = float(dd.mean() / sd) if sd > 0 else float("nan")
         res.append(dict(label=label, a=ka, b=kb, vmax=vmax,
                         sel_a=list(sa), sel_b=list(sb),
                         n=int(Ma.size), n_units=int(ua.size),
                         n_rows=int(Ma.shape[0]),
-                        n_seeds=len(seeds_of(ka)),
+                        n_seeds=len(common),
                         mean_a=float(ua.mean()), mean_b=float(ub.mean()),
-                        diff=m, lo=lo, hi=hi, p=p,
+                        diff=m, lo=lo, hi=hi, p=p, dz=dz,
                         better=("A" if hi < 0 else ("B" if lo > 0 else "tie"))))
         print("%-28s media=%4d rows=%5d  A=%.4f B=%.4f  diff=%+.4f [%+.4f,%+.4f]"
-              "  p=%.2e  %s"
+              "  p=%.2e  dz=%+.2f  %s"
               % (label, ua.size, Ma.shape[0], ua.mean(), ub.mean(), m, lo, hi,
-                 p, res[-1]["better"]))
+                 p, dz, res[-1]["better"]))
     C.save_json(dict(n_boot=a.n_boot, n_perm=a.n_perm,
                      unit="media", replicates="(seed, cell) within a medium",
                      cases=res), a.out)
