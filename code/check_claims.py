@@ -710,13 +710,57 @@ def batch_label_guard(root=None):
         bad("no manuscript binds a batch size to the measurement")
 
 
+ABSTRACT_EN_LIMIT = 200   # MDPI submission cap, counted on the rendered PDF
+ABSTRACT_CN_LIMIT = 400   # reading units: twice the EN cap (1 Latin word = 2 chars)
+
+
+def pdf_text(pdf):
+    """Rendered text of a built PDF, or None if pdftotext cannot read it.
+
+    Module level so the falsifiability probe can drive the abstract gate with
+    a synthetic render instead of building a PDF.
+    """
+    import subprocess
+    try:
+        r = subprocess.run(["pdftotext", pdf, "-"], capture_output=True,
+                           text=True, timeout=120)
+    except OSError:
+        return None
+    return r.stdout if r.returncode == 0 else None
+
+
+def rendered_abstract_words(text, heading="Abstract", keywords="Keywords:"):
+    """Word count of the abstract in rendered PDF text; returns (count, error).
+
+    The heading line and bare page-number lines (lineno mode stamps one per
+    page) are not words.  An absent heading or keyword line is an error, not
+    a zero: a count of zero would pass every cap.
+    """
+    i = text.find(heading)
+    j = text.find(keywords, i + 1) if i >= 0 else -1
+    if i < 0 or j < 0:
+        return 0, "abstract region not found in the rendered text"
+    lines = []
+    for ln in text[i:j].splitlines():
+        s = ln.strip()
+        if s and s != heading and not re.fullmatch(r"\d+", s):
+            lines.append(s)
+    return len(" ".join(lines).split()), None
+
+
 def submission_element_guard(root=None):
     """Two submission-level elements that no numeric check can see.
 
     (a) The abstract word budget.  MDPI caps the abstract at about 200 words and
         the cap is a *hard* editorial gate; the abstract is also the one part of
         the manuscript that is rewritten most often, and it grew from 196 to 229
-        words across one round of revision without anything flagging it.
+        words across one round of revision without anything flagging it.  The
+        count is taken on the rendered PDF -- the source-based count that
+        replaced the missing one reported 124 words for a 202-word abstract,
+        because its non-greedy regex stopped at the first '}' (the one inside
+        $v_{\max}$) and its macro deletion hid every number-bearing macro.  A
+        PDF older than main.tex is refused, so an edit without a rebuild cannot
+        pass either.
     (b) Placeholder-shaped tokens in the delivered tables.  Two shapes have
         actually shipped: the `$--$` "locator not triggered" cell, which in math
         mode prints as two minus signs and reads as a range, and a bare `--`
@@ -732,40 +776,70 @@ def submission_element_guard(root=None):
     root = root or C.ROOT
 
     # (a) abstract budget ---------------------------------------------------
-    for lang, limit in (("en", 200), ("cn", None)):
-        src = os.path.join(root, "paper", lang, "main.tex")
-        if not os.path.exists(src):
-            continue
-        txt = open(src, encoding="utf-8").read()
+    #
+    # EN is counted on the RENDERED PDF, because that is the text the
+    # editorial office counts.  The source-based count this replaces was
+    # wrong twice over and reported 124 words for the 202-word abstract that
+    # shipped: its non-greedy \abstract{(.*?)} stopped at the first '}', the
+    # one inside $v_{\max}$, so two thirds of the abstract was never seen,
+    # and every number-bearing macro (\CliffLo, \BATwoIn, ...) was deleted
+    # rather than counted.  The docstring below records the same class of
+    # failure going unnoticed before (196 -> 229 words).
+    #
+    # The staleness direction is closed with it: an abstract edited without a
+    # rebuild is refused, not silently counted from the stale render.
+    en_tex = os.path.join(root, "paper", "en", "main.tex")
+    en_pdf = os.path.join(root, "paper", "en", "main.pdf")
+    if not os.path.exists(en_tex):
+        bad("en: main.tex missing -- cannot check the abstract cap")
+    elif not os.path.exists(en_pdf):
+        bad("en: main.pdf missing -- the abstract cap is checked on the "
+            "rendered text; run `--steps tex,build` first")
+    elif os.path.getmtime(en_pdf) < os.path.getmtime(en_tex) - 1.0:
+        bad("en: main.pdf is older than main.tex -- the abstract would be "
+            "counted from a stale render; run `--steps tex,build` first")
+    else:
+        txt = pdf_text(en_pdf)
+        if txt is None:
+            bad("en: pdftotext could not read main.pdf")
+        else:
+            n, err = rendered_abstract_words(txt)
+            if err:
+                bad("en: %s" % err)
+            elif n > ABSTRACT_EN_LIMIT:
+                bad("en: abstract is %d words in the rendered PDF, over the "
+                    "%d-word submission limit" % (n, ABSTRACT_EN_LIMIT))
+            else:
+                ok("en: abstract is %d words in the rendered PDF (limit %d)"
+                   % (n, ABSTRACT_EN_LIMIT))
+    # CN: whitespace tokenisation is meaningless for Chinese, so the
+    # reading-unit convention the caption budget already uses (1 Latin word
+    # = 2 characters) is kept, with the cap proportional to the EN one.  A
+    # number-bearing macro is one Latin word once rendered, so it counts as
+    # one here too.
+    cn_tex = os.path.join(root, "paper", "cn", "main.tex")
+    if not os.path.exists(cn_tex):
+        bad("cn: main.tex missing -- cannot check the abstract cap")
+    else:
+        txt = open(cn_tex, encoding="utf-8").read()
         m = _re.search(r"\\begin\{abstract\}(.*?)\\end\{abstract\}", txt, _re.S)
         if not m:
-            # the official MDPI class typesets the abstract from the macro form
-            # \abstract{...} in the preamble, so both shapes must be accepted
-            m = _re.search(r"\\abstract\{(.*?)\}", txt, _re.S)
-        if not m:
-            bad("%s: no abstract environment found" % lang)
-            continue
-        body = m.group(1)
-        body = _re.sub(r"\\[A-Za-z]+\{([^}]*)\}", r"\1", body)
-        body = _re.sub(r"\\[A-Za-z]+", " ", body).replace("$", " ")
-        if limit is not None:
-            n = len([w for w in _re.split(r"\s+", body) if w.strip()])
-            if n > limit:
-                bad("%s: abstract is %d words, over the %d-word submission limit"
-                    % (lang, n, limit))
-            else:
-                ok("%s: abstract is %d words (limit %d)" % (lang, n, limit))
+            bad("cn: no abstract environment found")
         else:
-            # Whitespace tokenisation is meaningless for Chinese: the whole
-            # paragraph is one token.  Reading units, the unit the caption
-            # budget already uses (1 Latin word = 2 characters), is the
-            # comparable measure.
+            body = _re.sub(r"\\[A-Za-z]+\{([^}]*)\}", r"\1", m.group(1))
+            body = _re.sub(r"\\[A-Za-z]+", " X ", body)
             cjk = len(_re.findall(r"[\u3400-\u9fff\u3000-\u303f\uff00-\uffef]",
                                   body))
             latin = len([w for w in _re.split(r"[^A-Za-z0-9.]+", body)
                          if w.strip()])
-            note("%s: abstract is %d reading units (%d CJK + 2x%d Latin)"
-                 % (lang, cjk + 2 * latin, cjk, latin))
+            units = cjk + 2 * latin
+            if units > ABSTRACT_CN_LIMIT:
+                bad("cn: abstract is %d reading units, over the %d-unit cap "
+                    "(twice the EN word cap under the 1 Latin word = 2 "
+                    "characters convention)" % (units, ABSTRACT_CN_LIMIT))
+            else:
+                ok("cn: abstract is %d reading units (cap %d)"
+                   % (units, ABSTRACT_CN_LIMIT))
 
     # (b) placeholder-shaped cells ------------------------------------------
     #

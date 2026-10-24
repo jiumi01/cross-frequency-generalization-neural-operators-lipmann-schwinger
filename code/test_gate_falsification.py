@@ -74,50 +74,107 @@ def run(folder, fn, *args):
 def probe_submission_elements():
     """Probe 10 -- submission_element_guard, both halves and both directions.
 
-    The abstract budget must fire at 201 words and stay silent at 199.  The
-    placeholder shapes must fire on `$--$` and on a bare `--` cell, and stay
-    SILENT on a legitimate numeric range (`0.085--0.127`) and on an em-dash
-    aside: a guard that flagged every en-dash would be turned off by the first
-    person who saw it, and then the real defect would be invisible again.
+    The EN abstract cap is counted on the RENDERED text, so the probe drives
+    it through the module-level pdf_text seam: a 199-word render is accepted,
+    a 201-word render is rejected, an unreadable PDF is rejected, and a PDF
+    older than main.tex is refused rather than silently counted from the
+    stale render.  The counting function itself must report an error -- not a
+    zero, which would pass every cap -- when the region is absent.
+
+    CN keeps the source-based reading-unit count and must fire past its cap
+    and stay silent at it.  The placeholder half must fire on `$--$` and on a
+    bare `--` cell, and stay SILENT on a legitimate numeric range
+    (`0.085--0.127`) and on an em-dash aside: a guard that flagged every
+    en-dash would be turned off by the first person who saw it, and then the
+    real defect would be invisible again.
     """
+    import time
     d = tempfile.mkdtemp(prefix="_gate_probe10_")
+    seam = K.pdf_text
     try:
         for lang in ("en", "cn"):
             os.makedirs(os.path.join(d, "paper", lang))
+        en_tex = os.path.join(d, "paper", "en", "main.tex")
+        en_pdf = os.path.join(d, "paper", "en", "main.pdf")
+        cn_tex = os.path.join(d, "paper", "cn", "main.tex")
 
-        def write(n_words, cell):
-            body = " ".join(["word"] * n_words)
-            with open(os.path.join(d, "paper", "en", "main.tex"), "w",
-                      encoding="utf-8") as fh:
-                fh.write("\\begin{abstract}\n%s\n\\end{abstract}\n" % body)
+        def render(n):
+            return ("Abstract\n\n" + " ".join(["word"] * n)
+                    + "\n\nKeywords: a; b\n")
+
+        def en_tree(render_text, stale=False):
+            with open(en_tex, "w", encoding="utf-8") as fh:
+                fh.write("\\abstract{a short source abstract}\n")
+            with open(en_pdf, "w", encoding="utf-8") as fh:
+                fh.write("%PDF-1.4 probe dummy\n")
+            now = time.time()
+            os.utime(en_tex, (now, now))
+            os.utime(en_pdf, (now - 3600, now - 3600) if stale
+                     else (now + 60, now + 60))
+            K.pdf_text = lambda p: render_text
+
+        def cn_tree(n_cjk):
+            with open(cn_tex, "w", encoding="utf-8") as fh:
+                fh.write("\\begin{abstract}\n%s\n\\end{abstract}\n"
+                         % ("\u6c49" * n_cjk))
+
+        def cell_tree(cell):
             with open(os.path.join(d, "paper", "en", "gen_tab_x.tex"), "w",
                       encoding="utf-8") as fh:
                 fh.write("\\begin{tabular}{ccc}\n$f$ & $r$ & note \\\\\n"
                          "1.5 & 0.085 & %s \\\\\n\\end{tabular}\n" % cell)
 
-        write(199, "a range 0.085--0.127 --- an aside")
+        # clean: 199 words rendered, CN at its cap, a legal range and aside
+        en_tree(render(199)); cn_tree(400)
+        cell_tree("a range 0.085--0.127 --- an aside")
         del K.FAIL[:]
         run(d, K.submission_element_guard, d)
         clean = not K.FAIL
 
-        write(201, "a range 0.085--0.127 --- an aside")
+        # one word over the cap
+        en_tree(render(201)); cn_tree(10); cell_tree("note")
         del K.FAIL[:]
         run(d, K.submission_element_guard, d)
         long_abs = bool(K.FAIL)
 
-        write(199, "$--$")
+        # a stale render must be refused, not counted
+        en_tree(render(199), stale=True); cn_tree(10)
+        del K.FAIL[:]
+        run(d, K.submission_element_guard, d)
+        stale_pdf = bool(K.FAIL)
+
+        # an unreadable PDF must be refused
+        en_tree(render(199)); K.pdf_text = lambda p: None; cn_tree(10)
+        del K.FAIL[:]
+        run(d, K.submission_element_guard, d)
+        unreadable = bool(K.FAIL)
+
+        # the counting function itself: an absent region is an error, not 0
+        n, err = K.rendered_abstract_words(render(199))
+        _, err2 = K.rendered_abstract_words("1. Introduction\nbody text\n")
+        counter = (n == 199 and err is None and err2 is not None)
+
+        # CN one unit over its cap
+        en_tree(render(199)); cn_tree(401)
+        del K.FAIL[:]
+        run(d, K.submission_element_guard, d)
+        long_cn = bool(K.FAIL)
+
+        # placeholder shapes
+        en_tree(render(199)); cn_tree(10); cell_tree("$--$")
         del K.FAIL[:]
         run(d, K.submission_element_guard, d)
         dollar = bool(K.FAIL)
 
-        write(199, "--")
+        en_tree(render(199)); cell_tree("--")
         del K.FAIL[:]
         run(d, K.submission_element_guard, d)
         bare = bool(K.FAIL)
         del K.FAIL[:]
     finally:
+        K.pdf_text = seam
         shutil.rmtree(d, ignore_errors=True)
-    return clean, long_abs, dollar, bare
+    return clean, long_abs, stale_pdf, unreadable, counter, long_cn, dollar, bare
 
 
 def probe_selfmath_wrap():
@@ -542,13 +599,18 @@ def main():
         print("PROBE 9: MISBEHAVED %s" % msp)
 
     print("-- probe 10 (submission elements: abstract budget + placeholder cells) --")
-    s_clean, s_long, s_dollar, s_bare = probe_submission_elements()
-    if s_clean and s_long and s_dollar and s_bare:
-        print("PROBE 10: 199-word abstract and valid en-dash range accepted; "
-              "201-word abstract, $--$ and bare -- cells all rejected")
+    (s_clean, s_long, s_stale, s_unread, s_counter, s_cn, s_dollar,
+     s_bare) = probe_submission_elements()
+    if all((s_clean, s_long, s_stale, s_unread, s_counter, s_cn,
+            s_dollar, s_bare)):
+        print("PROBE 10: 199-word render and CN at cap accepted; 201-word "
+              "render, stale PDF, unreadable PDF, CN over cap, $--$ and bare "
+              "-- cells all rejected")
     else:
-        print("PROBE 10: MISBEHAVED clean=%s long=%s dollar=%s bare=%s"
-              % (s_clean, s_long, s_dollar, s_bare))
+        print("PROBE 10: MISBEHAVED clean=%s long=%s stale=%s unread=%s "
+              "counter=%s cn=%s dollar=%s bare=%s"
+              % (s_clean, s_long, s_stale, s_unread, s_counter, s_cn,
+                 s_dollar, s_bare))
 
     print("-- probe 11 (self-delimiting-math macro double-wrapped in '$') --")
     w_braced, w_bare, w_plain, w_caught = probe_selfmath_wrap()
@@ -693,7 +755,8 @@ def main():
             and b_ok and b_lit and b_drift
             and r_ok and r_drift and r_word and r_float and r_over and r_half
             and all(msp.values())
-            and s_clean and s_long and s_dollar and s_bare
+            and s_clean and s_long and s_stale and s_unread and s_counter
+            and s_cn and s_dollar and s_bare
             and w_braced and w_bare and w_plain and w_caught
             and p_honest and p_fno and p_unet and p_mac
             and l_clean and l_dup and l_unref
