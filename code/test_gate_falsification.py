@@ -759,6 +759,15 @@ def main():
     else:
         print("PROBE 26: MISBEHAVED %s" % sc)
 
+    print("-- probe 27 (the envelope documents outside every .tex gate) --")
+    dt = probe_delivery_texts()
+    if all(dt.values()):
+        print("PROBE 27: the current envelope is accepted; a drifted title, a "
+              "retired claim, a wrong version pin, a conflicting DOI sentence "
+              "and an undeclared supplement are all rejected")
+    else:
+        print("PROBE 27: MISBEHAVED %s" % dt)
+
     good = (caught and ignored and named and duped and good3 and bad3 and fin3
             and good4 and bad4t and bad4c and all(sty.values())
             and fresh_stale and fresh_ok
@@ -782,7 +791,8 @@ def main():
             and all(su.values())
             and all(bx.values())
             and all(sr.values())
-            and all(sc.values()))
+            and all(sc.values())
+            and all(dt.values()))
     print("PROBE RESULT: %s" % ("all gates fire on known-bad input" if good else "GATE FAILED"))
     return 0 if good else 1
 
@@ -2066,6 +2076,65 @@ def probe_seed_claim():
                     range_quiet=not out["rng"])
     finally:
         shutil.rmtree(d, ignore_errors=True)
+
+
+def probe_delivery_texts():
+    """probe 27: the files an editor reads before the manuscript.
+
+    Every other gate reads the .tex sources.  The cover letter, CITATION.cff,
+    README, the environment pins and the Data Availability wording sit outside
+    that, and each of them drifted while the manuscript stayed correct.  Five
+    classes are exercised here, one mutation each, plus a two-case archive test
+    on a synthetic tree (a seed the archive lacks, and a MANIFEST that describes
+    a different tree).
+    """
+    import check_delivery_texts as D
+    t = D.collect()
+    out = {}
+
+    # the untouched envelope must be accepted, or every rejection below is
+    # meaningless
+    out["clean"] = not D.run(texts=t)
+
+    m = dict(t)
+    m["cover"] = t["cover"].replace("Discretized", "", 1)
+    out["title"] = any("cover" in f for f in D.run(texts=m))
+
+    m = dict(t)
+    m["citation"] = (t["citation"]
+                     + "\n# the plateau is the trivial incident-field baseline\n")
+    out["retired"] = any("citation" in f for f in D.run(texts=m))
+
+    m = dict(t)
+    m["env"] = t["env"].replace("pytorch=2.6.0", "pytorch=2.13.0", 1)
+    out["pins"] = any("pytorch" in f for f in D.run(texts=m))
+
+    m = dict(t)
+    m["cover"] = t["cover"].replace("on acceptance", "on publication", 1)
+    out["doi"] = any("cover letter" in f for f in D.run(texts=m))
+
+    m = dict(t)
+    m["paper_cn"] = t["paper_cn"].replace("补充材料", "附录")
+    out["supp"] = any("paper_cn" in f for f in D.run(texts=m))
+
+    d = tempfile.mkdtemp(prefix="_deliv_probe_")
+    try:
+        live = os.path.join(d, "results")
+        arc = os.path.join(d, "submission", "supplementary")
+        os.makedirs(live)
+        os.makedirs(os.path.join(arc, "results"))
+        for s in range(6):
+            open(os.path.join(live, "eval_arm_s%d.json" % s), "w").write("{}")
+        for s in range(3):
+            open(os.path.join(arc, "results", "eval_arm_s%d.json" % s),
+                 "w").write("{}")
+        open(os.path.join(arc, "MANIFEST.md"), "w").write("# m\n\nFiles: 99\n")
+        fails = D.archive_failures(d)
+        out["archive_seed"] = any("missing seeds" in f for f in fails)
+        out["archive_manifest"] = any("MANIFEST claims" in f for f in fails)
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+    return out
 
 
 if __name__ == "__main__":

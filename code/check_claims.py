@@ -2648,6 +2648,19 @@ def main():
     print("\n=== submission elements ===")
     submission_element_guard()
 
+    print("\n=== envelope documents ===")
+    # The cover letter, README, CITATION.cff, the environment pins and the
+    # wording of the Data Availability statement are delivered text that no
+    # .tex-side gate can see.  Each of them drifted once while the manuscript
+    # stayed correct, so they are checked as a class rather than one by one.
+    import check_delivery_texts as DT
+    dt = DT.run()
+    for f in dt:
+        bad(f)
+    if not dt:
+        ok("cover letter, README, both CITATION copies, the environment pins, "
+           "the DOI wording and the archive agree with the manuscript")
+
     print("\n=== summary ===")
     if FAIL:
         print("  %d prose claims contradicted by the data:" % len(FAIL))

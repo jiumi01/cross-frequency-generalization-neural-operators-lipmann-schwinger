@@ -20,7 +20,13 @@ What is asserted, per language:
   2. the snapshot directory exists, has a non-empty MD5 manifest, and its
      ``paper/<lang>/main.pdf`` has the same MD5 as ``submission/paper_<lang>/main.pdf``;
   3. the named tree equals the tree of the local HEAD, and the named commit, when
-     present in the local object store, points at that same tree.
+     present in the local object store, points at that same tree;
+  4. the supplementary material's reproducibility checklist names the same
+     commit and tree as the manuscripts.  The checklist restates the code state
+     in a separate document that this gate did not read, and it drifted: for one
+     full revision it named a commit the repository had never been at, while
+     every manuscript-side assertion stayed green because the statement being
+     checked was in the *other* file.
 
 Exit code 0 iff all hold.  ``--self-test`` mutates one field in a temporary copy
 and asserts the checker rejects it, so the instrument is shown to fail on a
@@ -62,6 +68,30 @@ def git(*args, repo=None):
     return p.returncode, p.stdout.strip()
 
 
+def remote_tree(sha):
+    """Tree of a commit that exists only on the remote, via the GitHub API.
+
+    Returns ``(tree, error)``.  ``gh`` is the same transport the publication
+    path uses; if it is absent the caller treats the claim as unverifiable
+    rather than as verified.
+    """
+    repo = os.environ.get("LS_REPO",
+                          "jiumi01/cross-frequency-generalization-neural-"
+                          "operators-lipmann-schwinger")
+    try:
+        # The git/commits endpoint requires a full 40-character SHA and answers
+        # 404 for the abbreviation the manuscript quotes; the commits endpoint
+        # expands an abbreviation, so it is the one to use here.
+        p = subprocess.run(["gh", "api", "repos/%s/commits/%s" % (repo, sha),
+                            "--jq", ".commit.tree.sha"],
+                           capture_output=True, text=True, timeout=60)
+    except (OSError, subprocess.SubprocessError) as e:
+        return None, str(e)
+    if p.returncode != 0:
+        return None, (p.stderr or "gh api failed").strip().splitlines()[0]
+    return p.stdout.strip(), None
+
+
 def parse(lang):
     """Pull (commit, tree, snapshot) out of one manuscript's DAS block.
 
@@ -87,6 +117,24 @@ def parse(lang):
     return dict(commit=commit.group(1) if commit else None,
                 tree=tree.group(1) if tree else None,
                 snapshot=snap.group(1) if snap else None)
+
+
+def parse_si():
+    """Pull (commit, tree) out of the supplementary reproducibility checklist.
+
+    The checklist is a table row, not a prose block: ``code state & commit
+    \\texttt{...} (tree \\texttt{...}) of the public repository``.  A missing
+    commit is a failure rather than a skip -- the checklist exists precisely to
+    tell a reader which state the archive is, so it cannot be silently absent.
+    """
+    p = os.path.join(SUB, "paper_en", "SI_main.tex")
+    if not os.path.exists(p):
+        return {"commit": None, "tree": None}
+    src = read(p).replace("\\_", "_")
+    commit = re.search(r"commit\s*\\texttt\{([0-9a-f]{7,40})\}", src)
+    tree = re.search(r"tree\s*\\texttt\{([0-9a-f]{7,40})\}", src)
+    return {"commit": commit.group(1) if commit else None,
+            "tree": tree.group(1) if tree else None}
 
 
 def check(root=None, repo=None):
@@ -131,6 +179,17 @@ def check(root=None, repo=None):
             FAIL.append("%s: archived PDF is not the delivered PDF (%s vs %s)"
                         % (lang, md5(b)[:8], md5(a)[:8]))
 
+    si = parse_si()
+    if not all(si.values()):
+        FAIL.append("the supplementary checklist names no commit/tree (parsed "
+                    "%s) -- a reader who checks the archive from S23 has no "
+                    "state to check" % si)
+    elif si["commit"][:7] != enc["commit"][:7] or si["tree"][:7] != enc["tree"][:7]:
+        FAIL.append("the supplementary checklist names %s/%s while the "
+                    "manuscripts name %s/%s -- the two delivered documents "
+                    "disagree about which state the archive is"
+                    % (si["commit"], si["tree"], enc["commit"], enc["tree"]))
+
     rc, head_tree = git("rev-parse", "HEAD^{tree}", repo=repo)
     if rc != 0:
         FAIL.append("cannot read the local HEAD tree")
@@ -141,7 +200,19 @@ def check(root=None, repo=None):
                     "statement is stale relative to HEAD"
                     % (enc["tree"], head_tree[:len(enc["tree"])]))
     rc, ctree = git("rev-parse", "%s^{tree}" % enc["commit"], repo=repo)
-    if rc == 0 and not ctree.startswith(enc["tree"]):
+    if rc != 0:
+        # The named commit is the published one, so it need not exist in this
+        # checkout: the repository is published tree-first through the GitHub
+        # API and never fetched back.  The old code skipped the assertion in
+        # that case, which meant any hash -- including a typo -- passed.  Ask
+        # the remote instead, and fail if the remote cannot be asked.
+        ctree, err = remote_tree(enc["commit"])
+        if err:
+            FAIL.append("commit %s is neither in the local object store nor "
+                        "resolvable on the remote (%s), so the claim cannot be "
+                        "checked" % (enc["commit"], err))
+            return FAIL
+    if not ctree.startswith(enc["tree"]):
         FAIL.append("commit %s has tree %s, not the named %s"
                     % (enc["commit"], ctree, enc["tree"]))
     return FAIL
@@ -197,6 +268,24 @@ def self_test():
             open(p if lang == "en" else q, "w", encoding="utf-8").write(mutated)
             fails = list(check(tmp))
             print("%-18s -> %s" % (what, "rejected" if fails else "ACCEPTED (bad)"))
+            ok = ok and bool(fails)
+
+        # The supplementary checklist carries its own copy of the commit.  It is
+        # the case that actually shipped wrong, so it gets its own mutation: the
+        # manuscripts stay intact and only S23 changes.
+        si_path = os.path.join(tmp, "submission", "paper_en", "SI_main.tex")
+        si_src = read(si_path)
+        si_mut = si_src.replace(d["commit"], "0" * 7, 1)
+        if si_mut == si_src:
+            print("%-18s -> MUTATION DID NOT APPLY" % "SI stale commit")
+            ok = False
+        else:
+            open(p, "w", encoding="utf-8").write(src_en)
+            open(q, "w", encoding="utf-8").write(src_cn)
+            open(si_path, "w", encoding="utf-8").write(si_mut)
+            fails = list(check(tmp))
+            print("%-18s -> %s" % ("SI stale commit",
+                                   "rejected" if fails else "ACCEPTED (bad)"))
             ok = ok and bool(fails)
         return ok and not good
     finally:
