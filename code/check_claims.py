@@ -736,11 +736,25 @@ def rendered_abstract_words(text, heading="Abstract", keywords="Keywords:"):
     The heading line and bare page-number lines (lineno mode stamps one per
     page) are not words.  An absent heading or keyword line is an error, not
     a zero: a count of zero would pass every cap.
+
+    The region also ends at the journal's front-matter sidebar.  That sidebar
+    (``Received: / Revised: / Accepted: / Published: / Copyright: ... Submitted
+    to Appl. Sci.``) sits between the abstract and the keyword line in the
+    class's layout, and whether text extraction pulls it into the span depends
+    on the reading order -- which changed the moment the line numbers became
+    extractable, adding 32 words to the count without a word of the abstract
+    being touched.  Ending the region at the first of several sentinels makes
+    the count independent of that ordering.
     """
     i = text.find(heading)
-    j = text.find(keywords, i + 1) if i >= 0 else -1
-    if i < 0 or j < 0:
+    if i < 0:
         return 0, "abstract region not found in the rendered text"
+    stops = [text.find(k, i + 1) for k in
+             (keywords, "Received:", "Copyright:", "Submitted to")]
+    stops = [j for j in stops if j > i]
+    if not stops:
+        return 0, "abstract region not found in the rendered text"
+    j = min(stops)
     lines = []
     for ln in text[i:j].splitlines():
         s = ln.strip()

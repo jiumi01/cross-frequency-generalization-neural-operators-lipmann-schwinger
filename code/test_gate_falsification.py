@@ -763,8 +763,9 @@ def main():
     dt = probe_delivery_texts()
     if all(dt.values()):
         print("PROBE 27: the current envelope is accepted; a drifted title, a "
-              "retired claim, a wrong version pin, a conflicting DOI sentence "
-              "and an undeclared supplement are all rejected")
+              "retired claim, a wrong version pin, a conflicting DOI sentence, "
+              "an undeclared supplement, an abstract span that swallows the "
+              "front-matter sidebar, and two archive defects are all rejected")
     else:
         print("PROBE 27: MISBEHAVED %s" % dt)
 
@@ -2116,6 +2117,19 @@ def probe_delivery_texts():
     m = dict(t)
     m["paper_cn"] = t["paper_cn"].replace("补充材料", "附录")
     out["supp"] = any("paper_cn" in f for f in D.run(texts=m))
+
+    # The abstract cap is counted on rendered text, and the region used to run
+    # from "Abstract" to "Keywords:", which swallows the journal's front-matter
+    # sidebar whenever text extraction orders it there.  It did, once the line
+    # numbers became extractable: the count rose by 32 words with no change to
+    # the abstract.  A synthetic page with the sidebar present but outside the
+    # region must count exactly the abstract's own words.
+    import check_claims as K
+    page = ("Abstract\n" + " ".join(["alpha"] * 12) +
+            "\nReceived:\nRevised:\nAccepted:\nPublished:\n"
+            "Copyright: (c) 2026 by the authors.\nSubmitted to Appl. Sci.\n"
+            "Keywords:\nx\n")
+    out["abstract_span"] = (K.rendered_abstract_words(page)[0] == 12)
 
     d = tempfile.mkdtemp(prefix="_deliv_probe_")
     try:

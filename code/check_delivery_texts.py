@@ -345,7 +345,8 @@ def staleness_failures(root=None):
     sub = os.path.join(root, "submission")
     pairs = [("paper_en/main.tex", "paper_en/main.pdf"),
              ("paper_en/SI_main.tex", "paper_en/SI_main.pdf"),
-             ("paper_cn/main.tex", "paper_cn/main.pdf")]
+             ("paper_cn/main.tex", "paper_cn/main.pdf"),
+             ("cover_letter.tex", "cover_letter.pdf")]
     fails = []
     for tex, pdf in pairs:
         a, b = os.path.join(sub, tex), os.path.join(sub, pdf)
