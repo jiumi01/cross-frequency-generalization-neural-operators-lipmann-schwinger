@@ -246,14 +246,16 @@ def seed_guard(ev):
     checked against the evaluation records here.
 
     W1 (2026-10-24) extended the v=1.00 anchored pair (main_fno_a100 and
-    bax_fno_a100_m7) from three to six seeds.  The property the manuscript
-    actually claims is *within a comparison*: both sides of a paired test must
-    share seeds, otherwise the error bars are not like for like.  Uniformity
-    across the whole paper is neither claimed nor required -- the a050 arms
-    stay at three -- so the check is: every family that departs from the base
-    seed count must sit in a complete verdict-bearing pair (main + bax at one
-    contrast tag) whose members share the identical seed set, and the
-    diagnostic arms at that tag must sit inside that shared set.
+    bax_fno_a100_m7) from three to six seeds; W2 (2026-10-25) extended the
+    other seven arms the headline claims rest on, so nine arms now carry six.
+    The property the manuscript actually claims is *within a comparison*: both
+    sides of a paired test must share seeds, otherwise the error bars are not
+    like for like.  Uniformity across the whole paper is neither claimed nor
+    required -- the ablation arms stay at three -- so the check is: the
+    extended arms all carry one identical seed set, and no arm at the same
+    contrast tag carries seeds outside it.  A comparison between an extended
+    arm and a base arm then runs on the shared subset; that degradation is
+    reported, not failed, because the manuscript does not claim otherwise.
     """
     import re as _re
     fam = {}
@@ -271,43 +273,42 @@ def seed_guard(ev):
         ok("all %d arms carry the same %d seeds, so the claim of a uniform "
            "seed protocol holds" % (len(fam), base))
         return
-    # Every departing family must be the main or bax arm of one contrast tag,
-    # and the pair must be complete and seed-identical.
+    # W2 (2026-10-25) extended every arm the headline claims rest on, so the
+    # old rule -- "only a complete main+bax verdict pair may depart from the
+    # base count" -- is now the wrong rule: nine arms carry six seeds and most
+    # of them have no bax partner.  What still has to hold is the premise the
+    # paired tests rest on: all extended arms share one identical seed set, and
+    # no arm at their contrast tag sits outside it.  Pairing an extended arm
+    # against a base arm silently runs on the shared subset, which is honest
+    # only if it is stated, so that degradation is reported rather than failed.
+    sets = {k: frozenset(fam[k]) for k in odd}
+    if len({frozenset(v) for v in sets.values()}) != 1:
+        bad("the extended arms disagree on their seed sets: %s"
+            % {k: sorted(v) for k, v in sorted(sets.items())})
+        return
+    shared = next(iter(sets.values()))
     tags = {}
-    for k in odd:
-        m = _re.match(r"^(main|bax)_fno_(a\d+)", k)
-        if not m:
-            bad("%s carries %d seeds while every other arm carries %d, and "
-                "it is not part of a verdict-bearing pair -- the error bars "
-                "are not like for like" % (k, counts[k], base))
-            continue
-        tags.setdefault(m.group(2), []).append(k)
-    extended = []
+    for k in fam:
+        m = _re.match(r"^(?:main|ba|bax|baf)_fno_(a\d+)", k)
+        if m:
+            tags.setdefault(m.group(1), set()).add(k)
+    bad_any = False
     for tag, ks in sorted(tags.items()):
-        want = {"main_fno_%s" % tag}
-        want |= {k for k in fam if k.startswith("bax_fno_%s" % tag)}
-        if set(ks) != want:
-            bad("%s: the extended seed set covers %s but the verdict-bearing "
-                "pair is %s -- both sides of the paired test must share seeds"
-                % (tag, sorted(ks), sorted(want)))
-            continue
-        sets = {k: fam[k] for k in ks}
-        if len({frozenset(v) for v in sets.values()}) != 1:
-            bad("%s: the extended arms disagree on seeds: %s"
-                % (tag, {k: sorted(v) for k, v in sorted(sets.items())}))
-            continue
-        shared = set(next(iter(sets.values())))
-        for k, v in sorted(fam.items()):
-            if _re.search(r"(?:^|_)(?:ba|baf)_fno_%s(?:_|$)" % tag, k) \
-                    and not v <= shared:
-                bad("diagnostic %s carries seeds %s outside the shared "
-                    "verdict set %s" % (k, sorted(v - shared), sorted(shared)))
-        extended.append(tag)
-    if extended:
-        ok("%d arms carry %d seeds; %s extended to %d with both sides of "
-           "each paired test sharing the seed set"
-           % (len(fam) - len(odd), base, "/".join(extended),
-              max(len(fam[k]) for k in odd)))
+        inside = {k for k in ks if fam[k] <= shared}
+        if inside != ks:
+            for k in sorted(ks - inside):
+                bad("%s at tag %s carries seeds %s outside the extended set "
+                    "%s -- a paired test against it would compare different "
+                    "pairs than the paper says"
+                    % (k, tag, sorted(fam[k] - shared), sorted(shared)))
+            bad_any = True
+    if not bad_any:
+        degraded = sorted({t for t, ks in tags.items()
+                           if any(counts[k] == base for k in ks)})
+        ok("%d arms carry the extended seed set %s; %d arms stay at %s%s"
+           % (len(odd), sorted(shared), len(fam) - len(odd), base,
+              ", so comparisons at %s run on the shared subset only"
+              % "/".join(degraded) if degraded else ""))
 
 
 def caption_guard(ev):
@@ -1288,9 +1289,27 @@ def c1_guard(ev, root=None):
             "discriminating experiment of Section sec:c1 is not fully "
             "evaluated" % (len(base), len(comp)))
         return
-    if len(base) != 3 or len(comp) != 3:
-        bad("C1 arms are not 3-seed pairs (%d vs %d) -- the manuscript says "
-            "'means over 3 seeds'" % (len(base), len(comp)))
+    # The baseline arm is one of the arms W2 extended to six seeds; the
+    # compensated arm still has three.  Comparing the two six-seed means
+    # against the three-seed mean would be an unpaired comparison wearing a
+    # paired label, so the two arms are put on their shared seeds -- which is
+    # the design the manuscript describes ("means over 3 seeds") and leaves
+    # every C1 number unchanged.
+    def _seed(n):
+        m = re.search(r"_s(\d+)$", n)
+        return int(m.group(1)) if m else -1
+    bs = {_seed(n): n for n in base}
+    cs = {_seed(n): n for n in comp}
+    common = sorted(set(bs) & set(cs))
+    if len(common) < 3:
+        bad("C1 arms share only %d seeds (baseline %d, compensated %d) -- the "
+            "paired design needs at least three"
+            % (len(common), len(bs), len(cs)))
+        return
+    base = [bs[s] for s in common]
+    comp = [cs[s] for s in common]
+    ok("C1 arms compared on their %d shared seeds %s (baseline has %d, "
+       "compensated %d)" % (len(common), common, len(bs), len(cs)))
 
     def seed_mean(names):
         A = np.array([[r["mean"] for r in ev[n]["sweep"]["0.25"]] for n in names])
@@ -2591,6 +2610,7 @@ def main():
     T.figure_guard()
     T.text_residue_guard()
     T.range_dash_guard()
+    T.seed_claim_guard()
     FAIL.extend(T.FAIL)
 
     print("\n=== the three boundary locators, on every ladder ===")

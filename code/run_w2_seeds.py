@@ -106,6 +106,10 @@ def gpu_used_mib():
         return None
 
 
+WAIT_STATS = {"checks": 0, "longest_idle_run": 0, "idle_runs": [],
+              "last_used_mib": None}
+
+
 def wait_for_idle_gpu(limit_mib=4000, sustain_checks=5, interval=120,
                       max_wait_s=8 * 3600):
     """Block until the GPU has been comfortably idle for a sustained period.
@@ -118,6 +122,8 @@ def wait_for_idle_gpu(limit_mib=4000, sustain_checks=5, interval=120,
     idle = 0
     while True:
         used = gpu_used_mib()
+        WAIT_STATS["checks"] += 1
+        WAIT_STATS["last_used_mib"] = used
         if used is None:
             log("GPU wait: nvidia-smi unreadable; treating as busy")
             idle = 0
@@ -125,6 +131,8 @@ def wait_for_idle_gpu(limit_mib=4000, sustain_checks=5, interval=120,
             idle += 1
             log("GPU wait: %d MiB used (%d/%d sustained-idle checks)"
                 % (used, idle, sustain_checks))
+            if idle > WAIT_STATS["longest_idle_run"]:
+                WAIT_STATS["longest_idle_run"] = idle
             if idle >= sustain_checks:
                 log("GPU idle for %d min; starting the chain"
                     % (sustain_checks * interval // 60))
@@ -132,6 +140,8 @@ def wait_for_idle_gpu(limit_mib=4000, sustain_checks=5, interval=120,
         else:
             if idle or used >= limit_mib:
                 log("GPU wait: %d MiB used (busy)" % used)
+            if idle:
+                WAIT_STATS["idle_runs"].append(idle)
             idle = 0
         if time.time() - t0 > max_wait_s:
             log("GPU wait: still busy after %.1f h; aborting cleanly. "
@@ -201,19 +211,39 @@ def report():
     """Six-seed read of the arms the manuscript quotes, for the record."""
     ALL = (0, 1, 2) + SEEDS
     for tmpl, _ in REPORT:
-        tag = tmpl.split("_")[2]          # "main_fno_a025_s%d" -> "a025"
+        tag = tmpl.split("_")[2]          # "main_fno_a025" -> "a025"
         vmax = {"a005": 0.05, "a010": 0.10, "a025": 0.25, "a050": 0.50,
                 "a100": 1.00}[tag]
         ib, pl = [], []
         for s in ALL:
-            d = json.load(open(os.path.join(RES, "eval_%s.json" % (tmpl % s))))
+            # REPORT entries are arm names without the seed suffix; the seed
+            # has to be appended, not formatted into the name.
+            path = os.path.join(RES, "eval_%s.json" % ("%s_s%d" % (tmpl, s)))
+            d = json.load(open(path))
             ib.append(_inband(d, vmax))
             pl.append(_plateau(d, vmax))
         log("%s six-seed in-band mean=%.4f (sd %.4f) plateau mean=%.4f "
-            "(sd %.4f)" % (tmpl % "*", np.mean(ib), np.std(ib, ddof=1),
+            "(sd %.4f)" % (tmpl, np.mean(ib), np.std(ib, ddof=1),
                            np.mean(pl), np.std(pl, ddof=1)))
         log("   per-seed in-band %s" % [round(x, 4) for x in ib])
         log("   per-seed plateau %s" % [round(x, 4) for x in pl])
+
+
+def write_status(status, **extra):
+    """Record why the chain stopped, so an abort cannot be read as success.
+
+    A wait timeout that returns quietly with exit code 0 is indistinguishable
+    from a completed chain to every downstream reader.  The status file plus
+    a non-zero exit code make the two cases separable without reading the log.
+    """
+    payload = {"status": status,
+               "checked_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
+               "wait": WAIT_STATS}
+    payload.update(extra)
+    path = os.path.join(RES, "_w2_seeds_status.json")
+    with open(path, "w", encoding="utf-8") as fh:
+        json.dump(payload, fh, indent=2)
+    return path
 
 
 def main():
@@ -222,21 +252,32 @@ def main():
                     help="require an idle GPU now instead of waiting")
     ap.add_argument("--max-wait", type=float, default=8 * 3600,
                     help="seconds to wait for an idle GPU (0 = do not wait)")
+    ap.add_argument("--report-only", action="store_true",
+                    help="skip training/evaluation and just print the "
+                         "six-seed read (no GPU needed)")
     a = ap.parse_args()
     t0 = time.time()
     log("=== W2: headline arms 3 -> 6 seeds ===")
+    if a.report_only:
+        report()
+        write_status("report_only")
+        return
     if not a.no_wait and a.max_wait > 0:
         if not wait_for_idle_gpu(max_wait_s=a.max_wait):
-            return
+            write_status("wait_timeout", max_wait_h=a.max_wait / 3600.0)
+            raise SystemExit(3)
     elif gpu_used_mib() is not None and gpu_used_mib() >= 4000:
+        write_status("gpu_busy_no_wait", used_mib=gpu_used_mib())
         raise SystemExit("GPU busy (%.0f MiB used); rerun with the wait "
                          "enabled" % gpu_used_mib())
+    write_status("running")
     log("=== training pass (serial) ===")
     train_all()
     log("=== evaluation pass (serial) ===")
     eval_all()
     log("=== six-seed read ===")
     report()
+    write_status("done", minutes=round((time.time() - t0) / 60, 1))
     log("W2 done in %.0f min" % ((time.time() - t0) / 60))
 
 

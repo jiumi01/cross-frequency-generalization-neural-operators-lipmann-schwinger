@@ -22,14 +22,19 @@ import common as C
 # "read and absent", which is what makes the `--` fallbacks honest.
 _SPECTRUM = "unset"
 
+# The five arms of Table~\ref{tab:main}; their seed count is what that table's
+# caption must quote (see seed_macros).
+MAIN_ARMS = ("main_fno_a005", "main_fno_a010", "main_fno_a025",
+             "main_fno_a050", "main_fno_a100")
+
 CAP = { "en": dict(
   main=("Cross-frequency generalization of the FNO: mean relative $L_2$ error, "
-        "over \\NumSeeds\\ seeds and 200 paired media per frequency. Training "
+        "over \\NumSeedsMain\\ seeds and 200 paired media per frequency. Training "
         "uses $f\\in[1,4]$; the header splits the columns at that edge. Rows "
         "marked $\\psi_{\\mathrm{inc}}$ are the trivial baseline "
         "$u_\\theta\\equiv0$."),
   summary=("Generalization cliff per contrast arm: mean relative $L_2$ error over "
-           "\\NumSeeds\\ seeds, with the seed standard deviation beside each "
+           "\\NumSeedsMain\\ seeds, with the seed standard deviation beside each "
            "mean. $\\varepsilon_{\\mathrm{in}}$, "
            "$\\varepsilon_{\\infty}$: in-band and plateau mean relative $L_2$; "
            "$r$: $\\varepsilon(5)/\\varepsilon(4)$."),
@@ -148,10 +153,10 @@ CAP = { "en": dict(
     h=("model", "params (M)", "train (s/ep.)", "infer. (ms)")),
  ),
  "cn": dict(
-  main=("FNO 的跨频率泛化：\\NumSeeds\\ 个种子、每个频率 200 个配对介质的"
+  main=("FNO 的跨频率泛化：\\NumSeedsMain\\ 个种子、每个频率 200 个配对介质的"
         "平均相对 $L_2$ 误差。训练仅使用 $f\\in[1,4]$；表头在该边处拆分各列。"
         "标为 $\\psi_{\\mathrm{inc}}$ 的行是平凡基线 $u_\\theta\\equiv0$。"),
-  summary=("各对比度臂的泛化悬崖汇总：为 \\NumSeeds\\ 个随机种子的均值，"
+  summary=("各对比度臂的泛化悬崖汇总：为 \\NumSeedsMain\\ 个随机种子的均值，"
            "紧邻的一列为该窗口上的种子标准差。$\\varepsilon_{\\mathrm{in}}$：训练频带内、"
            "留出介质上的平均相对 $L_2$ 误差；$\\varepsilon_{\\infty}$：$f\\ge6$ 的"
            "平均值；$r$：$\\varepsilon(5)/\\varepsilon(4)$。"),
@@ -670,7 +675,7 @@ def _train_time_load():
         return {}
 
 
-def _median_train_s_per_epoch(prefix):
+def _median_train_s_per_epoch(prefix, seeds=(0, 1, 2)):
     """Median per-epoch seconds over the seeds of one arm.
 
     Wall clock is contaminated here and the table says so: every run stops at the
@@ -678,6 +683,14 @@ def _median_train_s_per_epoch(prefix):
     architecture's value spreads by up to 3x across seeds because the campaigns
     shared the device with the evaluation queue.  A median is reported rather
     than a single seed precisely because no seed is representative.
+
+    The seeds are pinned to the original campaign on purpose.  W2 (2026-10-25)
+    re-trained this arm with the device otherwise idle: 5.5 s/epoch against the
+    12-17 s/epoch it took under contention.  Averaging the two conditions moved
+    the median from 12.4 to 5.6 with no change to the model, and the row would
+    then read as though the FNO had become three times cheaper to train.  Since
+    the column is quoted for completeness and not for comparison, it is held to
+    one measurement condition instead of tracking a mixed one.
 
     The measurements live in runs/, which the release omits (2.9 GB of
     checkpoints).  Wall clock is not reproducible across machines in the first
@@ -688,8 +701,10 @@ def _median_train_s_per_epoch(prefix):
     silent divergence the rest of this toolchain refuses to allow.
     """
     vals = []
-    for p in sorted(glob.glob(os.path.join(C.RUNS, prefix + "_s*",
-                                          "result.json"))):
+    for s in seeds:
+        p = os.path.join(C.RUNS, "%s_s%d" % (prefix, s), "result.json")
+        if not os.path.exists(p):
+            continue
         try:
             d = json.load(open(p, encoding="utf-8"))
         except (ValueError, OSError):
@@ -1037,6 +1052,13 @@ def seed_macros(ev):
     replication pass, with no gate reading the sentence.  These macros are
     derived from the evaluation records themselves, so the claim in the text is
     a measurement rather than a recollection.
+
+    ``NumSeeds`` is the minimum over all arms and ``NumSeedsMain`` the minimum
+    over the five arms of Table~\\ref{tab:main}.  The latter is what that
+    table's caption has to quote: after the W2 pass every arm in it carries
+    six seeds, so the global minimum of three would understate the table's own
+    protocol.  ``NArmsAtMax`` counts the arms that reached the maximum, which
+    is how the text says *which* arms are replicated without naming them.
     """
     fam = {}
     for n in ev:
@@ -1046,11 +1068,18 @@ def seed_macros(ev):
         fam.setdefault(m.group(1), set()).add(int(m.group(2)))
     if not fam:
         return ["\\newcommand{\\%s}{--}" % k for k in ("NumSeeds", "NumSeedsMax",
+                                                       "NumSeedsMain",
+                                                       "NArmsAtMax",
                                                        "NumArmsSeeded")]
     counts = [len(v) for v in fam.values()]
+    mx = max(counts)
+    main_counts = [len(fam[a]) for a in MAIN_ARMS if a in fam]
     return [
         "\\newcommand{\\NumSeeds}{%d}" % min(counts),
-        "\\newcommand{\\NumSeedsMax}{%d}" % max(counts),
+        "\\newcommand{\\NumSeedsMax}{%d}" % mx,
+        "\\newcommand{\\NumSeedsMain}{%d}" % (min(main_counts)
+                                              if main_counts else 0),
+        "\\newcommand{\\NArmsAtMax}{%d}" % sum(1 for c in counts if c == mx),
         "\\newcommand{\\NumArmsSeeded}{%d}" % len(fam),
     ]
 

@@ -34,3 +34,5 @@ results/_bax_read.json.bak*
 results/_gen_macros*.bak*
 results/_w1*.log
 results/.pipeline_done
+figures_v2/
+results/_w2_seeds_status.json

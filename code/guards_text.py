@@ -249,3 +249,51 @@ def text_residue_guard(root=None, langs=("en", "cn")):
                   else "no escape residue in source (no PDF)"))
         elif not txt:
             note("text %s: PDF absent, only the source was checked" % lang)
+
+
+def seed_claim_guard(root=None, langs=("en", "cn")):
+    """A sentence quoting the maximum seed count must say which arms reached it.
+
+    Before the W2 replication pass the sentence "the $v_{\\max}=1.00$ anchored
+    arm carries NumSeedsMax of them" was true.  W2 gave nine arms six seeds, so
+    the qualifier in the parentheses became false while NumSeedsMax itself
+    stayed correct -- every numeric gate kept reporting green, because the
+    number is right and only its scope went stale.  That is the class closed
+    here: NumSeedsMax may be quoted only together with NArmsAtMax, which counts
+    the arms at the maximum straight from the evaluation records, unless the
+    sentence is the explicit range NumSeeds..NumSeedsMax.
+
+    The check uses a character window rather than sentence splitting: "2.6.0"
+    and "Fig. 3" contain periods, and a splitter that treats them as sentence
+    ends would separate a correct qualifier from the number it qualifies.  A
+    window can be fooled by a neighbouring sentence, which errs towards staying
+    quiet; a splitter errs towards firing on correct text, and a guard that
+    fires on correct text gets switched off.
+    """
+    root = root or C.ROOT
+    RANGE = re.compile(r"NumSeeds\{\}\s*(?:to|至|到|--|\u2013)\s*\\?NumSeedsMax")
+    WIN = 220
+    for lang in langs:
+        body = os.path.join(root, "submission", "paper_%s" % lang, "main.tex")
+        if not os.path.exists(body):
+            note("seeds %s: no delivered body, not asserted" % lang)
+            continue
+        src = _strip_comments(open(body, encoding="utf-8").read())
+        pos = [m.start() for m in re.finditer(r"\\NumSeedsMax(?![A-Za-z])", src)]
+        if not pos:
+            note("seeds %s: NumSeedsMax is never quoted, nothing to assert"
+                 % lang)
+            continue
+        bads = []
+        for p in pos:
+            win = src[max(0, p - WIN):p + WIN]
+            if "NArmsAtMax" not in win and not RANGE.search(win):
+                bads.append(" ".join(win.split())[:170])
+        if bads:
+            for w in bads[:3]:
+                bad("seeds %s: NumSeedsMax quoted without NArmsAtMax: ...%s..."
+                    % (lang, w))
+        else:
+            ok("seeds %s: all %d NumSeedsMax quotes name their scope "
+               "(NArmsAtMax) or are the NumSeeds..NumSeedsMax range"
+               % (lang, len(pos)))

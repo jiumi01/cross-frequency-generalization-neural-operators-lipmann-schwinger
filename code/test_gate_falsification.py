@@ -679,7 +679,8 @@ def main():
         print("PROBE 18: paired ratio, tight interval and consistent macros "
               "accepted; an unpaired draw, a ratio outside its interval, a "
               "decoration-only pairing, an unchanged denominator and a "
-              "false 'every' all rejected")
+              "false 'every' all rejected (and every mutation verified to "
+              "have actually applied)")
     else:
         print("PROBE 18: MISBEHAVED %s" % bb)
 
@@ -749,6 +750,15 @@ def main():
     else:
         print("PROBE 25: MISBEHAVED %s" % sr)
 
+    print("-- probe 26 (a seed-count qualifier that names the wrong arms) --")
+    sc = probe_seed_claim()
+    if all(sc.values()):
+        print("PROBE 26: a scope named by NArmsAtMax and the explicit "
+              "NumSeeds..NumSeedsMax range both stay quiet; a stale "
+              "'anchored arm' qualifier is rejected")
+    else:
+        print("PROBE 26: MISBEHAVED %s" % sc)
+
     good = (caught and ignored and named and duped and good3 and bad3 and fin3
             and good4 and bad4t and bad4c and all(sty.values())
             and fresh_stale and fresh_ok
@@ -771,7 +781,8 @@ def main():
             and all(rc.values())
             and all(su.values())
             and all(bx.values())
-            and all(sr.values()))
+            and all(sr.values())
+            and all(sc.values()))
     print("PROBE RESULT: %s" % ("all gates fire on known-bad input" if good else "GATE FAILED"))
     return 0 if good else 1
 
@@ -837,8 +848,25 @@ def probe_baseline_pairing():
             ratio_un_hi=o["rows"][2]["ratio_hi"]))
         same500 = mutate(base_tp, lambda o: o.update(
             rel_diff_vs_600=dict(mean=0.0002, max=0.001)))
-        word = ("\\TrivRatioLo}{1.02", "\\TrivRatioLo}{0.98")
-        drift = ("\\PlatTrivMid}{1.027", "\\PlatTrivMid}{1.120")
+        def _macro(name):
+            m = re.search(r"\\newcommand\{\\%s\}\{([0-9.]+)\}" % name, base_gm)
+            return None if m is None else m.group(1)
+
+        # The mutations are built from what the generator prints *now*.  They
+        # used to be hard-coded ("\\PlatTrivMid}{1.027"), and W2 then moved that
+        # macro to 1.030: the replacement stopped matching, the file went to the
+        # guard unmodified, and a probe that mutates nothing reports exactly what
+        # a working guard reports.  A stale literal is therefore a failed probe,
+        # not a quiet one.
+        rl, pm = _macro("TrivRatioLo"), _macro("PlatTrivMid")
+        word = (("\\TrivRatioLo}{%s" % rl, "\\TrivRatioLo}{0.98")
+                if rl is not None else None)
+        drift = (("\\PlatTrivMid}{%s" % pm,
+                  "\\PlatTrivMid}{%.3f" % (float(pm) * 1.09))
+                 if pm is not None else None)
+
+        def applies(m):
+            return m is not None and m[0] in base_gm and m[0] != m[1]
 
         res_d = dict(
             clean=not fires(),
@@ -846,8 +874,9 @@ def probe_baseline_pairing():
             outside=fires(ci_mut=outside),
             no_shrink=fires(ci_mut=flat),
             same_size=fires(tp_mut=same500),
-            word=fires(gm_mut=word),
-            drift=fires(gm_mut=drift),
+            word=fires(gm_mut=word) if applies(word) else False,
+            drift=fires(gm_mut=drift) if applies(drift) else False,
+            mutations_applied=applies(word) and applies(drift),
         )
         del G.FAIL[:]
         return res_d
@@ -1994,6 +2023,49 @@ def probe_si_refs():
     finally:
         open(main_tex, "w", encoding="utf-8").write(src)
     return out
+
+
+def probe_seed_claim():
+    """probe 26: a seed-count qualifier that names the wrong arms must fire.
+
+    The W2 replication pass gave nine arms six seeds.  The sentence "the
+    $v_{\\max}=1.00$ anchored arm carries NumSeedsMax of them" was true when it
+    was written and became false afterwards, while NumSeedsMax itself stayed
+    correct -- no numeric gate could see the stale scope.  Three inputs are
+    checked, because a guard that only rejects the bad case is free to reject
+    correct manuscripts:
+
+      good   the scope is named by NArmsAtMax, counted from the records;
+      stale  the scope is a remembered arm name, which is the defect;
+      rng    the explicit range NumSeeds..NumSeedsMax, which names no scope
+             and must stay quiet.
+    """
+    import guards_text as T
+    d = tempfile.mkdtemp(prefix="_seed_probe_")
+    try:
+        folder = os.path.join(d, "submission", "paper_en")
+        os.makedirs(folder)
+        cases = dict(
+            good="The \\NArmsAtMax\\ arms the headline claims rest on carry "
+                 "\\NumSeedsMax\\ of them.\n",
+            stale="the $v_{\\max}=1.00$ anchored arm carries \\NumSeedsMax\\ "
+                  "of them.\n",
+            rng="\\NumSeeds{} to \\NumSeedsMax{} seeds are trained per arm.\n",
+        )
+        out = {}
+        for k, body in cases.items():
+            with open(os.path.join(folder, "main.tex"), "w",
+                      encoding="utf-8") as fh:
+                fh.write(body)
+            del T.FAIL[:]
+            with contextlib.redirect_stdout(io.StringIO()):
+                T.seed_claim_guard(langs=("en",), root=d)
+            out[k] = bool(T.FAIL)
+        del T.FAIL[:]
+        return dict(good_quiet=not out["good"], stale_fires=out["stale"],
+                    range_quiet=not out["rng"])
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
 
 
 if __name__ == "__main__":
