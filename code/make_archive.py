@@ -22,6 +22,14 @@ ROOT = os.path.abspath(os.path.join(HERE, ".."))
 
 SKIP_DIRS = {"__pycache__", ".ipynb_checkpoints"}
 SKIP_FILE_SUFFIX = (".aux", ".log", ".out", ".bbl", ".blg", ".part", ".synctex.gz")
+# Driver transcripts and build stamps.  make_release.py has always refused
+# these, and the snapshot is described in the Data Availability statement as a
+# superset of that release -- so shipping them here put the two doors back out
+# of step one layer down.  They record which stage ran on this disk, they are
+# evidence for nothing, and the build stamp made the archive's own md5 manifest
+# differ between two rebuilds of the same sources.
+SKIP_STATE_FILES = {".finish_state", ".lastmile_state", ".pipeline_done",
+                    ".residual_state", ".residual2_state"}
 
 
 def md5(path):
@@ -40,7 +48,7 @@ def copy_tree(src, dst, base, rows):
         if os.path.isdir(s):
             copy_tree(s, os.path.join(dst, name), base, rows)
             continue
-        if name.endswith(SKIP_FILE_SUFFIX):
+        if name.endswith(SKIP_FILE_SUFFIX) or name in SKIP_STATE_FILES:
             continue
         os.makedirs(dst, exist_ok=True)
         shutil.copy2(s, os.path.join(dst, name))

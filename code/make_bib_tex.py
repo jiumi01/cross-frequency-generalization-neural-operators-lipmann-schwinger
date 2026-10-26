@@ -220,6 +220,12 @@ def render(e):
             s += ", %s." % pages
         else:
             s += "."
+        # Third branch with the same rule: a journal that issues no DOI (JMLR)
+        # still has a preprint, and the number is the locator.  See the
+        # inproceedings and misc branches.
+        ep = e.get("eprint")
+        if ep:
+            s += " %s:%s." % (e.get("archivePrefix") or "arXiv", ep)
         return s + doi_s
 
     if t in ("inproceedings", "conference"):
@@ -230,7 +236,15 @@ def render(e):
             s += ", vol. %s" % vol
         if pages:
             s += ", pp. %s" % pages
-        return s + "; %s.%s" % (y, doi_s)
+        s += "; %s." % y
+        # The same loss the misc branch documents below: ICLR/ICML/NeurIPS
+        # proceedings carry no DOI, so the arXiv number is the entry's only
+        # persistent locator, and this branch rendered volume and pages but
+        # dropped it.  Six entries printed with no locator at all.
+        ep = e.get("eprint")
+        if ep:
+            s += " %s:%s." % (e.get("archivePrefix") or "arXiv", ep)
+        return s + doi_s
 
     if t == "book":
         ed = e.get("edition")

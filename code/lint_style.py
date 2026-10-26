@@ -79,6 +79,14 @@ RULES_EN = [
     # closes, and the body still excludes `-` and `&`.
     ("en-dash-aside", r"(?:^|\n|[ \t])--[ \t\n][^-&]{1,140}[ \t\n]--[ \t\n]", 0,
      "en-dash pair used as a parenthetical aside; use `---` or restructure"),
+    # A single spaced `--` is the same defect as the pair above, written once:
+    # "an analytic head -- fitted inside the band -- carries" is caught, but
+    # "removable by a construction -- fitted inside the band" was not, and
+    # sixteen of those shipped while the pair rule reported clean.  A numeric
+    # range never has a space around its en dash, so the rule is safe there.
+    ("en-dash-single", r"(?:^|\n|[ \t])--[ \t]", 0,
+     "spaced en dash used as punctuation; use a comma, a colon or a new "
+     "sentence"),
     ("explanatory-paren",
      r"\((?:i\.e\.|e\.g\.|which|that is|the same|so that|not |see |but )",
      0, "parenthesis that explains rather than names"),
@@ -104,6 +112,8 @@ RULES_CN = [
      "em-dash pair used as a parenthetical aside"),
     ("en-dash-aside", r"(?:^|\n|[ \t])--[ \t\n][^-&]{1,140}[ \t\n]--[ \t\n]", 0,
      "en-dash pair used as a parenthetical aside; use `---` or restructure"),
+    ("en-dash-single", r"(?:^|\n|[ \t])--[ \t]", 0,
+     "spaced en dash used as punctuation"),
     ("citation-after-space", r"[a-zA-Z0-9\u4e00-\u9fff]\s+\\cite\{", 0,
      "citation separated from its subject by a space without a tie"),
     ("cn-em-dash-aside", r"——[^—]{1,140}——", 0,
@@ -158,6 +168,49 @@ def strip_comments(text):
     return "\n".join(out)
 
 
+DEF_LINE = re.compile(
+    r"^\s*\\(?:newcommand|renewcommand|providecommand|DeclareMathOperator|"
+    r"def|let|gdef|edef)\b")
+
+
+def strip_definitions(text):
+    r"""Blank out macro-definition lines, preserving line structure.
+
+    A definition is code, not prose: `\newcommand{\secref}[1]{Sec.~\ref{#1}}`
+    tripped the abbreviated-cross-reference rule while producing exactly the
+    compact form the table needs.  Only single-line definitions are stripped,
+    which is every definition in this manuscript; the rendered text is checked
+    separately by guards_text, so nothing can hide here and reach the reader.
+    """
+    out = []
+    for line in text.split("\n"):
+        out.append("" if DEF_LINE.match(line) else line)
+    return "\n".join(out)
+
+
+# A `--` that is the whole of a table cell marks "not applicable".  That is a
+# value, not punctuation, but the dash rules read the line as text and see
+# `& -- & -- &` as two spaced dashes; the rule then fires on data.  The pairing
+# rule below had already been taught to exclude `&` from an aside body, and the
+# single-dash rule broke that fix the moment it was added -- the falsification
+# probe for the cell case is what caught it.  Masking only the cell-only form
+# keeps the signal on prose: a dash that merely shares a line with a cell
+# separator is still scored.
+CELL_MARK = re.compile(r"(?<=&)[ \t]*--[ \t]*(?=&|\\\\)")
+
+
+def mask_cell_marks(text):
+    """Blank the dashes of cell placeholders, preserving length and offsets."""
+    out, last = [], 0
+    for m in CELL_MARK.finditer(text):
+        i = text.index("--", m.start(), m.end())
+        out.append(text[last:i])
+        out.append("\u2588\u2588")
+        last = i + 2
+    out.append(text[last:])
+    return "".join(out)
+
+
 def reading_load(body):
     """(cjk_chars, latin_words, units) for a caption body."""
     cjk = len(re.findall(r"[\u4e00-\u9fff]", body))
@@ -171,7 +224,7 @@ def _strip_tex(s):
 
 
 def scan(path, text, rules):
-    text = strip_comments(text)
+    text = mask_cell_marks(strip_definitions(strip_comments(text)))
     for name, rx, budget, desc in rules:
         hits = []
         for m in re.finditer(rx, text):

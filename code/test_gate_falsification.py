@@ -42,6 +42,7 @@ import io
 import glob
 import json
 import shutil
+import hashlib
 import tempfile
 import contextlib
 
@@ -530,7 +531,33 @@ def probe_doi_placeholder():
     return clean, bad
 
 
+def _tree_fingerprint():
+    """md5 of every .tex under submission/ and paper/ -- files no probe may write.
+
+    The suite audits the delivered manuscript, so it must not edit it, and it
+    did: probe 25 mutated submission/paper_en/main.tex in place and wrote it
+    back through text mode, which converted the delivered source to CRLF on
+    every run and made the byte-level mirror gate accuse the archive of being
+    built before an edit that never happened.  An instrument that rewrites its
+    subject is not measuring it, and a kill between mutation and restore would
+    have left a withdrawn sentence in the manuscript of record.  Checked here
+    rather than trusted, because the failure is invisible in the probe output.
+    """
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    out = {}
+    for sub in ("submission", "paper"):
+        for dirpath, _, names in os.walk(os.path.join(root, sub)):
+            for n in names:
+                if n.endswith(".tex"):
+                    p = os.path.join(dirpath, n)
+                    with open(p, "rb") as fh:
+                        out[os.path.relpath(p, root)] = hashlib.md5(
+                            fh.read()).hexdigest()
+    return out
+
+
 def main():
+    before = _tree_fingerprint()
     d = tempfile.mkdtemp(prefix="_gate_probe_")
     try:
         with open(os.path.join(d, "gen_macros.tex"), "w", encoding="utf-8") as fh:
@@ -795,6 +822,11 @@ def main():
             and all(sr.values())
             and all(sc.values())
             and all(dt.values()))
+    after = _tree_fingerprint()
+    touched = sorted(k for k, v in after.items() if before.get(k) != v)
+    if touched:
+        print("the suite modified the tree it audits: %s" % touched[:5])
+    good = good and not touched
     print("PROBE RESULT: %s" % ("all gates fire on known-bad input" if good else "GATE FAILED"))
     return 0 if good else 1
 
@@ -1404,6 +1436,13 @@ def probe_style_gate():
             "Bi-CGSTAB (reference) & -- & -- & 1.31 & 1.0 \\\\\n", "en"),
         cn_dash_cells_ok=not scan_fails(
             "Bi-CGSTAB（参考） & -- & -- & 1.31 & 1.0 \\\\\n", "cn"),
+        # The inverted control for the masking above: a prose dash that merely
+        # shares a line with a cell separator is not a placeholder and must
+        # still be caught, or the mask would silence the rule everywhere a
+        # table row appears.
+        en_dash_after_amp_bad=scan_fails(
+            "the reference solver & the head -- fitted inside the band -- "
+            "agree to 2\\%.\n", "en"),
         # a comment never reaches the PDF, so it must not be scored as prose
         comment_ok=not scan_fails("% banner -- a -- b -- c, do not edit\n", "en"),
         # The blind spot that was live in the manuscript: the source is
@@ -1432,8 +1471,8 @@ def probe_style_gate():
         # while the English rule meters 140, so a long Chinese aside was
         # invisible; the cap now matches.
         cn_dash_long_bad=scan_fails(
-            "其他算子主干——消息传递\cite{brandstetter2022message} 与 "
-            "Transformer 式架构\cite{hao2024dpot}——同样可在本文数据上训练。\n",
+            r"其他算子主干——消息传递\cite{brandstetter2022message} 与 "
+            r"Transformer 式架构\cite{hao2024dpot}——同样可在本文数据上训练。" "\n",
             "cn"),
         cn_bad=scan_fails(
             "该结论——在低频段尤其明显——并不新。值得注意的是它成立。\n", "cn"),
@@ -1451,6 +1490,22 @@ def probe_style_gate():
         # Control on the English side too: 60 words must fail, 5 must not.
         en_cap_bad=caption_fails("\\caption{%s}\n" % ("word " * 60)),
         en_cap_ok=not caption_fails("\\caption{a short caption here}\n"),
+        # A *single* spaced en dash is the aside rule's blind spot: the pair
+        # rule only ever saw dashes in twos, so sixteen one-dash asides shipped
+        # while it reported clean (measured 2026-10-26).
+        en_dash_single_bad=scan_fails(
+            "the plateau is analytic Born truncation error -- removable by a "
+            "construction fitted inside the band.\n", "en"),
+        # The control on the other side: an en dash inside a range has no
+        # spaces and must stay legal, or the rule would condemn every table.
+        en_dash_single_range_ok=not scan_fails(
+            "the ratio runs 7.16--8.07 over f in 1--12.\n", "en"),
+        # A macro definition is code, not prose: its \ref argument is a
+        # placeholder, and scoring it as a broken reference is how the
+        # abbreviated-cross-reference rule fired on the macro that produces
+        # exactly the compact table form it is meant to encourage.
+        def_line_ok=not scan_fails(
+            "\\newcommand{\\secref}[1]{Sec.~\\ref{#1}}\n", "en"),
     )
     # The failure mode this gate actually shipped with: it skipped missing
     # files silently and then reported a pass, so pointing it at the wrong root
@@ -1846,9 +1901,9 @@ def probe_bax_gate():
         shutil.copy(os.path.join(root, "results",
                                  "eval_bax_fno_a100_m7_s0.json"), p3)
         txt = {}
-        for lang, sent in (("en", "the same arm fails at $v_{\max}\ge0.50$, "
+        for lang, sent in (("en", r"the same arm fails at $v_{\max}\ge0.50$, "
                                     "destroying the plateau."),
-                           ("cn", "同一臂在 $v_{\max}\ge0.50$ 失效。")):
+                           ("cn", r"同一臂在 $v_{\max}\ge0.50$ 失效。")):
             mp = os.path.join(sub, "paper_%s" % lang, "main.tex")
             t = open(mp, encoding="utf-8").read()
             open(mp, "w", encoding="utf-8").write(
@@ -2026,29 +2081,48 @@ def probe_si_refs():
     import subprocess
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     gate = os.path.join(root, "code", "check_si_refs.py")
-    main_tex = os.path.join(root, "submission", "paper_en", "main.tex")
-    src = open(main_tex, encoding="utf-8").read()
-
-    def run():
-        p = subprocess.run([sys.executable, gate], cwd=root,
-                           capture_output=True, text=True)
-        return p.returncode, p.stdout
-
-    out = {}
+    # Run against a sandbox copy.  This probe used to mutate the delivered
+    # manuscript in place and write it back in text mode, so every run of the
+    # suite converted submission/paper_en/main.tex to CRLF -- and the
+    # byte-level mirror gate then reported "the archive was built before the
+    # last edit" about a file whose content had not changed by one character.
+    # An instrument that edits its own subject also loses the subject if it is
+    # killed between the mutation and the restore.
+    d = tempfile.mkdtemp(prefix="_si_refs_probe_")
     try:
+        os.makedirs(os.path.join(d, "submission", "paper_en"))
+        os.makedirs(os.path.join(d, "paper", "en"))
+        for name in ("main.tex", "SI_main.tex"):
+            shutil.copy(os.path.join(root, "submission", "paper_en", name),
+                        os.path.join(d, "submission", "paper_en", name))
+        for name in glob.glob(os.path.join(root, "paper", "en", "*.tex")):
+            shutil.copy(name, os.path.join(d, "paper", "en",
+                                           os.path.basename(name)))
+        main_tex = os.path.join(d, "submission", "paper_en", "main.tex")
+        src = open(main_tex, encoding="utf-8").read()
+
+        def put(text):
+            # byte-exact: utf-8, no newline translation, inside the sandbox
+            open(main_tex, "wb").write(text.encode("utf-8"))
+
+        def run():
+            p = subprocess.run([sys.executable, gate, "--root", d], cwd=root,
+                               capture_output=True, text=True)
+            return p.returncode, p.stdout
+
+        out = {}
         rc, log = run()
         out["clean"] = (rc == 0)
-        open(main_tex, "w", encoding="utf-8").write(
-            src.replace("(Supplementary Table~15)", "(Supplementary Table~7)"))
+        put(src.replace("(Supplementary Table~15)",
+                        "(Supplementary Table~7)"))
         rc, log = run()
         out["wrong_table"] = (rc != 0 and "Table~7" in log)
-        open(main_tex, "w", encoding="utf-8").write(
-            src.replace("(Supplementary Table~15)",
+        put(src.replace("(Supplementary Table~15)",
                         "(Supplementary Table~99)"))
         rc, log = run()
         out["out_of_range"] = (rc != 0 and "only has" in log)
     finally:
-        open(main_tex, "w", encoding="utf-8").write(src)
+        shutil.rmtree(d, ignore_errors=True)
     return out
 
 

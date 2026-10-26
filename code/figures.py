@@ -96,7 +96,96 @@ def set_style():
     })
 
 
+def data_inside_axes(fig, tol=1.0):
+    """Plot points that fall outside their axes, in display pixels.
+
+    Every panel draws with ``clip_on=False`` so that a marker sitting on the
+    frame is not halved.  The price is that a hand-set limit which is too
+    tight does not crop the data, it paints it over the tick labels and the
+    neighbouring panel.  A limit is a statement about the data, so it is
+    checked here rather than trusted.
+
+    The comparison is made in display coordinates after applying each
+    artist's OWN transform: axvline/axhline and legend handles mix data and
+    axes coordinates, and comparing raw x/y against get_xlim() reports them
+    as violations.
+    """
+    bad = []
+    for k, ax in enumerate(fig.axes):
+        # Opt-in per panel.  Most panels carry a deliberately divergent
+        # reference curve (the truncated Born series leaves the top of the
+        # frame by design), so a figure-wide rule would be all false
+        # positives; a panel whose argument depends on the full range of its
+        # data declares that with require_inside().
+        if not getattr(ax, "_must_contain", False):
+            continue
+        bb = ax.bbox
+        artists = []
+        for ln in ax.lines:
+            if not ln.get_visible():
+                continue
+            x = np.asarray(ln.get_xdata(orig=False), dtype=float)
+            y = np.asarray(ln.get_ydata(orig=False), dtype=float)
+            if x.size == 0:
+                continue
+            artists.append((x, y, ln.get_transform(),
+                            "panel %d line %r" % (k, ln.get_label())))
+        for co in ax.collections:
+            if not co.get_visible():
+                continue
+            # errorbar's caps and bars are LineCollections drawn from
+            # segments and carry a single placeholder offset at (0, 0);
+            # reading that offset reports a phantom point at the origin.
+            segs = getattr(co, "get_segments", None)
+            if segs is not None:
+                sg = [s for s in segs() if len(s)]
+                if sg:
+                    arr = np.concatenate([np.asarray(s, dtype=float) for s in sg])
+                    artists.append((arr[:, 0], arr[:, 1], co.get_transform(),
+                                    "panel %d segments" % k))
+                    continue
+            off = co.get_offsets()
+            if off is None or len(off) == 0:
+                continue
+            arr = np.asarray(off, dtype=float)
+            if arr.shape == (1, 2) and not arr.any():
+                continue
+            artists.append((arr[:, 0], arr[:, 1], co.get_offset_transform(),
+                            "panel %d collection" % k))
+        for x, y, tr, what in artists:
+            if x.size != y.size:
+                y = np.resize(y, x.size)
+            keep = np.isfinite(x) & np.isfinite(y)
+            if int((~keep).sum()):
+                bad.append("%s: %d non-finite point(s)"
+                           % (what, int((~keep).sum())))
+            if not keep.any():
+                continue
+            disp = tr.transform(np.column_stack([x[keep], y[keep]]))
+            out = ((disp[:, 0] < bb.x0 - tol) | (disp[:, 0] > bb.x1 + tol) |
+                   (disp[:, 1] < bb.y0 - tol) | (disp[:, 1] > bb.y1 + tol))
+            if out.any():
+                bad.append("%s: %d of %d point(s) outside the axes"
+                           % (what, int(out.sum()), int(keep.sum())))
+    return bad
+
+
+_CONTAINED = []
+
+
+def require_inside(ax):
+    """Declare that every plotted point in this panel must be inside it."""
+    ax._must_contain = True
+    _CONTAINED.append(ax)
+
+
 def save(fig, path):
+    escaped = data_inside_axes(fig)
+    if escaped:
+        for msg in escaped[:8]:
+            print("   !! data outside axes -- " + msg)
+        raise SystemExit("%s: plotted data escapes its axes; fix the limit, "
+                         "do not widen clip_on" % os.path.basename(path))
     fig.savefig(path + ".pdf", bbox_inches="tight", pad_inches=0.03)
     fig.savefig(path + ".png", dpi=400, bbox_inches="tight", pad_inches=0.03)
     plt.close(fig)
@@ -599,7 +688,7 @@ def fig_spectrum(out):
         ends.append((float(y[-1]), r"$M=%d$" % M, MODES6[i]))
     band(ax)
     sweep_axis(ax)
-    ax.set_ylabel("out-of-band energy fraction $\delta_M$")
+    ax.set_ylabel(r"out-of-band energy fraction $\delta_M$")
     end_labels(ax, ends, fs=7.0, min_sep=10.5)
     save(fig, os.path.join(out, "fig_spectrum"))
 
@@ -1271,11 +1360,13 @@ def fig_deep(out):
                                        12.0])
     ns = arm_names(ev, "a025")
     ends_b = []
+    vals_b = []
     if ns:
         Fm, M, S = mean_curve(ev, ns, 0.25)
         ax.errorbar(Fm, M, yerr=S, color=BLUE, marker="o", ms=3.2, lw=1.3,
                     capsize=1.8, clip_on=False, zorder=3, label="trained FNO")
         ends_b.append((float(M[-1]), "trained FNO", BLUE))
+        vals_b.append(np.ravel(M))
     # the head curve comes from the order scan, which is the instrument that
     # records a sweep per (contrast, order); the order-selection record only
     # keeps the plateau it selected on.
@@ -1287,6 +1378,7 @@ def fig_deep(out):
         ax.plot(Fh, hv, color=VERMILION, marker="D", ms=3.2, lw=1.3,
                 clip_on=False, zorder=3, label="head, $M=M_{\\mathrm{sel}}$")
         ends_b.append((float(hv[-1]), "head", VERMILION))
+        vals_b.append(np.ravel(hv))
     for pref, col, mk, lab in (("ba_fno_a025_m8_s", GREEN, "P",
                                 "head $+$ residual, $M=8$"),
                                ("ba_fno_a025_s", ORANGE, "X",
@@ -1299,9 +1391,18 @@ def fig_deep(out):
                     capsize=1.8, clip_on=False, zorder=3, label=lab)
         ends_b.append((float(M[-1]), lab.replace("head $+$ residual, ", ""),
                        col))
+        vals_b.append(np.ravel(M))
     band(ax)
     ax.set_yscale("log")
-    ax.set_ylim(0.008, 4.5)
+    # The four objects span three decades here (the head alone is an order of
+    # magnitude below the trained operator inside the band), so the limit is
+    # taken from the data with one decade of headroom instead of being written
+    # in by hand: 0.008 was tighter than the head curve, and clip_on=False
+    # painted its low-frequency markers over the tick labels.
+    val = np.concatenate(vals_b)
+    val = val[np.isfinite(val) & (val > 0)]
+    ax.set_ylim(val.min() / 1.5, val.max() * 1.5)
+    require_inside(ax)
     decades(ax, numticks=3)
     sweep_axis(ax)
     ax.set_ylabel(r"relative $L_2$ error")
@@ -1540,19 +1641,19 @@ def fig_realgeo(out):
              BLUE, "--")):
         for g in names:
             y = [d["bands"][g][str(M)] for M in Md]
-            # clip_on: the synthetic fractions run many decades below the
-            # 1e-6 floor, and unclipped the curves left the axes and crossed
-            # the whole figure.
-            ax.plot(Md, y, ls, color=col, lw=1.3, clip_on=True, zorder=2)
+            ax.plot(Md, y, ls, color=col, lw=1.3, clip_on=False, zorder=2)
         y_end = float(np.mean([d["bands"][g][str(Md[-1])] for g in names]))
-        # The label rides at the height of its own curve, but a curve that
-        # has exited through the floor must not drag its label out of the
-        # panel with it: clamp into the axes from both sides.
-        ends.append((min(max(y_end, 3e-6), 0.5),
+        ends.append((min(max(y_end, 2e-14), 0.5),
                      "real geology" if fam == "real" else "synthetic", col))
     ax.set_yscale("log")
-    ax.set_ylim(1e-6, 1.0)
-    decades(ax, numticks=7)
+    # The synthetic control's energy falls to ~1e-13 by mode 24 (it is
+    # band-limited by construction) and the real windows stop at ~3e-3; a
+    # 1e-6 floor cut seven decades off the one curve that shows the contrast
+    # and made the cut look like an artefact of the model.  The full range is
+    # kept: the separation between the two families IS the panel.
+    ax.set_ylim(2e-14, 1.0)
+    decades(ax, numticks=5)
+    require_inside(ax)
     ax.set_xlabel("mode index $M$")
     ax.set_ylabel("field energy outside $M$")
     panel_label(ax, "c", "contrast field")
@@ -1721,6 +1822,7 @@ if __name__ == "__main__":
     a = ap.parse_args()
     ev = load_evals(a.res)
     print("loaded %d evals" % len(ev))
+    _before = len(_CONTAINED)
     if a.only in ("all", "main"):
         fig_main(ev, a.out)
     if a.only in ("all", "training"):
@@ -1759,3 +1861,9 @@ if __name__ == "__main__":
         fig_deep(a.out)
     if a.only in ("all", "fewshot"):
         fig_fewshot(a.out)
+    # A declaration that no longer fires is worse than none: it reads as a
+    # check in the log.  At least one panel must have been tested.
+    if len(_CONTAINED) == _before:
+        raise SystemExit("no panel declared require_inside() on this run -- "
+                         "the containment check was vacuous")
+    print("containment: %d panel(s) checked" % (len(_CONTAINED) - _before))

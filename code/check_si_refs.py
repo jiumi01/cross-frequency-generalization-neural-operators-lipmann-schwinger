@@ -26,6 +26,14 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, ".."))
 EN = os.path.join(ROOT, "submission", "paper_en")
+# The falsification probe has to run this gate against a mutated copy of the
+# manuscript.  Before this option existed the probe mutated the delivered file
+# in place and restored it afterwards, which meant the instrument wrote into
+# the object it measures -- and, because the restore went through text mode, it
+# silently converted the delivered source to CRLF every time the suite ran.
+if "--root" in sys.argv:
+    ROOT = os.path.abspath(sys.argv[sys.argv.index("--root") + 1])
+    EN = os.path.join(ROOT, "submission", "paper_en")
 
 
 def read(path):

@@ -213,6 +213,14 @@ def check_selfmath_macros(folder):
 
 def check_labels(tex):
     txt, extra = expand_inputs(tex)
+    # Macro definitions are code: `\newcommand{\secref}[1]{Sec.~\ref{#1}}`
+    # has a \ref whose argument is the placeholder #1, not a label, and a
+    # gate that reads it as one reports a broken reference for a reference
+    # that is generated correctly.  Same strip as lint_style uses; the
+    # rendered prose is audited separately.
+    txt = "\n".join("" if re.match(
+        r"\s*\\(?:newcommand|renewcommand|providecommand|def|let|gdef|edef)\b",
+        line) else line for line in txt.split("\n"))
     # A *list*, not a set: a label defined twice is invisible to a set, and
     # LaTeX silently resolves every \\ref to the LAST definition.  That is not
     # hypothetical -- \\label{sec:disc} was attached both to the discriminator
@@ -297,6 +305,53 @@ def check_bib_inline_tex(folder):
     if not hits:
         ok("%s: the rendered reference list carries no unescaped text-mode "
            "special" % os.path.basename(folder))
+    bib_locators(folder)
+
+
+# Entries whose venue issues no DOI and that have no preprint: a 1991 EAGE
+# abstract volume, an APS meeting abstract, and two GitHub-hosted data sets.
+# Each is listed with the reason, so the exception cannot be widened silently
+# by adding a key without one.
+NO_LOCATOR_OK = {
+    "bourgeois1991marmousi": "EAGE abstract volume, 1991, no DOI",
+    "millet2024acoustic": "APS DFD meeting abstract, no DOI or preprint",
+    "mlamoureuxMarmousi": "GitHub data set, URL is the locator",
+    "shenyaojinMarmousi": "GitHub data set, URL is the locator",
+}
+
+
+def bib_locators(folder):
+    """Every reference must carry a DOI or an arXiv number.
+
+    MDPI production asks for the DOI of every entry it can resolve, and the
+    entries that lack one here are the proceedings papers, whose arXiv number
+    is their only persistent locator.  The renderer used to drop that field
+    (see make_bib_tex.render), so six references printed as "In Proceedings;
+    2024." with nothing to find them by.  Checking the rendered file rather
+    than the .bib is what catches a renderer that ignores a field it has.
+    """
+    p = os.path.join(folder, "gen_bib.tex")
+    if not os.path.exists(p):
+        return
+    txt = open(p, encoding="utf-8").read()
+    items = re.split(r"\\bibitem\{", txt)[1:]
+    missing = []
+    for it in items:
+        key = it.split("}", 1)[0]
+        body = it.split("}", 1)[1] if "}" in it else ""
+        if "doi.org/" in body or re.search(r"(arXiv|arxiv):\s*\d", body):
+            continue
+        if key in NO_LOCATOR_OK:
+            continue
+        missing.append(key)
+    if missing:
+        for k in missing:
+            bad("%s: reference %r has neither a DOI nor an arXiv number"
+                % (os.path.basename(folder), k))
+    else:
+        ok("%s: every reference carries a DOI or an arXiv number "
+           "(%d entries, %d documented exceptions)"
+           % (os.path.basename(folder), len(items), len(NO_LOCATOR_OK)))
 
 
 # ---------------------------------------------------------------------------

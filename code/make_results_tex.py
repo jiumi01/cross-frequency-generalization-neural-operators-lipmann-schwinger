@@ -89,7 +89,7 @@ CAP = { "en": dict(
         "first leaves $3\\times$ its own in-band level. 3-seed means."),
   anchor=("Analytic anchor on every other arm's protocol: paired media, "
           "$n=200$, seeds shared with the trained rows. $a,b$ are fitted on a "
-          "prefix of the training cache only -- no test medium, no "
+          "prefix of the training cache only, with no test medium and no "
           "out-of-band frequency. The learned residual is identically zero."),
   deep=("Analytic head depth on the common protocol: paired media, $n=200$, "
         "shared seeds. Each row is fitted on one in-band prefix; $M$ counts "
@@ -182,7 +182,7 @@ CAP = { "en": dict(
            "两组均为同一批 \\RealWinN{} 个窗口上的均值，而非表 "
            "\\ref{tab:main} 的 \\MainNMedia{} 个配对介质，且两组只差几何。"),
   paired=("配对检验。$A$、$B$ 为首列两配置；$n$ 为条目数（介质 $\\times$ 种子 "
-          "$\\times$ 频点）；$\\Delta$ 为平均配对差值，95\\% 区间对\emph{介质}重抽样；"
+          "$\\times$ 频点）；$\\Delta$ 为平均配对差值，95\\% 区间对\\emph{介质}重抽样；"
           "$p$ 为双侧符号翻转置换检验（保留一位有效数字）；星号表示区间不含 0。"),
   arms=("支撑种子协议的全部训练臂清单。$\\varepsilon(f)$：测试频率 $f$ 处的"
         "种子均值相对 $L_2$；末列对 $f\\ge6$ 取平均。对加宽带臂，这些频率位于"
@@ -3071,7 +3071,7 @@ def anchor_macros():
     arm's own evaluation records.  The one number that carries the argument is
     not the anchor's error level but its FLATNESS: the ratio of its out-of-band
     error to its in-band error is near one, where the trained operator's is
-    \CliffLo--\CliffHi.  Both ratios are computed here rather than quoted.
+    \\CliffLo--\\CliffHi.  Both ratios are computed here rather than quoted.
     """
     keys = ["AnchIn", "AnchE", "AnchEdge", "AnchPlat", "AnchRatio",
             "AnchTrivPlat", "AnchTrivRatio", "AnchInOut", "AnchFnoIn",
@@ -3227,7 +3227,7 @@ def deep_macros():
     contraction factor with its frequency spread.  The frequency spread is
     included because it is the number that CORRECTS the manuscript's earlier
     "near-frequency-independent" wording: rho does move with f, by a factor
-    \RhoSpread, which is real but three times smaller than the cliff.
+    \\RhoSpread, which is real but three times smaller than the cliff.
     """
     keys = ["DAMsel", "DAMselStrong", "DAPlatSel", "DAInSel", "DAPlatMTwo",
             "DAFnoPlat", "DAFnoIn", "DAWinOut", "DAWinIn",

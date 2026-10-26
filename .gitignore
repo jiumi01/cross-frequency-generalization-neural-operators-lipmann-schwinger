@@ -33,6 +33,19 @@ results/_fig_deep_check.png
 results/_bax_read.json.bak*
 results/_gen_macros*.bak*
 results/_w1*.log
-results/.pipeline_done
 figures_v2/
 results/_w2_seeds_status.json
+
+# Driver transcripts and build stamps.  These are machine-local records of
+# which stage ran when on this disk, not evidence for any claim, and
+# make_release.py already refuses to ship them.  Four of them were nevertheless
+# tracked, so the same archive had two different file sets depending on whether
+# a reader took the release tree or the repository -- and the build stamp inside
+# a content-addressed evidence directory made the DAS tree hash move on every
+# rebuild, which is a fixed point the statement can never satisfy.  They stay on
+# disk (the .sh drivers read them) but out of the tracked tree.
+results/.pipeline_done
+results/.finish_state
+results/.lastmile_state
+results/.residual_state
+results/.residual2_state

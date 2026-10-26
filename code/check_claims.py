@@ -773,7 +773,7 @@ def submission_element_guard(root=None):
         count is taken on the rendered PDF -- the source-based count that
         replaced the missing one reported 124 words for a 202-word abstract,
         because its non-greedy regex stopped at the first '}' (the one inside
-        $v_{\max}$) and its macro deletion hid every number-bearing macro.  A
+        $v_{\\max}$) and its macro deletion hid every number-bearing macro.  A
         PDF older than main.tex is refused, so an edit without a rebuild cannot
         pass either.
     (b) Placeholder-shaped tokens in the delivered tables.  Two shapes have
