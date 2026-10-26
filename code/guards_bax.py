@@ -230,13 +230,16 @@ def bax_text_guard(paths=None):
         if lang == "en":
             withdrawn = [r"fails at \$v_\{\\max\}\\ge0\.50",
                          r"does not transfer at every contrast"]
-            # The corrected-reading sentence is required in colon form, not as
-            # a dash aside: lint_style holds the spaced-dash-aside budget at
-            # zero, so the dash form only ever passed when the aside body
-            # happened to contain a hyphen ("higher-contrast").  The colon
-            # form also matches the CN sentence's structure.
+            # The corrected-reading disclosure is required in two parts: the
+            # statement that the head must sum what it was fitted to sum (the
+            # check itself) and the statement that the pre-check archives carry
+            # a protocol key (the record cannot be mixed).  Two independent
+            # patterns rather than one, because the single-pattern form let a
+            # rewrite of the surrounding prose drop the disclosure while the
+            # gate stayed green.
             anchored = [r"\\BaxVerdictMid", r"\\BaxVerdictStrong",
-                        r"defect: a head fitted at depth \$M\$"]
+                        r"head sums what it was fitted to sum",
+                        r"protocol key"]
             stale = [r"\\BATwoInMid", r"\\BATwoPlatMid",
                      r"\\BATwoInStrong", r"\\BATwoPlatStrong"]
         else:

@@ -738,8 +738,9 @@ def main():
     bx = probe_bax_gate()
     if all(bx.values()):
         print("PROBE 24: the corrected tree accepted; a broken PASS gate, a "
-              "perturbed a025 invariant, a stripped protocol key and a "
-              "restored 'fails at v>=0.50' sentence all rejected")
+              "perturbed a025 invariant, a stripped protocol key, a "
+              "restored 'fails at v>=0.50' sentence and a deleted disclosure "
+              "all rejected")
     else:
         print("PROBE 24: MISBEHAVED %s" % bx)
 
@@ -1855,8 +1856,23 @@ def probe_bax_gate():
                  if "\\begin{abstract}" in t else sent + "\n" + t)
             txt[lang] = mp
         b4 = run(with_txt=txt)
+        # 5. the other direction: remove the disclosure itself.  A guard that
+        #    only fires on the presence of a withdrawn sentence stays green
+        #    when the required text is deleted, which is how the single-pattern
+        #    form of this check passed a rewrite that dropped the whole
+        #    paragraph.
+        mp = os.path.join(sub, "paper_en", "main.tex")
+        t = open(mp, encoding="utf-8").read()
+        assert "head sums what it was fitted to sum" in t, \
+            "MUTATION TARGET ABSENT: the disclosure sentence is gone"
+        open(mp, "w", encoding="utf-8").write(
+            t.replace("head sums what it was fitted to sum",
+                      "head is used as fitted"))
+        b5 = run(with_txt={"en": mp})
+        open(mp, "w", encoding="utf-8").write(t)
         out = dict(clean=clean, pass_broken=b1, invariant_broken=b2,
-                   protocol_hidden=b3, text_drift=b4)
+                   protocol_hidden=b3, text_drift=b4,
+                   disclosure_missing=b5)
         del GB.FAIL[:]
         return out
     finally:
