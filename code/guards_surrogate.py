@@ -272,11 +272,17 @@ def bound_text_guard(root=None):
             note("bound_text: no %s manuscript" % lang)
             continue
         txt = open(p, encoding="utf-8").read()
-        hits = [s for s in banned[lang] if s in txt]
+        # Match on whitespace-normalised text.  These are sentences, not lines:
+        # reflowing a paragraph must not be able to hide the qualification from
+        # the gate, and it did once -- the source broke "sample by sample"
+        # across a newline and the paragraph read as if the disclosure were
+        # gone while the manuscript was correct.
+        flat = " ".join(txt.split())
+        hits = [s for s in banned[lang] if " ".join(s.split()) in flat]
         if hits:
             bad("bound_text/%s: the manuscript still claims the pointwise bound "
                 "holds: %s" % (lang, hits))
-        miss = [s for s in want[lang] if s not in txt]
+        miss = [s for s in want[lang] if " ".join(s.split()) not in flat]
         if miss:
             bad("bound_text/%s: the RMS qualification is missing: %s"
                 % (lang, miss))

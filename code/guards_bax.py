@@ -227,6 +227,12 @@ def bax_text_guard(paths=None):
             bad("%s: manuscript not found" % lang)
             continue
         txt = open(root, encoding="utf-8").read()
+        # Sentence patterns, matched on whitespace-normalised source: a reflow
+        # of the paragraph must not be able to drop a required disclosure out of
+        # the gate's view, and it did once -- an inserted word broke the phrase
+        # "head sums what it was fitted to sum" while the sentence was still
+        # there in spirit and the gate read it as missing.
+        flat = " ".join(txt.split())
         if lang == "en":
             withdrawn = [r"fails at \$v_\{\\max\}\\ge0\.50",
                          r"does not transfer at every contrast"]
@@ -250,14 +256,14 @@ def bax_text_guard(paths=None):
             stale = [r"\\BATwoInMid", r"\\BATwoPlatMid",
                      r"\\BATwoInStrong", r"\\BATwoPlatStrong"]
         for pat in withdrawn:
-            if re.search(pat, txt):
+            if re.search(pat, flat):
                 bad("%s: withdrawn sentence present: %s" % (lang, pat))
         for pat in anchored:
-            if not re.search(pat, txt):
+            if not re.search(pat, flat):
                 bad("%s: required corrected-reading text missing: %s"
                     % (lang, pat))
         for pat in stale:
-            if re.search(pat, txt):
+            if re.search(pat, flat):
                 bad("%s: co-adapted re-scored number quoted in text: %s"
                     % (lang, pat))
     if not fails:

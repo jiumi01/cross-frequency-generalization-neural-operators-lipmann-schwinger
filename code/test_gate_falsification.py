@@ -1996,7 +1996,7 @@ def probe_surrogate_gate():
                 SG.paired_jump_guard(os.path.join(res, "p0_checks.json"))
             return bool(SG.FAIL)
 
-        def text_fires(sentence=None):
+        def text_fires(sentence=None, mutator=None):
             """Re-run the text guard on a copy of the delivered manuscript."""
             src = os.path.join(root, "submission", "paper_en", "main.tex")
             if not os.path.exists(src):
@@ -2004,6 +2004,8 @@ def probe_surrogate_gate():
             sub = os.path.join(d, "sub")
             os.makedirs(os.path.join(sub, "paper_en"), exist_ok=True)
             txt = open(src, encoding="utf-8").read()
+            if mutator is not None:
+                txt = mutator(txt)
             if sentence:
                 # the front matter uses \abstract{...}, not the environment
                 assert "\\abstract{" in txt, "no anchor for the drift probe"
@@ -2060,6 +2062,20 @@ def probe_surrogate_gate():
         if tf is not None:
             clean_text = text_fires()
             out["text_drift"] = bool(tf) and not clean_text
+
+            # The opposite direction, which is the one that bit: the required
+            # sentence is present, but the source wraps it across a line break.
+            # A literal-substring gate reads that as "qualification missing"
+            # and reports a correct manuscript as wrong.  Flattening the file
+            # and re-breaking the sentence guarantees the case is exercised
+            # whatever the current wrapping happens to be.
+            def reflow(t):
+                flat = " ".join(t.split())
+                key = "in the mean, but not sample by sample"
+                assert key in flat, "anchor for the reflow probe is gone"
+                return flat.replace(key, "in the mean, but not\nsample by sample", 1)
+
+            out["text_reflow_silent"] = not text_fires(mutator=reflow)
         del SG.FAIL[:]
     finally:
         shutil.rmtree(d, ignore_errors=True)
