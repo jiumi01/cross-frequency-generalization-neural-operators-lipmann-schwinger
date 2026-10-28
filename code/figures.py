@@ -581,7 +581,7 @@ def fig_mode_phase(evals, out, band_tag, train_edge, fname):
     ax.tick_params(which="minor", length=0)
     ax.set_xticks(range(len(F)))
     ax.set_xticklabels(["%.2g" % f for f in F], rotation=45, ha="right",
-                       fontsize=7)
+                       fontsize=8)
     ax.set_yticks(range(len(modes)))
     ax.set_yticklabels([str(m) for m in modes])
     ax.set_xlabel("frequency $f$")
@@ -589,23 +589,24 @@ def fig_mode_phase(evals, out, band_tag, train_edge, fname):
     xb = np.searchsorted(F, train_edge - 1e-9)
     ax.axvline(xb - 0.5, color="w", lw=1.2, ls=(0, (4, 2)))
     # Above the axes, not inside: rotated inside, the label sat on top of the
-    # cell annotations it is there to help read.
+    # cell annotations it is there to help read.  The gap is 7 pt rather than
+    # 3 pt so that the 8 pt label clears the top row of cells at print size.
     ax.annotate("training edge", xy=(xb - 0.5, 1.0),
                 xycoords=("data", "axes fraction"),
-                xytext=(0, 3), textcoords="offset points",
-                ha="center", va="bottom", fontsize=7, color="#333333",
+                xytext=(0, 7), textcoords="offset points",
+                ha="center", va="bottom", fontsize=8, color="#333333",
                 annotation_clip=False)
     for i, m in enumerate(modes):
         for j in range(len(F)):
             if np.isnan(Mat[i, j]):
                 continue
             ax.text(j, i, "%.2f" % Mat[i, j], ha="center", va="center",
-                    fontsize=7.0,
+                    fontsize=8,
                     color="k" if Mat[i, j] > 0.5 * vmax_c else "w")
     cb = fig.colorbar(im, ax=ax, fraction=0.046, pad=0.03)
     cb.outline.set_linewidth(0.5)
     cb.ax.tick_params(labelsize=7.5)
-    cb.set_label(r"relative $L_2$ error", fontsize=7.5)
+    cb.set_label(r"relative $L_2$ error", fontsize=8)
     save(fig, os.path.join(out, fname))
 
 
@@ -657,7 +658,7 @@ def fig_scaling(evals, out):
     # All five curves converge to the same plateau, so right-edge direct
     # labels stacked on one point collided; the region below the plateau on
     # the right is empty, which is where the legend goes instead.
-    ax.legend(fontsize=7.0, loc="lower right", frameon=False,
+    ax.legend(fontsize=8, loc="lower right", frameon=False,
               handlelength=1.6, labelspacing=0.32)
     save(fig, os.path.join(out, "fig_scaling"))
     return {}
@@ -791,7 +792,7 @@ def fig_fields(out, device=None):
                 stamp = None
             if stamp:
                 ax.text(0.97, 0.97, stamp, transform=ax.transAxes,
-                        ha="right", va="top", fontsize=6.8,
+                        ha="right", va="top", fontsize=8,
                         bbox=dict(facecolor="white", alpha=0.75,
                                   edgecolor="none", pad=1.2))
     # One colourbar per physical quantity, not per panel and not per row: the
@@ -805,7 +806,7 @@ def fig_fields(out, device=None):
                           fraction=0.030, pad=0.012)
         cb.outline.set_linewidth(0.5)
         cb.ax.tick_params(labelsize=7.5)
-        cb.set_label(lab, fontsize=7.5, labelpad=2)
+        cb.set_label(lab, fontsize=8, labelpad=2)
     save(fig, os.path.join(out, "fig_fields"))
 
 
@@ -885,7 +886,7 @@ def fig_bound(evals, out):
         # reference curves are deliberately absent: each belongs to one panel
         # only, so it is named in that panel's caption instead of in a legend
         # that would imply it appears in both.
-        fig.legend(h, l, fontsize=7.5, ncol=7, loc="lower center",
+        fig.legend(h, l, fontsize=8, ncol=7, loc="lower center",
                    bbox_to_anchor=(0.5, 1.005), handlelength=1.7,
                    columnspacing=1.1, labelspacing=0.3)
     save(fig, os.path.join(out, "fig_bound"))
@@ -956,9 +957,12 @@ def fig_solver(out):
           ha="center", color=GREEN)
     ax.set_ylim(0, max(naive.max() * 1.30, 1.0))
     # Legend row ABOVE the panel: below the axes it used to sit on top of the
-    # "(b)" panel identifier, which shares that band.
-    ax.legend(fontsize=6.6, loc="lower center", bbox_to_anchor=(0.5, 1.03),
-              ncol=3, handlelength=1.4, columnspacing=1.1, labelspacing=0.3)
+    # "(b)" panel identifier, which shares that band.  Two columns, not three:
+    # at 8 pt the three labels in one row were wider than the text block, and
+    # because the PDF is emitted with bbox_inches="tight" that showed up as a
+    # figure wider than \textwidth rather than as an overlong legend.
+    ax.legend(fontsize=8, loc="lower center", bbox_to_anchor=(0.5, 1.03),
+              ncol=2, handlelength=1.4, columnspacing=1.1, labelspacing=0.3)
     panel_label(ax, "b", r"%d heterogeneous batches" % len(conds))
     despine(ax)
     save(fig, os.path.join(out, "fig_solver"))
@@ -1076,10 +1080,10 @@ def fig_crosscontrast(evals, out):
     h.append(Line2D([], [], color="none", marker="o", ms=8, mfc="none",
                     mec="#555555", mew=1.3))
     l.append("own contrast")
-    fig.legend(h, l, fontsize=7.5, ncol=len(h), loc="lower center",
+    fig.legend(h, l, fontsize=8, ncol=len(h), loc="lower center",
                bbox_to_anchor=(0.5, 1.005), handlelength=1.6,
                columnspacing=1.0, labelspacing=0.3,
-               title="eval contrast", title_fontsize=7.5)
+               title="eval contrast", title_fontsize=8)
     save(fig, os.path.join(out, "fig_crosscontrast"))
 
 
@@ -1349,7 +1353,7 @@ def fig_deep(out):
     despine(ax)
     # Lower left, not upper right: the upper-right corner is where the
     # v_max = 1.00 curve runs, and the legend box used to sit on the curve.
-    ax.legend(fontsize=6.8, loc="lower left", frameon=False,
+    ax.legend(fontsize=8, loc="lower left", frameon=False,
               handlelength=1.6, labelspacing=0.25)
     panel_label(ax, "a")
 
@@ -1510,7 +1514,7 @@ def fig_c3probe(out):
     # legend row for the strip, with the short arm names the tables use.
     h = [Line2D([], [], color=col, marker=mk, ls="-", lw=1.3, ms=3.4)
          for _, col, mk, _ in specs]
-    fig.legend(h, [lab for _, _, _, lab in specs], fontsize=7.5, ncol=3,
+    fig.legend(h, [lab for _, _, _, lab in specs], fontsize=8, ncol=3,
                loc="lower center", bbox_to_anchor=(0.5, 1.005),
                handlelength=1.8, columnspacing=1.6)
     badge(axes[0], 0.03, 0.05, "training band", ha="left", va="bottom")
@@ -1576,7 +1580,7 @@ def fig_realgeo(out):
     # and an axis-label collision with panel (b) was the earlier failure mode.
     cb = fig.colorbar(im, ax=ax, location="right", pad=0.03, shrink=0.85,
                       aspect=20)
-    cb.set_label("$c$ (m/s)", fontsize=6.8, labelpad=1)
+    cb.set_label("$c$ (m/s)", fontsize=8, labelpad=1)
     cb.set_ticks([2000, 3500, 5000])
     cb.ax.tick_params(labelsize=6.8, length=1.6)
     cb.outline.set_linewidth(0.5)
@@ -1622,7 +1626,7 @@ def fig_realgeo(out):
     # In-panel legend instead of right-edge end labels: the labels used to
     # land in the inter-panel gap and on top of panel (c)'s axis label.  The
     # region below the plateau on the right is empty.
-    ax.legend(fontsize=7.2, loc="lower right", frameon=False,
+    ax.legend(fontsize=8, loc="lower right", frameon=False,
               handlelength=2.6, labelspacing=0.35)
     panel_label(ax, "b", r"$v_{\max}=%.2f$, FNO" % VMAX)
     despine(ax)
@@ -1795,11 +1799,11 @@ def fig_plateau_coupling(evals, out):
     for x, y in zip(coups, plats):
         ax.annotate("%.2f" % y, xy=(x, y), xytext=(0, 5.5),
                     textcoords="offset points", ha="center", va="bottom",
-                    fontsize=6.8, color=BLUE)
+                    fontsize=8, color=BLUE)
     for x, y in zip(coups, trivs):
         ax.annotate("%.2f" % y, xy=(x, y), xytext=(0, -6.5),
                     textcoords="offset points", ha="center", va="top",
-                    fontsize=6.8, color=VERMILION)
+                    fontsize=8, color=VERMILION)
     end_labels(ax, [(float(plats[-1]), "FNO", BLUE),
                     (float(trivs[-1]), "trivial", VERMILION)], fs=7.4)
     # The excess is the quantity of interest and is stated twice: per point,
