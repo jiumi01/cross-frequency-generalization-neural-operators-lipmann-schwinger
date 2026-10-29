@@ -1,23 +1,38 @@
 # Author: Longgang Wang <longgangwang@163.com>
 # Affiliation: Luoyang Institute of Science and Technology, Luoyang 471000, Henan, China
 
-"""Guard the hard-coded Supplementary Table numbers in the main text.
+"""Guard every cross-reference from the main text into the supplement.
 
-The SI is a separate LaTeX document, so its tables cannot be reached with
-\\ref from the main text; the prose therefore quotes them by number
-("Supplementary Table~12").  A number is only correct for the order the
-tables happen to appear in the SI, and reordering the SI would silently
-break every one of those quotes.  This gate recomputes the numbering from
-the SI source and checks that each quoted number still points at a table
-whose caption shares vocabulary with the sentence that quotes it.
+The SI is a separate LaTeX document, so \\ref cannot reach it.  The main text
+therefore cites SI floats through a generated map, gen_si_refs.tex, keyed by
+the SI's own \\label:
 
-What it asserts, per quoted number N:
-  1. N is within 1..(number of tables in the SI);
-  2. the sentence quoting N and the caption of table N share at least one
-     significant token (>= 5 letters, prefix-matched so that "compare"
-     matches "comparison").
+    Supplementary Table~\\siTab{tab:si_born}
+    Supplementary Figure~\\siFig{figS:bound}
 
-Exit code 0 iff every quote passes.
+Before that map existed the prose carried literal numbers.  Literals are only
+correct for one particular order of the SI: inserting one figure ahead of the
+others shifted every figure after it by one, and the main text went on citing
+"Supplementary Figure~S3" for a float that had become S4.  The old version of
+this gate checked tables only, and table numbers happened to still be right, so
+the drift reached a submitted draft with a clean report.
+
+What it asserts
+  1. gen_si_refs.tex is byte-identical to what the SI source generates now
+     (catches a map that was not rebuilt after the SI changed);
+  2. the map agrees with the numbers LaTeX itself wrote into SI_main.aux --
+     an instrument independent of the parser in gen_si_labels.py;
+  3. every \\siTab{}/\\siFig{} key used in the main text is defined (an
+     undefined key typesets ?? in the PDF, which is invisible to a text audit);
+  4. no literal "Supplementary Table~N" / "Supplementary Figure~SN" survives
+     in the main text or in any generated table;
+  5. the numbering form matches the render: figures S-prefixed in the SI,
+     tables not;
+  6. each citation sits in a sentence that shares vocabulary with the caption
+     of the float it names -- a key can exist and still name the wrong float;
+  7. no caption carries a stale self-citation ("as Supplementary Figure~S3").
+
+Exit code 0 iff every assertion holds.
 """
 import os
 import re
@@ -25,15 +40,14 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, ".."))
-EN = os.path.join(ROOT, "submission", "paper_en")
-# The falsification probe has to run this gate against a mutated copy of the
-# manuscript.  Before this option existed the probe mutated the delivered file
-# in place and restored it afterwards, which meant the instrument wrote into
-# the object it measures -- and, because the restore went through text mode, it
-# silently converted the delivered source to CRLF every time the suite ran.
+# The falsification probe runs this gate against a mutated copy of the
+# manuscript; see the note in the older version of this file.
 if "--root" in sys.argv:
     ROOT = os.path.abspath(sys.argv[sys.argv.index("--root") + 1])
-    EN = os.path.join(ROOT, "submission", "paper_en")
+EN = os.path.join(ROOT, "submission", "paper_en")
+PEN = os.path.join(ROOT, "paper", "en")
+
+FAIL = []
 
 
 def read(path):
@@ -41,70 +55,151 @@ def read(path):
         return fh.read()
 
 
-def si_tables():
-    """Return {number: caption} for the SI, resolving \\input in place."""
-    src = read(os.path.join(EN, "SI_main.tex"))
-    # inline the inputs at the position they are pulled in
-    while True:
+def bad(msg):
+    FAIL.append(msg)
+
+
+def strip_comments(src):
+    out = []
+    for line in src.split("\n"):
+        k = 0
+        keep = line
+        while True:
+            j = line.find("%", k)
+            if j < 0:
+                break
+            b = 0
+            p = j - 1
+            while p >= 0 and line[p] == "\\":
+                b += 1
+                p -= 1
+            if b % 2 == 1:
+                k = j + 1
+                continue
+            keep = line[:j]
+            break
+        out.append(keep)
+    return "\n".join(out)
+
+
+def inline_inputs(src, base):
+    seen = set()
+    for _ in range(64):
         m = re.search(r"\\input\{([^}]+)\}", src)
         if not m:
             break
-        name = m.group(1)
+        name = m.group(1).strip()
         if not name.endswith(".tex"):
             name += ".tex"
-        path = os.path.join(ROOT, "paper", "en", name)
-        if not os.path.exists(path):
-            raise SystemExit("SI input missing from paper/en/: %s" % name)
+        path = os.path.join(base, name)
+        if not os.path.exists(path) or path in seen:
+            break
+        seen.add(path)
         src = src[:m.start()] + read(path) + src[m.end():]
+    return src
+
+
+def braced(text, start):
+    """Return the group that starts at text[start] == '{' (balanced)."""
+    assert text[start] == "{"
+    depth = 0
+    i = start
+    while i < len(text):
+        c = text[i]
+        if c == "\\":
+            i += 2
+            continue
+        if c == "{":
+            depth += 1
+        elif c == "}":
+            depth -= 1
+            if depth == 0:
+                return text[start + 1:i]
+        i += 1
+    return ""
+
+
+def floats(src):
+    """{label: {'kind':..., 'n':..., 'caption':...}} in SI source order."""
     out = {}
-    n = 0
-    for tm in re.finditer(r"\\begin\{table\*?\}(.*?)\\end\{table\*?\}",
-                          src, re.S):
-        cm = re.search(r"\\caption\{(.*?)\}\s*\n", tm.group(1), re.S)
-        if not cm:
-            cm = re.search(r"\\caption\{(.*?)\}", tm.group(1), re.S)
-        n += 1
-        out[n] = " ".join(cm.group(1).split()) if cm else ""
+    for kind in ("table", "figure"):
+        pat = r"\\begin\{%s\*?\}(.*?)\\end\{%s\*?\}" % (kind, kind)
+        for n, m in enumerate(re.finditer(pat, src, re.S), 1):
+            body = m.group(1)
+            lab = re.search(r"\\label\{([^}]+)\}", body)
+            if not lab:
+                continue
+            cap = ""
+            cm = re.search(r"\\caption\s*\{", body)
+            if cm:
+                cap = " ".join(braced(body, cm.end() - 1).split())
+            out[lab.group(1)] = {"kind": kind, "n": n, "caption": cap}
     return out
 
 
-def stems(text):
-    """Lower-cased >=5 letter tokens, hyphen/underscore split."""
+def expected_map(fl):
+    """The text gen_si_refs.tex must contain, for the SI as it stands now."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        "gen_si_labels", os.path.join(ROOT, "code", "gen_si_labels.py"))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    text, tables, figs = mod.build(ROOT)
+    return text, tables, figs
+
+
+def aux_numbers():
+    """{label: raw value string} from the aux that built the delivered PDF."""
+    path = os.path.join(EN, "SI_main.aux")
+    if not os.path.exists(path):
+        return None
+    out = {}
+    for m in re.finditer(r"\\newlabel\{([^}]+)\}\{\{([^}]*)\}", read(path)):
+        out[m.group(1)] = m.group(2)
+    return out
+
+
+def stems_of(text):
     text = re.sub(r"\\[a-zA-Z]+\*?", " ", text)
     text = re.sub(r"[^A-Za-z ]", " ", text)
     return {w.lower() for w in text.split() if len(w) >= 5}
 
 
-def shared(a, b):
-    """Count distinct stems of a sharing a >=5 letter prefix with a stem of b."""
-    n = 0
-    for w in a:
-        for c in b:
-            k = 0
-            while k < len(w) and k < len(c) and w[k] == c[k]:
-                k += 1
-            if k >= 5:
-                n += 1
-                break
-    return n
+# Discourse connectives and function words.  They can be "distinctive" across
+# captions -- "therefore" appears in the cost caption and nowhere else -- while
+# carrying no subject matter, so a caption match on one of them is not evidence
+# that the sentence is about that float.  Measured case: redirecting a Born
+# citation at the cost table left "therefore" as the only overlap and the check
+# passed.  This is a class filter (words that denote no subject), not a list of
+# the collisions seen so far.
+CONNECTIVES = {
+    "therefore", "although", "though", "however", "whereas", "because",
+    "between", "within", "without", "rather", "against", "through", "which",
+    "while", "where", "whose", "there", "their", "these", "those", "being",
+    "would", "could", "should", "might", "must", "about", "above", "after",
+    "before", "during", "since", "until", "under", "over", "thus", "hence",
+    "also", "only", "both", "each", "more", "most", "much", "many", "some",
+    "such", "when", "with", "from", "into", "onto", "upon", "across", "along",
+    "among", "around", "than", "then", "this", "that", "have", "been", "does",
+}
 
 
-def sentences(masked, start, end):
-    """Sentence containing [start,end) plus the next one, as one token set.
+def same_stem(a, b):
+    k = 0
+    while k < len(a) and k < len(b) and a[k] == b[k]:
+        k += 1
+    return k >= 5
 
-    The next sentence is included because several quotes are continued there
-    ("Both column groups of that table ..."), and it is the only place the
-    shared vocabulary appears.
-    """
+
+def sentence_of(masked, start, end):
     before = [m for m in re.finditer(r"\.(?:\s|$)", masked[:start])]
     a = before[-1].end() if before else 0
     after = [m for m in re.finditer(r"\.(?:\s|$)", masked[end:])]
     b = end + after[0].start() + 1 if after else len(masked)
-    return stems(masked[a:b])
+    return stems_of(masked[a:b])
 
 
 def mask_math(s):
-    """Blank out $...$ spans, preserving length so indices stay valid."""
     out = list(s)
     i = 0
     while i < len(s):
@@ -121,70 +216,136 @@ def mask_math(s):
     return "".join(out)
 
 
-def same_stem(w, d):
-    """True when w and d share a common prefix of >= 5 letters."""
-    k = 0
-    while k < len(w) and k < len(d) and w[k] == d[k]:
-        k += 1
-    return k >= 5
-
-
 def main():
-    tabs = si_tables()
-    if not tabs:
-        print("FAIL: no tables found in the SI")
+    si_path = os.path.join(EN, "SI_main.tex")
+    if not os.path.exists(si_path):
+        print("FAIL: no SI source at %s" % si_path)
         return 1
-    print("SI tables: %d (numbered 1..%d)" % (len(tabs), max(tabs)))
-    src = read(os.path.join(EN, "main.tex"))
+    si_raw = read(si_path)
+    fl = floats(inline_inputs(strip_comments(si_raw), EN))
+    n_tab = sum(1 for v in fl.values() if v["kind"] == "table")
+    n_fig = sum(1 for v in fl.values() if v["kind"] == "figure")
+    print("SI floats: %d tables, %d figures, %d labelled"
+          % (n_tab, n_fig, len(fl)))
+
+    # 1. the generated map is current -------------------------------------
+    want, tab_list, fig_list = expected_map(fl)
+    gen_path = os.path.join(PEN, "gen_si_refs.tex")
+    if not os.path.exists(gen_path):
+        bad("paper/en/gen_si_refs.tex is missing -- run `--steps tex`")
+        have = ""
+    else:
+        have = read(gen_path)
+        if have != want:
+            bad("gen_si_refs.tex is stale: it does not match the SI source "
+                "(run `--steps tex`)")
+    defined_tabs = dict(re.findall(r"sitab@([^\\]+)\\endcsname\{(\d+)\}", have))
+    defined_figs = dict(re.findall(r"sifig@([^\\]+)\\endcsname\{(\d+)\}", have))
+    print("map: %d table keys, %d figure keys"
+          % (len(defined_tabs), len(defined_figs)))
+
+    # 2. cross-check against LaTeX's own counters --------------------------
+    aux = aux_numbers()
+    if aux is None:
+        print("note: no SI_main.aux -- counter cross-check skipped")
+    else:
+        checked = 0
+        for lab, val in list(defined_tabs.items()) + list(defined_figs.items()):
+            if lab not in aux:
+                bad("%s is in the map but LaTeX recorded no such label in "
+                    "SI_main.aux" % lab)
+                continue
+            digits = re.sub(r"[^0-9]", "", aux[lab])
+            if digits and int(digits) != int(val):
+                bad("%s: map says %s, SI_main.aux says %s"
+                    % (lab, val, aux[lab]))
+            checked += 1
+        print("counter cross-check: %d labels agree with SI_main.aux" % checked)
+
+    # 3. numbering form matches the render --------------------------------
+    if r"\renewcommand{\thefigure}{S\arabic{figure}}" not in si_raw:
+        bad("the SI does not number figures with an S prefix, but the main "
+            "text cites them as S<n>")
+    if re.search(r"\\renewcommand\{\\thetable\}", si_raw):
+        bad("the SI redefines \\thetable, but the map emits a bare number")
+
+    # 4./5. every key used in the main text resolves -----------------------
+    main_path = os.path.join(EN, "main.tex")
+    src = read(main_path)
     masked = mask_math(src)
-    quotes = list(re.finditer(r"Supplementary Table~(\d+)", src))
-    if not quotes:
-        print("FAIL: no 'Supplementary Table~N' quotes found -- "
-              "did the phrasing change?")
+    used_tab = re.findall(r"\\siTab\{([^}]+)\}", src)
+    used_fig = re.findall(r"\\siFig\{([^}]+)\}", src)
+    if not used_tab:
+        bad("no \\siTab{...} in the main text -- did the phrasing change?")
+    for key in used_tab:
+        if key not in defined_tabs:
+            bad("\\siTab{%s}: no such SI table label (typesets ??)" % key)
+    for key in used_fig:
+        if key not in defined_figs:
+            bad("\\siFig{%s}: no such SI figure label (typesets ??)" % key)
+    print("main-text keys: %d table citations over %d labels, "
+          "%d figure citations over %d labels"
+          % (len(used_tab), len(set(used_tab)),
+             len(used_fig), len(set(used_fig))))
+
+    # 6. no literals survive ----------------------------------------------
+    targets = [main_path] + [os.path.join(PEN, f) for f in
+                             sorted(os.listdir(PEN))
+                             if f.startswith("gen_") and f.endswith(".tex")]
+    lit = re.compile(r"Supplementary\s+(?:Table~\d|Figure~S?\d)")
+    for path in targets:
+        hits = lit.findall(read(path))
+        if hits:
+            bad("%s still carries a literal SI float number: %s"
+                % (os.path.relpath(path, ROOT), hits[:4]))
+
+    # 7. the sentence must be about the float it names ---------------------
+    # Evaluated per key, not per citation: a key is cited once in a sentence
+    # that carries its argument ("the dashed curves of ... are a property of
+    # the data") and again in a terse "are plotted in ..." follow-up.  The
+    # follow-up shares no vocabulary with any caption and is not evidence of a
+    # mispointed key; requiring every citation to match would fail on prose
+    # style rather than on substance.
+    stems = {k: stems_of(v["caption"]) - CONNECTIVES for k, v in fl.items()}
+    for kind, macro, defined in (("table", "siTab", defined_tabs),
+                                 ("figure", "siFig", defined_figs)):
+        contexts = {}
+        for m in re.finditer(r"\\%s\{([^}]+)\}" % macro, src):
+            key = m.group(1)
+            if key in fl:
+                contexts.setdefault(key, []).append(
+                    sentence_of(masked, m.start(), m.end()))
+        for key, ctxs in sorted(contexts.items()):
+            mine = stems[key]
+            others = set().union(*[stems[k] for k in stems
+                                   if k != key and fl[k]["kind"] == kind]) \
+                if len(stems) > 1 else set()
+            distinctive = mine - others
+            hit, shared = False, set()
+            for ctx in ctxs:
+                content = ctx - CONNECTIVES
+                if any(same_stem(w, d) for w in content for d in distinctive):
+                    hit = True
+                shared |= {w for w in content
+                           if any(same_stem(w, d) for d in mine)}
+            okk = hit if kind == "table" else (hit or len(shared) >= 2)
+            if not okk:
+                bad("Supplementary %s \\%s{%s}: no citing sentence shares "
+                    "vocabulary with the caption" % (kind.capitalize(), macro, key))
+                print("      sentence stems: %s" % sorted(set().union(*ctxs)))
+                print("      caption: %s" % fl[key]["caption"][:110])
+
+    # 8. no stale self-citation in a caption ------------------------------
+    stale = re.findall(r"as Supplementary (?:Table|Figure)~S?\d", si_raw)
+    if stale:
+        bad("an SI caption still names its own number by hand: %s" % stale[:3])
+
+    if FAIL:
+        for msg in FAIL:
+            print("FAIL  " + msg)
+        print("RESULT: %d problem(s)" % len(FAIL))
         return 1
-    print("main-text quotes: %d" % len(quotes))
-    cap_stems = {c: stems(cap) for c, cap in tabs.items()}
-    bad = 0
-    seen = {}
-    for m in quotes:
-        n = int(m.group(1))
-        seen[n] = seen.get(n, 0) + 1
-        if n not in tabs:
-            print("FAIL  Table~%d: the SI only has %d tables" % (n, len(tabs)))
-            bad += 1
-            continue
-        # The quoting sentence (plus its continuation) must share a stem with
-        # the caption of the table it names that no other caption contains:
-        # a renumbering of the SI would move captions relative to numbers,
-        # and a generic word such as "relative" or "paired" appears in too
-        # many captions to catch that on its own.
-        ctx = sentences(masked, m.start(), m.end())
-        mine = cap_stems.get(n, set())
-        others = set().union(*[cap_stems[c] for c in cap_stems if c != n]) \
-            if len(cap_stems) > 1 else set()
-        # a caption stem is distinctive when no other caption carries it
-        # verbatim; "retained" stays distinctive against a caption that says
-        # "retains", while "paired" or "relative" do not
-        distinctive = mine - others
-        hit = sorted(w for w in ctx if any(same_stem(w, d)
-                                           for d in distinctive))
-        if not hit:
-            print("FAIL  Table~%d: the sentence shares no distinctive "
-                  "vocabulary with the caption" % n)
-            print("      sentence stems: %s" % sorted(ctx))
-            print("      distinctive caption stems: %s" % sorted(distinctive))
-            print("      caption: %s" % tabs[n][:120])
-            bad += 1
-    print("quoted numbers: %s" % ", ".join(
-        "%d(x%d)" % (k, v) for k, v in sorted(seen.items())))
-    unquoted = [n for n in tabs if n not in seen]
-    if unquoted:
-        print("note: tables never quoted from the main text: %s" % unquoted)
-    if bad:
-        print("RESULT: %d misaligned quote(s)" % bad)
-        return 1
-    print("RESULT: every quoted number points at a caption that matches "
-          "its sentence")
+    print("RESULT: every SI cross-reference resolves and matches its caption")
     return 0
 
 

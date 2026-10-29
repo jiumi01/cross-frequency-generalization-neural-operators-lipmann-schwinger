@@ -200,18 +200,24 @@ def check(root=None, repo=None):
                     "statement is stale relative to HEAD"
                     % (enc["tree"], head_tree[:len(enc["tree"])]))
     rc, ctree = git("rev-parse", "%s^{tree}" % enc["commit"], repo=repo)
-    if rc != 0:
-        # The named commit is the published one, so it need not exist in this
-        # checkout: the repository is published tree-first through the GitHub
-        # API and never fetched back.  The old code skipped the assertion in
-        # that case, which meant any hash -- including a typo -- passed.  Ask
-        # the remote instead, and fail if the remote cannot be asked.
-        ctree, err = remote_tree(enc["commit"])
-        if err:
-            FAIL.append("commit %s is neither in the local object store nor "
-                        "resolvable on the remote (%s), so the claim cannot be "
-                        "checked" % (enc["commit"], err))
-            return FAIL
+    # The statement says the state is PUBLIC at a named commit, so the remote is
+    # the authority and a local copy is not evidence.  The previous version did
+    # the opposite: it asked the remote only when the commit was missing from
+    # the checkout, which is never true for the commit at HEAD -- so a commit
+    # that existed locally and had never been pushed passed the gate while the
+    # URL a reviewer opens returns 404.  That is the exact failure this gate
+    # exists for, and it shipped.  Ask the remote first, always.
+    rtree, err = remote_tree(enc["commit"])
+    if err:
+        FAIL.append("commit %s cannot be resolved on the public remote (%s) -- "
+                    "the public claim is unverifiable, which is worse than an "
+                    "unpublished hash" % (enc["commit"], err))
+        return FAIL
+    if rc == 0 and not ctree.startswith(rtree):
+        FAIL.append("local object store and the public remote disagree about "
+                    "commit %s: local tree %s, remote tree %s"
+                    % (enc["commit"], ctree[:7], rtree[:7]))
+    ctree = rtree
     if not ctree.startswith(enc["tree"]):
         FAIL.append("commit %s has tree %s, not the named %s"
                     % (enc["commit"], ctree, enc["tree"]))
@@ -287,6 +293,26 @@ def self_test():
             print("%-18s -> %s" % ("SI stale commit",
                                    "rejected" if fails else "ACCEPTED (bad)"))
             ok = ok and bool(fails)
+
+        # Direction that shipped broken: a commit that exists in the checkout
+        # but not on the public remote.  Simulated by pointing the resolver at a
+        # repository that does not exist, which is the same code path (the
+        # remote cannot resolve the citation) and needs no fabricated history.
+        open(p, "w", encoding="utf-8").write(src_en)
+        open(q, "w", encoding="utf-8").write(src_cn)
+        open(si_path, "w", encoding="utf-8").write(si_src)
+        old_repo = os.environ.get("LS_REPO")
+        os.environ["LS_REPO"] = "jiumi01/this-repository-does-not-exist-ls-gate"
+        try:
+            fails = list(check(tmp))
+        finally:
+            if old_repo is None:
+                os.environ.pop("LS_REPO", None)
+            else:
+                os.environ["LS_REPO"] = old_repo
+        print("%-18s -> %s" % ("unpushed commit",
+                               "rejected" if fails else "ACCEPTED (bad)"))
+        ok = ok and bool(fails)
         return ok and not good
     finally:
         shutil.rmtree(tmp, ignore_errors=True)

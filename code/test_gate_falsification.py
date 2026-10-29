@@ -773,8 +773,9 @@ def main():
 
     sr = probe_si_refs()
     if all(sr.values()):
-        print("PROBE 25: the real quotes accepted; a redirected table number "
-              "and an out-of-range number both rejected")
+        print("PROBE 25: the real map accepted; a hand-renumbered map, an "
+              "undefined key, a reintroduced literal, a key naming the wrong "
+              "float and a dropped S prefix all rejected")
     else:
         print("PROBE 25: MISBEHAVED %s" % sr)
 
@@ -2085,41 +2086,60 @@ def probe_surrogate_gate():
 
 
 def probe_si_refs():
-    """probe 25: the hard-coded Supplementary Table numbers must break when a
-    quote points at the wrong table.
+    """probe 25: every cross-reference into the supplement must fail loudly.
 
-    The gate recomputes the SI numbering from the SI source and requires each
-    quoted number to point at a caption that shares distinctive vocabulary
-    with the quoting sentence.  Three cases: the untouched manuscript passes;
-    a quote redirected at an unrelated table (15 -> 7, no shared vocabulary)
-    is rejected; a quote beyond the table count is rejected as well.
+    The main text cites SI floats through the generated map gen_si_refs.tex,
+    keyed by the SI's own \\label.  This probe checks each assertion of
+    check_si_refs.py separately, because they fail in different ways and a
+    single mutation would only exercise one of them:
+
+      clean            untouched manuscript passes;
+      stale_map        a map entry renumbered by hand is caught even though
+                       the main text is untouched (the map no longer matches
+                       the SI, and it no longer matches SI_main.aux);
+      undefined_key    a key with no definition typesets ?? in the PDF --
+                       invisible to a text audit, so the gate must catch it;
+      literal_back     a hand-written number reintroduced next to the macro;
+      wrong_table      a key that exists but names the wrong float is caught
+                       by the caption-vocabulary check;
+      no_s_prefix      the SI dropping the S prefix while the main text still
+                       cites S<n>.
+
+    Runs against a sandbox copy: this probe used to mutate the delivered
+    manuscript in place and write it back in text mode, which converted
+    submission/paper_en/main.tex to CRLF on every suite run and made the
+    byte-level mirror gate report a stale archive for a file that had not
+    changed by one character.
     """
     import subprocess
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     gate = os.path.join(root, "code", "check_si_refs.py")
-    # Run against a sandbox copy.  This probe used to mutate the delivered
-    # manuscript in place and write it back in text mode, so every run of the
-    # suite converted submission/paper_en/main.tex to CRLF -- and the
-    # byte-level mirror gate then reported "the archive was built before the
-    # last edit" about a file whose content had not changed by one character.
-    # An instrument that edits its own subject also loses the subject if it is
-    # killed between the mutation and the restore.
     d = tempfile.mkdtemp(prefix="_si_refs_probe_")
     try:
         os.makedirs(os.path.join(d, "submission", "paper_en"))
         os.makedirs(os.path.join(d, "paper", "en"))
-        for name in ("main.tex", "SI_main.tex"):
-            shutil.copy(os.path.join(root, "submission", "paper_en", name),
-                        os.path.join(d, "submission", "paper_en", name))
+        os.makedirs(os.path.join(d, "code"))
+        for name in glob.glob(os.path.join(root, "submission", "paper_en",
+                                          "*.tex")):
+            shutil.copy(name, os.path.join(d, "submission", "paper_en",
+                                           os.path.basename(name)))
         for name in glob.glob(os.path.join(root, "paper", "en", "*.tex")):
             shutil.copy(name, os.path.join(d, "paper", "en",
                                            os.path.basename(name)))
-        main_tex = os.path.join(d, "submission", "paper_en", "main.tex")
-        src = open(main_tex, encoding="utf-8").read()
+        # the gate re-derives the map by importing the generator
+        shutil.copy(os.path.join(root, "code", "gen_si_labels.py"),
+                    os.path.join(d, "code", "gen_si_labels.py"))
 
-        def put(text):
+        main_tex = os.path.join(d, "submission", "paper_en", "main.tex")
+        si_tex = os.path.join(d, "submission", "paper_en", "SI_main.tex")
+        gen_tex = os.path.join(d, "paper", "en", "gen_si_refs.tex")
+        src = open(main_tex, encoding="utf-8").read()
+        si_src = open(si_tex, encoding="utf-8").read()
+        gen_src = open(gen_tex, encoding="utf-8").read()
+
+        def put(path, text):
             # byte-exact: utf-8, no newline translation, inside the sandbox
-            open(main_tex, "wb").write(text.encode("utf-8"))
+            open(path, "wb").write(text.encode("utf-8"))
 
         def run():
             p = subprocess.run([sys.executable, gate, "--root", d], cwd=root,
@@ -2129,14 +2149,38 @@ def probe_si_refs():
         out = {}
         rc, log = run()
         out["clean"] = (rc == 0)
-        put(src.replace("(Supplementary Table~15)",
-                        "(Supplementary Table~7)"))
+
+        put(gen_tex, gen_src.replace(
+            "sitab@tab:si_born\\endcsname{3}",
+            "sitab@tab:si_born\\endcsname{4}"))
         rc, log = run()
-        out["wrong_table"] = (rc != 0 and "Table~7" in log)
-        put(src.replace("(Supplementary Table~15)",
-                        "(Supplementary Table~99)"))
+        out["stale_map"] = (rc != 0 and "stale" in log)
+        put(gen_tex, gen_src)
+
+        put(main_tex, src.replace("\\siTab{tab:si_born}",
+                                  "\\siTab{tab:si_nope}"))
         rc, log = run()
-        out["out_of_range"] = (rc != 0 and "only has" in log)
+        out["undefined_key"] = (rc != 0 and "no such SI table label" in log)
+        put(main_tex, src)
+
+        put(main_tex, src.replace("Supplementary Table~\\siTab{tab:si_born}",
+                                  "Supplementary Table~3"))
+        rc, log = run()
+        out["literal_back"] = (rc != 0 and "literal SI float number" in log)
+        put(main_tex, src)
+
+        put(main_tex, src.replace("\\siTab{tab:si_born}",
+                                  "\\siTab{tab:si_cost}"))
+        rc, log = run()
+        out["wrong_table"] = (rc != 0
+                              and "shares vocabulary with the caption" in log)
+        put(main_tex, src)
+
+        put(si_tex, si_src.replace(
+            "\\renewcommand{\\thefigure}{S\\arabic{figure}}", ""))
+        rc, log = run()
+        out["no_s_prefix"] = (rc != 0 and "S prefix" in log)
+        put(si_tex, si_src)
     finally:
         shutil.rmtree(d, ignore_errors=True)
     return out
@@ -2203,9 +2247,23 @@ def probe_delivery_texts():
     # meaningless
     out["clean"] = not D.run(texts=t)
 
+    # The mutation must be derived from the title the manuscript actually
+    # carries.  Hard-coding a word of it ("Discretized", until v42) turns the
+    # probe into a no-op the moment the title is edited, and a no-op probe
+    # passes without ever asking the gate anything -- worse than no probe,
+    # because the suite still prints a green line for it.
     m = dict(t)
-    m["cover"] = t["cover"].replace("Discretized", "", 1)
-    out["title"] = any("cover" in f for f in D.run(texts=m))
+    canon = D.norm(D.tex_title(t["paper_en"], "Title") or "")
+    token = None
+    for cand in canon.split():
+        if len(cand) >= 5 and t["cover"].count(cand) == 1:
+            token = cand
+            break
+    if token is None:
+        out["title"] = False
+    else:
+        m["cover"] = t["cover"].replace(token, "", 1)
+        out["title"] = any("cover" in f for f in D.run(texts=m))
 
     m = dict(t)
     m["citation"] = (t["citation"]

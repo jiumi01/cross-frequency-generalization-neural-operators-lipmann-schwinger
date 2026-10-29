@@ -1070,16 +1070,16 @@ def realgeo_guard(root=None):
         # a manuscript could carry the label while never showing the reader the
         # figure that the level-3 sentences refer to. The level-3 table may
         # live in the supplementary material, in which case the main text
-        # points at it by name ("Supplementary Table~15") instead of by
-        # \ref, which would dangle in a separately compiled document.
+        # points at it by name, through the generated \\siTab map, instead of
+        # by \ref, which would dangle in a separately compiled document.
         for need, why in (("fig:realgeo", "figure"),):
             if not _re.search(r"\\ref\s*\{[^}]*" + need + r"[^}]*\}", t):
                 bad("[%s] the level-3 %s is never referenced from the text"
                     % (lang, why))
         if (not _re.search(r"\\ref\s*\{[^}]*tab:realgeo[^}]*\}", t)
-                and "Supplementary Table~15" not in t):
+                and "\\siTab{tab:si_realgeo}" not in t):
             bad("[%s] the level-3 table is never referenced from the text "
-                "(either \\ref{tab:realgeo} or a Supplementary Table~15 "
+                "(either \\ref{tab:realgeo} or a \\siTab{tab:si_realgeo} "
                 "pointer is required)" % lang)
     if len(FAIL) == n_fail0:
         ok("both manuscripts carry the non-separation sentence bound to the "

@@ -35,7 +35,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 # Derived from make_results_tex.TAB_ORDER rather than spelled out, so adding a
 # table cannot leave a stale copy unchecked -- an out-of-sync list is exactly
 # how a composite gen_results.tex would have survived the split unnoticed.
-GEN_FILES = (["gen_bib.tex", "gen_macros.tex"]
+GEN_FILES = (["gen_bib.tex", "gen_macros.tex", "gen_si_refs.tex",
+              "gen_cross.tex", "gen_tab_cross.tex", "gen_tab_cross_q.tex"]
              + ["gen_tab_%s.tex" % k for k in MR.TAB_ORDER])
 
 
@@ -124,10 +125,20 @@ def sync_shared():
 
 def stage_tex():
     run([PY, os.path.join(HERE, "make_results_tex.py")])
+    # The frequency x mesh cross has its own single source of truth
+    # (results/cross_analysis.json); every macro and both tables the
+    # manuscripts quote come from here.  Must run before gen_si_labels.py,
+    # which inlines the SI's \input{gen_tab_cross_q} to count its floats.
+    run([PY, os.path.join(HERE, "make_cross_tex.py")])
     # The reference list is emitted from refs.bib rather than run through
     # bibtex: the MDPI entry shape is produced directly, which would otherwise
     # require mdpi.bst (not redistributable here).
     run([PY, os.path.join(HERE, "make_bib_tex.py")])
+    # SI float numbers, keyed by the SI's own \label: the main text cannot use
+    # \ref across documents, and a hand-written number drifts the moment a
+    # float is inserted (which is exactly how "Supplementary Figure~S3" came to
+    # name the fourth figure).
+    run([PY, os.path.join(HERE, "gen_si_labels.py")])
     sync_shared()
 
 

@@ -57,7 +57,10 @@ SUB = os.path.join(ROOT, "submission")
 # be compared character by character with the English one, so the fragments are
 # the parts that carry the claim: the discretised periodic setting, the
 # frequency axis, the paired measurement design and the analytic correction.
-CN_TITLE_FRAGMENTS = ["离散周期", "跨频率泛化", "配对测量", "解析校正"]
+# Mirrors \title{} of the Chinese companion.  These four strings are
+# duplicated state: every retitle has to move them by hand, which is why
+# the check below prints the title it parsed instead of only complaining.
+CN_TITLE_FRAGMENTS = ["跨频率泛化", "配对基准", "Born", "Lippmann"]
 
 # Phrases that describe a state the paper no longer is in.  Each one shipped at
 # least once in a delivered file after it stopped being true.  Matched

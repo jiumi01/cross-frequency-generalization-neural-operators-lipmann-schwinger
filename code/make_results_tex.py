@@ -111,7 +111,7 @@ CAP = { "en": dict(
        "$f^{\\star}$, jump and errors only."),
   res_note=("$\\varepsilon_{\\infty}$ averages $f>5$ in (a), (b), as in "
             "Table~\\ref{tab:main}, and $f\\ge5$ in (c), (d), as in "
-            "Supplementary Table~15."),
+            "Supplementary Table~\\siTab{tab:si_realgeo}."),
   banddown=("Below-band FNO behaviour per contrast arm: mean relative "
             "$L_2$ error over \\NumSeeds\\ seeds at the left band edge and "
             "below, against the in-band floor (Table~\\ref{tab:summary}) and "
@@ -340,8 +340,26 @@ def fmt(x, n=3):
 
 
 def fmt_p(p):
-    # one significant figure, typographically correct scientific notation.
-    # %.0e yields the bare "1e-04"; the table renders it as $1\times10^{-4}$.
+    """Exact p to three decimals above 0.001, scientific notation below.
+
+    Why this is not one significant figure everywhere
+    -------------------------------------------------
+    `%.0e` printed p = 0.0488 as $5\\times10^{-2}$, i.e. a value the text then
+    described as "p = 0.05": the rounding erased the only digits that made the
+    result interesting, and a reader cannot tell 0.0488 from 0.0549.  It also
+    made the "report the exact p" convention impossible to follow.  Values
+    above 0.001 are therefore printed as decimals; values below it stay in
+    scientific notation, which is both more informative than "< 0.001" and is
+    the only form that cannot collapse to the string `0.000` -- the one thing
+    a statistical report must never print.  A p that underflows to exactly
+    zero in double precision is reported as a bound, not as a zero.
+    """
+    if not np.isfinite(p):
+        return "--"
+    if p >= 0.001:
+        return "%.3f" % p
+    if p <= 0.0:
+        return r"<10^{-16}"
     m, e = ("%.0e" % p).split("e")
     return r"%s\times10^{%d}" % (m, int(e))
 

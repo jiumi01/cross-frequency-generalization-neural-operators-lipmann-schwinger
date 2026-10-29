@@ -1,12 +1,12 @@
-# Cross-Frequency Generalization of Neural Operators on a Periodic Lippmann–Schwinger Benchmark
+# Cross-Frequency Generalization of Neural Operators for a Periodic Lippmann-Schwinger Benchmark
 
 An empirical characterisation of how neural operators generalise across the
 excitation frequency when solving the periodic Lippmann–Schwinger integral
 equation. On a strictly delimited numerical benchmark (one equation family,
 fixed-loss-tangent propagator, contrasts up to \(v_{\max}=1\)), the paper
-systematically characterises the cross-frequency error curve, quantifies its
-boundary and plateau, and probes candidate mechanisms with controlled
-comparisons.
+measures the cross-frequency error curve under a paired protocol, locates its
+band-edge boundary, reads the plateau against the trivial incident-field
+baseline, and tests which interventions do and do not move that boundary.
 
 ## What this repository contains
 
@@ -34,7 +34,23 @@ The heavy corpora are **not redistributed**:
 names used in the paper (e.g. `grid_conv_256.json`, `spectrum.json`,
 `realgeo.json`, `prescreen_anchor.json`).
 
+The frequency x mesh cross reported in Section 3.4 has its own chain, in this
+order: `cross_design.py` (media drawn at \(384^2\) and spectrally restricted to
+each grid) -> `gen_cross_cache.py` -> `flatten_cross_cache.py` ->
+`train_multigrid.py` -> `cross_eval.py` -> `cross_analyze.py` (writes
+`results/cross_analysis.json`, including the pre-registered verdict) ->
+`make_cross_tex.py` (emits every macro and both tables the manuscripts quote,
+and refuses to run without a verdict).
+
 ## Manuscript status
 
-Under review. Data availability (DOI/code archive) will be published on
-acceptance, per journal policy.
+**Not submitted to any journal.** This repository has never been under
+review, and the manuscript it accompanies is not simultaneously under
+consideration elsewhere. The exact state the paper's numbers were produced
+from is identified by the commit hash and tree hash quoted in its Data
+Availability Statement; that commit's tree is this repository's content, so
+`git checkout <commit>` reproduces it.
+
+An archival deposit with a DOI (Zenodo) is made **on acceptance**, per journal
+policy; until then the permanent identifier is the versioned snapshot named in
+the Data Availability Statement.
