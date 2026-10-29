@@ -62,12 +62,35 @@ def main():
     if head == local:
         print("already at the local head; nothing to publish")
         return
-    rc = subprocess.run(["git", "merge-base", "--is-ancestor", head, local],
-                        cwd=ROOT).returncode
-    if rc != 0:
-        raise SystemExit("remote head is not an ancestor of local HEAD; refusing")
 
-    diff = sh("git", "diff", "--name-status", "%s..%s" % (head, local)).strip().splitlines()
+    # The commit this tool writes is not the local one: same tree, different
+    # identity and timestamp, so its sha is new and lives only on the remote.
+    # The next run therefore cannot find it in the local object store, and an
+    # ancestry test would refuse to publish a second time -- which is exactly
+    # what happened on the first attempt after the tree-slot fix.  Match on the
+    # tree instead: an API-published head is a rewrite of a local commit that
+    # has the same tree, and that commit is the correct diff base.
+    base, base_note = head, ""
+    if subprocess.run(["git", "cat-file", "-e", head + "^{commit}"],
+                      cwd=ROOT, capture_output=True).returncode != 0:
+        base, base_note = None, ""
+        for c in sh("git", "rev-list", "--all", "-n", "500").split():
+            if sh("git", "rev-parse", c + "^{tree}").strip() == head_tree:
+                base = c
+                break
+        if base is None:
+            raise SystemExit("remote head %s is neither local nor a rewrite of a "
+                             "local commit (no commit has tree %s); refusing"
+                             % (head[:7], head_tree[:7]))
+        print("remote head %s is an API rewrite of local %s (same tree)"
+              % (head[:7], base[:7]))
+    else:
+        rc = subprocess.run(["git", "merge-base", "--is-ancestor", head, local],
+                            cwd=ROOT).returncode
+        if rc != 0:
+            raise SystemExit("remote head is not an ancestor of local HEAD; refusing")
+
+    diff = sh("git", "diff", "--name-status", "%s..%s" % (base, local)).strip().splitlines()
     changes = []
     for line in diff:
         parts = line.split("\t")
@@ -105,8 +128,12 @@ def main():
     commit = gh("POST", "repos/%s/git/commits" % REPO,
                 dict(message=msg, tree=tree["sha"], parents=[head]))
     gh("PATCH", "repos/%s/git/refs/heads/main" % REPO, dict(sha=commit["sha"], force=False))
-    print("published %s (tree %s)" % (commit["sha"], commit["sha"][:7]))
-    print("set DAS commit to %s, tree to %s" % (commit["sha"][:7], tree["sha"][:7]))
+    print("published %s (tree %s)" % (commit["sha"][:7], tree["sha"][:7]))
+    # These two values are what the DAS must quote: the remote commit, and
+    # the tree it shares with the local HEAD.  Printing the commit sha in
+    # the tree slot would send the operator to write a tree that no
+    # checkout has, and check_das would reject it only after a rebuild.
+    print("set DAS commit to %s, tree to %s" % (commit["sha"], tree["sha"]))
 
 
 if __name__ == "__main__":
