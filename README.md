@@ -6,7 +6,9 @@ equation. On a strictly delimited numerical benchmark (one equation family,
 fixed-loss-tangent propagator, contrasts up to \(v_{\max}=1\)), the paper
 measures the cross-frequency error curve under a paired protocol, locates its
 band-edge boundary, reads the plateau against the trivial incident-field
-baseline, and tests which interventions do and do not move that boundary.
+baseline, and tests which interventions do and do not move that boundary. The
+boundary is separated from the sampling density it is usually confounded with
+by evaluating one multi-grid model over the product of frequency and mesh.
 
 ## What this repository contains
 
