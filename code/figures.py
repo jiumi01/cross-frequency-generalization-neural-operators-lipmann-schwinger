@@ -356,10 +356,11 @@ def badge(ax, x, y, text, fs=7.0, ha="left", va="top", color="#333333"):
                                    edgecolor="none", pad=1.4))
 
 
-def ratio_arrow(ax, x, y0, y1, text, fs=7.6, color="#333333", side="right"):
+def ratio_arrow(ax, x, y0, y1, text, fs=7.6, color="#333333", side="right",
+                lw=0.8):
     """Vertical double arrow between two levels with the ratio beside it."""
     ax.annotate("", xy=(x, y0), xytext=(x, y1),
-                arrowprops=dict(arrowstyle="<->", lw=0.8, color=color))
+                arrowprops=dict(arrowstyle="<->", lw=lw, color=color))
     ymid = np.sqrt(y0 * y1) if (y0 > 0 and y1 > 0) else 0.5 * (y0 + y1)
     dx = 4 if side == "right" else -4
     ax.annotate(text, xy=(x, ymid), xytext=(dx, 0),
@@ -454,6 +455,12 @@ def fig_arch(evals, out):
     styles = [(BLUE, "o"), (ORANGE, "s"), (GREEN, "^"), (PINK, "v")]
     series = [(p % "a025", p % "a100", lab, col, mk)
               for (p, lab), (col, mk) in zip(C.ARCH_GROUPS, styles)]
+    # DeepONet gets its own dash pattern: three of the four families are drawn
+    # with the same solid line, so in a greyscale reproduction (and for a
+    # red-green colour-blind reader, PINK against GREEN) the only cue left was
+    # the marker.  The line style is a second, colour-independent channel.
+    def line_of(lab):
+        return (0, (5.0, 1.6, 1.2, 1.6)) if "DeepONet" in lab else "-"
     fig, axes = plt.subplots(1, 3, figsize=(FULL_W, FULL_W * 0.40),
                              layout="constrained")
     for k, (ax, vmax) in enumerate(zip(axes[:2], (0.25, 1.00))):
@@ -464,7 +471,7 @@ def fig_arch(evals, out):
                 continue
             F, M, S = mean_curve(evals, names, vmax)
             ax.errorbar(F, M, yerr=S, color=col, marker=mk, ms=3.0, lw=1.2,
-                        capsize=1.6, clip_on=False, zorder=3)
+                        ls=line_of(lab), capsize=1.6, clip_on=False, zorder=3)
         band(ax)
         ax.set_yscale("log")
         # Same y range as Fig. 1, so the plateau heights of the two figures can
@@ -486,13 +493,22 @@ def fig_arch(evals, out):
         names = sorted(n for n in evals if n.startswith(pref0))
         if not names:
             continue
-        F, M, _ = mean_curve(evals, names, 0.25)
+        F, M, S = mean_curve(evals, names, 0.25)
         pl = M[F >= 6.0]
         if not pl.size or pl.mean() <= 0:
             continue
-        axn.plot(F, M / pl.mean(), color=col, marker=mk, ms=2.6, lw=1.2,
-                 clip_on=False, zorder=3)
+        # Each curve is divided by ITS OWN plateau, so the seed spread has to
+        # be divided by the same number; carrying the raw spread here would
+        # make the band wider for the family with the higher plateau, which is
+        # the opposite of what the normalised panel compares.
+        axn.errorbar(F, M / pl.mean(), yerr=S / pl.mean(), color=col,
+                     marker=mk, ms=2.6, lw=1.2, ls=line_of(lab), capsize=1.4,
+                     clip_on=False, zorder=3)
     axn.axhline(1.0, color="#666666", lw=0.8, ls=(0, (1.1, 1.5)), zorder=1)
+    # Upper left: at the right edge of (c) the four curves converge on the
+    # rule, so a label placed there printed on top of them.
+    axn.annotate("own plateau $=1$", xy=(2.05, 1.62), fontsize=7.0,
+                 color="#333333", va="top", ha="left")
     band(axn)
     axn.set_ylim(0.0, 1.75)
     panel_label(axn, "c", r"$v_{\max}=0.25$, own plateau")
@@ -502,8 +518,9 @@ def fig_arch(evals, out):
     # legend row above the strip is replaced by direct labels -- one per panel
     # would repeat four names three times, and one panel's labels would not
     # name the curves drawn in the other two.
-    handles = [Line2D([], [], color=col, marker=mk, ls="-", lw=1.2, ms=3.0)
-               for _, _, _, col, mk in series]
+    handles = [Line2D([], [], color=col, marker=mk, ls=line_of(lab), lw=1.2,
+                      ms=3.0)
+               for _, _, lab, col, mk in series]
     labels = [lab for _, _, lab, _, _ in series]
     fig.legend(handles, labels, loc="lower center", ncol=len(handles),
                frameon=False, fontsize=8, handlelength=2.0,
@@ -536,19 +553,34 @@ def fig_band(evals, out):
         # Each arm has its own training edge, so a single shared vertical rule
         # would mark only one of the five.  Marking the edge with a ring on
         # the arm's own curve locates it without five full-height rules
-        # cutting the panel into stripes.
+        # cutting the panel into stripes.  The edge frequency is printed next
+        # to the ring: five rings at five heights are otherwise the same
+        # glyph, and the reader has to count rings against the legend.
         k = int(np.argmin(np.abs(F - fedge)))
         ax.plot([F[k]], [M[k]], marker="o", ms=9.0, mfc="none", mec=col,
                 mew=1.3, clip_on=False, zorder=4)
+        # No number beside the ring: the right-edge label already reads
+        # "train [1,N]", so a second copy of N inside the plot only collided
+        # with the five curves that cross at f = 4 (measured: the "4" glyph sat
+        # on three of them).  The ring marks WHERE the edge is, the end label
+        # says WHICH edge it is.
         ends.append((float(M[-1]), r"train $[1,%.0f]$" % fedge, col))
     band(ax)
+    # The shading is the REFERENCE band, not the band of every curve: the
+    # figure's whole argument is that each curve has a different one.  Saying
+    # so on the patch itself keeps the grey from being read as "the band".
+    ax.annotate(r"reference band $[1,4]$", xy=(1.05, 0.0105), fontsize=7.0,
+                color="#555555", ha="left", va="bottom",
+                bbox=dict(boxstyle="round,pad=0.10", fc="white", ec="none",
+                          alpha=0.75))
     ax.set_yscale("log")
     ax.set_ylim(0.008, 4.5)
     decades(ax, numticks=3)
     sweep_axis(ax)
     ax.set_ylabel(r"relative $L_2$ error")
     end_labels(ax, ends, fs=7.0, min_sep=10.5)
-    badge(ax, 0.985, 0.035, r"ring: train band edge", ha="right", va="bottom")
+    badge(ax, 0.985, 0.035, r"ring: train band edge", ha="right", va="bottom",
+          fs=7.4)
     save(fig, os.path.join(out, "fig_bandwidth"))
 
 
@@ -583,7 +615,10 @@ def fig_mode_phase(evals, out, band_tag, train_edge, fname):
     # an ~10 pt cell.  The figure is emitted wider instead, and fig_widths
     # derives the larger inclusion fraction from the MediaBox, so the 1:1
     # type-size rule still holds.
-    fig, ax = plt.subplots(figsize=(10.4 * CM, 10.4 * CM * 0.62),
+    # Full text width: 15 frequency columns of a four-character value need
+    # ~31 pt per cell; at the previous 10.4 cm the cells were 19 pt wide and
+    # neighbouring values printed into each other ("0.860.83").
+    fig, ax = plt.subplots(figsize=(FULL_W, FULL_W * 0.56),
                            layout="constrained")
     vmax_c = np.nanmax(Mat)
     im = ax.imshow(Mat, cmap="viridis", aspect="auto", origin="lower",
@@ -602,11 +637,18 @@ def fig_mode_phase(evals, out, band_tag, train_edge, fname):
     ax.set_xlabel("frequency $f$")
     ax.set_ylabel("retained modes $M$")
     xb = np.searchsorted(F, train_edge - 1e-9)
-    ax.axvline(xb - 0.5, color="w", lw=1.2, ls=(0, (4, 2)))
+    # The edge rule is drawn twice: a white dash on the viridis fill (visible
+    # over the dark low-error cells) and a thin black hairline underneath it
+    # (visible over the bright high-error cells).  A single white rule
+    # disappeared in the top-right corner of the map, which is exactly where
+    # the reader checks whether the step is at f=4 or beyond it.
+    ax.axvline(xb - 0.5, color="k", lw=2.0, ls=(0, (4, 2)), zorder=4)
+    ax.axvline(xb - 0.5, color="w", lw=1.0, ls=(0, (4, 2)), zorder=5)
     # Above the axes, not inside: rotated inside, the label sat on top of the
     # cell annotations it is there to help read.  The gap is 7 pt rather than
     # 3 pt so that the 8 pt label clears the top row of cells at print size.
-    ax.annotate("training edge", xy=(xb - 0.5, 1.0),
+    ax.annotate(r"training-band edge $f=%g$" % train_edge,
+                xy=(xb - 0.5, 1.0),
                 xycoords=("data", "axes fraction"),
                 xytext=(0, 7), textcoords="offset points",
                 ha="center", va="bottom", fontsize=8, color="#333333",
@@ -616,7 +658,7 @@ def fig_mode_phase(evals, out, band_tag, train_edge, fname):
             if np.isnan(Mat[i, j]):
                 continue
             ax.text(j, i, "%.2f" % Mat[i, j], ha="center", va="center",
-                    fontsize=8,
+                    fontsize=8.6,
                     color="k" if Mat[i, j] > 0.5 * vmax_c else "w")
     cb = fig.colorbar(im, ax=ax, fraction=0.046, pad=0.03)
     cb.outline.set_linewidth(0.5)
@@ -649,6 +691,11 @@ def fig_scaling(evals, out):
             continue
         F, M, S = mean_curve(evals, names, vmax)
         plateau = float(M[F >= 6].mean())
+        # Light seed band, same colours as Figures 3 and 4: five curves on one
+        # panel need a spread, but a full errorbar at every node hid the
+        # overshoot the figure exists to show.
+        ax.fill_between(F / 4.0, (M - S) / plateau, (M + S) / plateau,
+                        color=ARMS5[i], alpha=0.16, lw=0, zorder=1)
         ax.plot(F / 4.0, M / plateau, color=ARMS5[i], marker="o", ms=3.0,
                 lw=1.3, clip_on=False, zorder=3,
                 label=r"$v_{\max}=%.2f$" % vmax)
@@ -942,7 +989,11 @@ def fig_solver(out):
     m = v / (10.0 ** e)
     badge(ax, 0.97, 0.94, r"max $=%.1f\times10^{%d}$" % (m, e), ha="right")
     badge(ax, 0.97, 0.80, r"$10^{-12}$ ref.", ha="right", color=VERMILION)
-    panel_label(ax, "a", r"$10\times10$ grid, dense cross-check")
+    # The comparison is only a cross-check if the two solves share no code
+    # path; the dense solve is a direct LU factorisation, stated in the panel
+    # title rather than as a badge -- a badge in this corner collided with the
+    # "max" annotation, which is the number the panel exists to report.
+    panel_label(ax, "a", r"$10\times10$ grid, dense cross-check (direct LU)")
     despine(ax)
 
     # (b) freezing ablation: three implementations of the shared loop
@@ -953,37 +1004,40 @@ def fig_solver(out):
     zmask = np.array([100.0 * c["zeromask"] / c["n"] for c in conds])
     frozen = np.array([100.0 * c["frozen"] / c["n"] for c in conds])
     sil = np.array([100.0 * c["silent"] / c["n"] for c in conds])
-    # "silent" is a subset of "naive" (the corrupted labels the in-loop check
-    # cannot see), so it is drawn as a narrower bar on top of the plain-loop
-    # bar instead of beside it.  Both used to be shades of red, which made
-    # the containment -- the whole point of the panel -- invisible.
-    ax.bar(idx, naive, width=0.66, color=VERMILION, alpha=0.45, zorder=3,
-           label="unfrozen (plain loop)")
-    ax.bar(idx, sil, width=0.32, color=PINK, zorder=4,
-           label="of which silent to the in-loop check")
-    ax.axhline(0.0, color=GREEN, lw=2.2, zorder=2)
-    ax.plot([], [], color=GREEN, lw=2.2, label="frozen (both variants)")
+    # STACKED in principle, but the "detected" segment is measured at exactly
+    # zero on every batch: the in-loop check found none of the corrupted
+    # labels.  Drawing a zero-height second segment would look like an
+    # omission, so the bar is the silent corruption and the undetected part is
+    # stated in words.  The containment (silent <= total, equal here) is the
+    # finding, not a plotting choice.
+    det = np.clip(naive - sil, 0.0, None)
+    ax.bar(idx, sil, width=0.66, color=PINK, zorder=3,
+           label="silent corrupted labels")
+    ax.axhline(0.0, color=GREEN, lw=2.2, zorder=4)
+    # Both frozen variants measure identically zero; the labels carry the
+    # value so the entry cannot be read as "condition missing".
+    ax.plot([], [], color=GREEN, lw=2.2,
+            label="frozen variants: max %.1f%% and %.1f%%"
+                  % (float(frozen.max()), float(zmask.max())))
     ax.set_xticks(idx)
     ax.set_xticklabels(["%d" % (c["batch"] + 1) for c in conds])
     ax.set_xlabel("batch index")
     ax.set_ylabel("% corrupted labels")
-    # The frozen bars are identically zero, so they are stated rather than
-    # drawn: an invisible bar would leave the reader guessing whether the
-    # condition was missing or measured at zero.  The wording gives the
-    # maximum over batches, which stays true if a batch ever becomes
-    # non-zero -- an "is zero" claim would silently go stale.
-    badge(ax, 0.5, 0.965,
-          "frozen variants: max %.1f%% and %.1f%% over all batches"
-          % (float(frozen.max()), float(zmask.max())),
-          ha="center", color=GREEN)
     ax.set_ylim(0, max(naive.max() * 1.30, 1.0))
+    # Both zero categories are stated rather than drawn: an invisible bar
+    # leaves the reader guessing whether the condition was missing or measured
+    # at zero.  The wording gives the maximum over batches, which stays true if
+    # a batch ever becomes non-zero -- an "is zero" claim would go stale.
+    badge(ax, 0.03, 0.955,
+          "in-loop check detected %.1f%%" % float(det.max()),
+          ha="left", fs=6.9, color=GREEN)
     # Legend row ABOVE the panel: below the axes it used to sit on top of the
     # "(b)" panel identifier, which shares that band.  Two columns, not three:
     # at 8 pt the three labels in one row were wider than the text block, and
     # because the PDF is emitted with bbox_inches="tight" that showed up as a
     # figure wider than \textwidth rather than as an overlong legend.
-    ax.legend(fontsize=8, loc="lower center", bbox_to_anchor=(0.5, 1.03),
-              ncol=2, handlelength=1.4, columnspacing=1.1, labelspacing=0.3)
+    ax.legend(fontsize=7.8, loc="lower center", bbox_to_anchor=(0.5, 1.02),
+              ncol=2, handlelength=1.4, columnspacing=1.2, labelspacing=0.3)
     panel_label(ax, "b", r"%d heterogeneous batches" % len(conds))
     despine(ax)
     save(fig, os.path.join(out, "fig_solver"))
@@ -1098,13 +1152,16 @@ def fig_crosscontrast(evals, out):
     h = [Line2D([], [], color=ARMS5[i], marker="o", ls="-", lw=1.2, ms=3.0)
          for i in range(len(C.VMAX_LIST))]
     l = [r"$v_{\max}=%.2f$" % v for v in C.VMAX_LIST]
+    h.append(Line2D([], [], color="#555555", marker="o", ls="-", lw=2.4,
+                    ms=3.0))
+    l.append("train-matched")
     h.append(Line2D([], [], color="none", marker="o", ms=8, mfc="none",
                     mec="#555555", mew=1.3))
-    l.append("own contrast")
-    fig.legend(h, l, fontsize=8, ncol=len(h), loc="lower center",
-               bbox_to_anchor=(0.5, 1.005), handlelength=1.6,
-               columnspacing=1.0, labelspacing=0.3,
-               title="eval contrast", title_fontsize=8)
+    l.append("band edge")
+    fig.legend(h, l, fontsize=7.6, ncol=len(h), loc="lower center",
+               bbox_to_anchor=(0.5, 1.005), handlelength=1.4,
+               columnspacing=0.8, labelspacing=0.3,
+               title="eval contrast", title_fontsize=7.6)
     save(fig, os.path.join(out, "fig_crosscontrast"))
 
 
@@ -1190,9 +1247,16 @@ def fig_c1(out):
                      "baseline", BLUE),
                     (float(d["arms"]["compensated"]["attained"][-1]),
                      "compensated", ORANGE)], fs=7.2)
-    badge(ax, 0.5, 0.955,
-          r"spread $%.1f\times$ $\rightarrow$ constant" % v["attained_baseline_spread"],
-          ha="center", fs=6.8)
+    # The spread->constant statement lives in the caption: inside the panel it
+    # collided with the compensated arm, which is a flat line at the only
+    # height the note could occupy.
+    # The two panels share the colour code; (b) states it in a legend because
+    # its two series are the point of the panel (what the compensation did to
+    # the norm) and a reader should not have to carry the code across panels.
+    ax.legend([Line2D([], [], color=BLUE, marker="o", ls="-", lw=1.3),
+               Line2D([], [], color=ORANGE, marker="s", ls="-", lw=1.3)],
+              ["baseline", "compensated"], fontsize=7.4, loc="upper left",
+              frameon=False, handlelength=1.8, labelspacing=0.3)
     panel_label(ax, "b")
     save(fig, os.path.join(out, "fig_c1"))
 
@@ -1234,7 +1298,7 @@ def fig_anchor(out):
         Fm, M, S = mean_curve(ev, names, 0.25)
         ax.errorbar(Fm, M, yerr=S, color=BLUE, marker="o", ms=3.4, lw=1.3,
                     capsize=2, clip_on=False, zorder=3,
-                    label="trained FNO")
+                    label="Trained FNO")
     anch = np.array([r["mean"] for r in a["sweep"]])
     ax.plot(F, anch, color=VERMILION, marker="D", ms=3.4, lw=1.3,
             clip_on=False, zorder=3, label="anchor, $aB_1+bB_2$")
@@ -1259,7 +1323,7 @@ def fig_anchor(out):
     pl_f = float(np.mean(M[F >= 6.0]))
     if pl_a > 0 and pl_f > pl_a:
         ratio_arrow(ax, 11.55, pl_a, pl_f,
-                    r"$%.1f\times$" % (pl_f / pl_a), fs=7.6)
+                    r"$%.1f\times$" % (pl_f / pl_a), fs=8.8, lw=1.1)
     panel_label(ax, "a", r"$v_{\max}=0.25$")
 
     # ---- (b) plateau against contrast
@@ -1271,20 +1335,29 @@ def fig_anchor(out):
             clip_on=False, zorder=3, label="anchor")
     ax.plot(vm, trivp, color=FAINT, lw=1.0, ls=(0, (1.5, 1.6)),
             clip_on=False, zorder=2, label="trivial, $\\hat u\\equiv0$")
-    fno, keep = [], []
+    fno, keep, fsd = [], [], []
     for v in vm:
         ns = arm_names(ev, "a%03d" % int(round(v * 100)))
         if not ns:
             continue
-        _, Mv, _ = mean_curve(ev, ns, float(v))
-        fno.append(float(np.mean(Mv[np.array(d["f_test"]) >= 6])))
+        # Per-seed plateau means, so panel (b) can carry a vertical spread:
+        # the panel compares the learned plateau with two analytic curves, and
+        # without a spread a one-seed wobble reads as a contrast trend.
+        per = []
+        for n in ns:
+            Fn, Mn, _ = curve(ev[n], float(v))
+            per.append(float(np.mean(Mn[Fn >= 6])))
+        fno.append(float(np.mean(per)))
+        fsd.append(float(np.std(per, ddof=1)) if len(per) > 1 else 0.0)
         keep.append(float(v))
     if fno:
-        ax.plot(np.array(keep), np.array(fno), color=BLUE, marker="o",
-                ms=4.0, lw=1.3, clip_on=False, zorder=3, label="trained FNO")
+        ax.errorbar(np.array(keep), np.array(fno), yerr=np.array(fsd),
+                    color=BLUE, marker="o", ms=4.0, lw=1.3, capsize=1.8,
+                    elinewidth=0.8, clip_on=False, zorder=3,
+                    label="Trained FNO")
     ax.set_yscale("log")
     ax.set_xscale("log")
-    ax.set_xlabel("$v_{\\max}$")
+    ax.set_xlabel(r"contrast $v_{\max}$")
     ax.set_ylabel(r"plateau $\varepsilon_{\infty}$")
     ax.set_xticks([0.05, 0.1, 0.25, 0.5, 1.0])
     ax.set_xticklabels(["0.05", "0.10", "0.25", "0.50", "1.00"])
@@ -1297,9 +1370,11 @@ def fig_anchor(out):
     # range: two fitted coefficients carry real out-of-band information at
     # every contrast, which is the claim the trained operator cannot make.
     if anchp[-1] < trivp[-1]:
-        badge(ax, 0.03, 0.05,
+        # Upper left: at the low-contrast end the anchor and the baseline sit
+        # at the bottom of the frame, which is where this note used to print.
+        badge(ax, 0.03, 0.96,
               "anchor below the trivial baseline at every contrast",
-              ha="left", va="bottom", fs=6.8)
+              ha="left", va="top", fs=6.8)
     panel_label(ax, "b", r"out-of-band plateau")
     save(fig, os.path.join(out, "fig_anchor"))
 
@@ -1389,7 +1464,7 @@ def fig_deep(out):
     if ns:
         Fm, M, S = mean_curve(ev, ns, 0.25)
         ax.errorbar(Fm, M, yerr=S, color=BLUE, marker="o", ms=3.2, lw=1.3,
-                    capsize=1.8, clip_on=False, zorder=3, label="trained FNO")
+                    capsize=1.8, clip_on=False, zorder=3, label="Trained FNO")
         ends_b.append((float(M[-1]), "trained FNO", BLUE))
         vals_b.append(np.ravel(M))
     # the head curve comes from the order scan, which is the instrument that
@@ -1401,22 +1476,34 @@ def fig_deep(out):
         Fh = np.array([r["f"] for r in sweep])
         hv = np.array([r["mean"] for r in sweep])
         ax.plot(Fh, hv, color=VERMILION, marker="D", ms=3.2, lw=1.3,
-                clip_on=False, zorder=3, label="head, $M=M_{\\mathrm{sel}}$")
-        ends_b.append((float(hv[-1]), "head", VERMILION))
+                clip_on=False, zorder=3, label="Analytic head")
+        ends_b.append((float(hv[-1]), "Analytic head", VERMILION))
         vals_b.append(np.ravel(hv))
     for pref, col, mk, lab in (("ba_fno_a025_m8_s", GREEN, "P",
-                                "head $+$ residual, $M=8$"),
+                                "Residual on deep head, $M=8$"),
                                ("ba_fno_a025_s", ORANGE, "X",
-                                "head $+$ residual, $M=2$")):
+                                "Residual on shallow head, $M=2$")):
         ns = [n for n in sorted(ev) if n.startswith(pref)]
         if not ns:
             continue
         Fm, M, S = mean_curve(ev, ns, 0.25)
         ax.errorbar(Fm, M, yerr=S, color=col, marker=mk, ms=3.2, lw=1.3,
                     capsize=1.8, clip_on=False, zorder=3, label=lab)
-        ends_b.append((float(M[-1]), lab.replace("head $+$ residual, ", ""),
-                       col))
+        ends_b.append((float(M[-1]),
+                       "deep head $+$ res." if "deep" in lab
+                       else "shallow head $+$ res.", col))
         vals_b.append(np.ravel(M))
+        if "deep" in lab:
+            # The residual does not remove the step, and the panel says so with
+            # the same edge rule the other figures use -- no arrow.  An arrow
+            # between e(4) and e(5) on this arm was 12 px long: it landed on the
+            # green curve and on the analytic-head curve, both of which sit at
+            # the plateau by f = 5.  The ratio itself is in the caption and in
+            # the macro the caption is built from, so a hand-placed number here
+            # would be a second, unchecked copy of it.
+            k4 = int(np.argmin(np.abs(Fm - 4.0)))
+            ax.plot([Fm[k4]], [M[k4]], marker="o", ms=7.5, mfc="none",
+                    mec=GREEN, mew=1.2, clip_on=False, zorder=5)
     band(ax)
     ax.set_yscale("log")
     # The four objects span three decades here (the head alone is an order of
@@ -1454,30 +1541,38 @@ def fig_fewshot(out):
         print("no fewshot_purchase.json -- run code/run_fewshot.py"); return
     d = C.load_json(p)
     ns = [0, 64, 256, 1024]
+    # Categorical x axis: the rungs are 0, 64, 256, 1024, so a linear axis
+    # places 0, 64 and 256 inside the first tenth of the panel and asks the
+    # reader to infer a spacing that carries no meaning.  The four rungs are
+    # four conditions, not four quantities.
+    xs = np.arange(len(ns), dtype=float)
     fig, ax = plt.subplots(figsize=(HALF_W, HALF_W * 0.95), layout="constrained")
     specs = [(5.0, ARMS5[0], "f = 5 (fine-tune band)"),
              (8.0, ARMS5[1], "f = 8 (fine-tune band)"),
              (12.0, ARMS5[2], "f = 12 (uncovered)")]
-    ends = []
     for f, col, lab in specs:
         ys = [d["rows"][str(n)][str(float(f))] for n in
               ["0", "64", "256", "1024"]]
-        ax.plot(ns, ys, color=col, marker="o", ls="-", lw=1.4, ms=4.2,
-                clip_on=False, zorder=3)
-        ends.append((float(ys[-1]), lab, col))
-    ax.axvspan(64, 1024, color="#7a828c", alpha=0.10, lw=0, zorder=0)
+        ax.plot(xs, ys, color=col, marker="o", ls="-", lw=1.4, ms=4.2,
+                clip_on=False, zorder=3, label=lab)
+    # The grey span covers the fine-tuned rungs only; the baseline is outside
+    # it, because it has seen no out-of-band label at all.
+    ax.axvspan(0.5, len(ns) - 0.5, color="#7a828c", alpha=0.10, lw=0, zorder=0)
+    ax.annotate("fine-tuned", xy=(2.0, 0.995), xycoords=("data", "axes fraction"),
+                ha="center", va="bottom", fontsize=7.4, color="#555555")
     ax.set_xlabel("out-of-band labels $n$")
     ax.set_ylabel(r"relative $L_2$ error")
-    ax.set_xticks(ns)
-    # Linear x: the rungs include n = 0 (the zero-shot baseline), which a log
-    # axis cannot place.
+    ax.set_xticks(xs)
+    ax.set_xticklabels(["Baseline", "64", "256", "1024"])
+    ax.set_xlim(-0.45, len(ns) - 0.55)
     ax.set_ylim(0.3, 1.25)
     despine(ax)
-    # Left edge, not right: the two fine-tune-band curves CONVERGE at
-    # n = 1024 (both reach the same floor) and are separated where they enter
-    # the panel, so a right-edge label stack would name two curves at one
-    # height.
-    end_labels(ax, ends, fs=7.0, side="left")
+    # A legend, not end labels: the two fine-tune-band curves CONVERGE at
+    # n = 1024, and a label stack in the left margin ran into the y-axis label.
+    # The lower left of the panel is empty (all three curves start at 0.9 or
+    # above there).
+    ax.legend(fontsize=7.4, loc="lower left", frameon=False,
+              handlelength=1.8, labelspacing=0.3)
     badge(ax, 0.97, 0.955, r"$v_{\max}=0.25$", ha="right")
     save(fig, os.path.join(out, "fig_fewshot"))
 
@@ -1513,8 +1608,13 @@ def fig_c3probe(out):
     for pi, (field, ylab) in enumerate(
             [("energy_ratio", r"$\|\widehat{u}\|/\|u\|$"),
              ("alignment",
-              r"$|\langle\widehat{u},u\rangle|/( \|\widehat{u}\|\|u\| )$")]):
+              r"$|\langle\widehat{u},u\rangle|/(\|\widehat{u}\|\|u\|)$")]):
         ax = axes[pi]
+        # y = 1 in both panels is the "does nothing useful" level: the ratio
+        # equals 1 when the correction has the energy of the target, and the
+        # alignment equals 1 when it points along it.  Without the rule the
+        # reader has to hold the two scales in mind at once.
+        ax.axhline(1.0, color=INK, lw=0.7, ls=(0, (2.0, 2.0)), zorder=1)
         for key, col, mk, lab in specs:
             arm = d["arms"][key]
             fs = sorted(float(k) for k in arm["energy"])
@@ -1526,18 +1626,40 @@ def fig_c3probe(out):
         ax.set_ylabel(ylab)
         ax.set_xticks([4, 5, 6, 8, 10, 12])
         ax.set_xlim(3.6, 12.4)
-        ax.set_ylim(0.0, 1.75)
+        ax.set_ylim(-0.45 if pi else 0.0, 1.75)
         despine(ax)
         panel_label(ax, "ab"[pi])
+    # The signed correlation, on the arm where it was measured.  |<u,u_hat>|
+    # cannot separate "aligned but small" from "antiparallel", so the absolute
+    # value alone cannot support the sentence in the text that the emitted
+    # correction is on average OPPOSED to the target.  The signed curve is
+    # drawn from results/corr_energy.json (the same three-seed probe, written
+    # by code/diag_corr.py), and only for the baseline arm -- the other two
+    # arms were probed by code/analyze_c3.py, which stores the absolute value
+    # only.  Drawing the sign for one arm and the magnitude for three keeps
+    # the figure inside the data that exists.
+    cp = os.path.join(C.RES, "corr_energy.json")
+    if os.path.exists(cp):
+        cd = json.load(open(cp, encoding="utf-8"))
+        fq = [float(x) for x in cd["f"]]
+        ax = axes[1]
+        ax.plot(fq, [cd["signed"]["%g" % f] for f in fq], color=BLUE,
+                marker="o", mfc="none", ms=4.0, lw=1.2, ls=(0, (4, 1.6)),
+                clip_on=False, zorder=4)
+        ax.axhline(0.0, color=INK, lw=0.6, zorder=1)
     # No end labels here: the whole point of the right panel is that the three
     # arms CONVERGE (alignment collapses to the same floor for all of them),
     # so a right-edge label stack would print three names at one height.  One
     # legend row for the strip, with the short arm names the tables use.
     h = [Line2D([], [], color=col, marker=mk, ls="-", lw=1.3, ms=3.4)
          for _, col, mk, _ in specs]
-    fig.legend(h, [lab for _, _, _, lab in specs], fontsize=8, ncol=3,
-               loc="lower center", bbox_to_anchor=(0.5, 1.005),
-               handlelength=1.8, columnspacing=1.6)
+    h.append(Line2D([], [], color=BLUE, marker="o", mfc="none", ms=4.0,
+                    ls=(0, (4, 1.6)), lw=1.2))
+    fig.legend(h, [lab for _, _, _, lab in specs] +
+               ["baseline, signed correlation"],
+               fontsize=8, ncol=4, loc="lower center",
+               bbox_to_anchor=(0.5, 1.005), handlelength=1.8,
+               columnspacing=1.4)
     badge(axes[0], 0.03, 0.05, "training band", ha="left", va="bottom")
     save(fig, os.path.join(out, "fig_c3probe"))
 
@@ -1767,9 +1889,21 @@ def fig_banddown(evals, out):
     ax.set_ylabel(r"relative $L_2$ error")
     despine(ax)
     end_labels(ax, ends, fs=7.0)
-    badge(ax, 0.03, 0.045,
-          "solid: FNO   dashed: trivial baseline (same colour)",
-          ha="left", va="bottom")
+    # A legend inside the axes (below), not a badge: the "solid/dashed" gloss
+    # used to be a free-text annotation, so the one encoding the panel rests on
+    # -- solid FNO against dashed baseline -- was the only one not stated as a
+    # legend entry.  Both band edges are already drawn by the shading and the
+    # two dotted rules; the patch names them.
+    h = [Line2D([], [], color="#3a3a3a", ls="-", lw=1.5),
+         Line2D([], [], color="#3a3a3a", ls="--", lw=1.0, alpha=0.65),
+         Patch(facecolor="#7a828c", alpha=0.12, edgecolor="none")]
+    # Above the axes, two columns: inside, the only free space sits between
+    # the solid and dashed curves at f<1 and the box printed over both.
+    ax.legend(h, ["Trained FNO", "Trivial incident-field baseline",
+                  "Training band $[1,4]$"],
+              fontsize=7.2, loc="lower center", bbox_to_anchor=(0.5, 1.01),
+              frameon=False, ncol=2, handlelength=2.2, labelspacing=0.3,
+              columnspacing=1.2)
     save(fig, os.path.join(out, "fig_banddown"))
 
 
@@ -1788,7 +1922,7 @@ def fig_plateau_coupling(evals, out):
     spec = json.load(open(os.path.join(C.RES, "spectrum.json"),
                           encoding="utf-8"))
     fig, ax = plt.subplots(figsize=(HALF_W, HALF_W * 0.92), layout="constrained")
-    coups, plats, trivs = [], [], []
+    coups, plats, trivs, sds = [], [], [], []
     for vk, vmax in zip(("a005", "a010", "a025", "a050", "a100"), C.VMAX_LIST):
         plateau = []
         for s in range(3):
@@ -1799,14 +1933,30 @@ def fig_plateau_coupling(evals, out):
             plateau.append(M[F >= 6])
         if not plateau:
             continue
-        plats.append(float(np.mean(plateau)))
+        # Per-seed plateau means first, then the mean and the spread over
+        # seeds: the panel is the only place the seed-to-seed spread of the
+        # plateau is visible, and a bare mean curve let a reader take the
+        # 1.4x excess for a point estimate rather than for a mean over three
+        # seeds.  ddof=1 because the three seeds are a sample of the training
+        # variance, not its population.
+        per_seed = np.array([float(np.mean(p)) for p in plateau])
+        plats.append(float(per_seed.mean()))
+        sds.append(float(per_seed.std(ddof=1)) if len(per_seed) > 1 else 0.0)
         trivs.append(float(np.mean(
             [spec["data"][str(vmax)]["f=%g" % f]["triv"]
              for f in C.F_TEST if f >= 6])))
         coups.append(vmax / (2 * C.GAMMA))
     coups, plats, trivs = np.array(coups), np.array(plats), np.array(trivs)
-    ax.plot(coups, plats, "-o", color=BLUE, lw=1.5, ms=4.6, clip_on=False,
-            zorder=3, label="FNO plateau")
+    sds = np.array(sds)
+    # y = 1 is the "predict zero" level of the metric: a curve above it is
+    # worse than returning the incident field alone, which is what makes the
+    # plateau-versus-baseline comparison legible without a second axis.
+    ax.axhline(1.0, color=INK, lw=0.7, ls=(0, (2.0, 2.0)), zorder=1)
+    ax.annotate(r"$y=1$ (predict zero)", xy=(0.52, 1.02), fontsize=7.0,
+                color="#333333", va="bottom")
+    ax.errorbar(coups, plats, yerr=sds, fmt="-o", color=BLUE, lw=1.5, ms=4.6,
+                capsize=2.0, elinewidth=0.8,
+                clip_on=False, zorder=3, label="FNO plateau")
     ax.plot(coups, trivs, "--s", color=VERMILION, lw=1.5, ms=4.2,
             clip_on=False, zorder=3, label="trivial baseline")
     ax.set_xscale("log")

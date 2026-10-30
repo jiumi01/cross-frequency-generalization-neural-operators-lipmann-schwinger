@@ -191,6 +191,34 @@ def same_stem(a, b):
     return k >= 5
 
 
+def mask_captions(s):
+    """Blank every \\caption{...} body.
+
+    A citation that sits in the paragraph *before* a float has its sentence
+    truncated at the last full stop, and the float's own caption is punctuated
+    with full stops too, so the "sentence" used to be read across the caption
+    boundary: the citation of the Born table picked up "training range" from
+    the figure caption above it.  Caption words are the very words the
+    vocabulary test compares against, so they must not enter the sentence.
+    Measured case: with the Born key redirected to the cost table, the only
+    overlap left was the word "range", taken from a figure caption, and the
+    gate passed a citation that named the wrong float.
+    """
+    out = []
+    i = 0
+    while True:
+        m = re.compile(r"\\caption\s*\{").search(s, i)
+        if not m:
+            out.append(s[i:])
+            break
+        out.append(s[i:m.end()])
+        body = braced(s, m.end() - 1)
+        out.append(" " * len(body))
+        out.append("}")
+        i = m.end() + len(body) + 1
+    return "".join(out)
+
+
 def sentence_of(masked, start, end):
     before = [m for m in re.finditer(r"\.(?:\s|$)", masked[:start])]
     a = before[-1].end() if before else 0
@@ -272,7 +300,7 @@ def main():
     # 4./5. every key used in the main text resolves -----------------------
     main_path = os.path.join(EN, "main.tex")
     src = read(main_path)
-    masked = mask_math(src)
+    masked = mask_math(mask_captions(src))
     used_tab = re.findall(r"\\siTab\{([^}]+)\}", src)
     used_fig = re.findall(r"\\siFig\{([^}]+)\}", src)
     if not used_tab:
@@ -317,8 +345,12 @@ def main():
                     sentence_of(masked, m.start(), m.end()))
         for key, ctxs in sorted(contexts.items()):
             mine = stems[key]
-            others = set().union(*[stems[k] for k in stems
-                                   if k != key and fl[k]["kind"] == kind]) \
+            # Distinctiveness is measured against every other caption in the
+            # SI, not only against the captions of the same float type.  A word
+            # that some other caption also uses -- "range", "error", "media" --
+            # says nothing about which float is meant, and the type-scoped
+            # version of this test let exactly such a word carry a wrong key.
+            others = set().union(*[stems[k] for k in stems if k != key]) \
                 if len(stems) > 1 else set()
             distinctive = mine - others
             hit, shared = False, set()
@@ -336,7 +368,16 @@ def main():
                 print("      caption: %s" % fl[key]["caption"][:110])
 
     # 8. no stale self-citation in a caption ------------------------------
-    stale = re.findall(r"as Supplementary (?:Table|Figure)~S?\d", si_raw)
+    # \s+ rather than a single space: the first version of this rule missed a
+    # self-citation that LaTeX had wrapped across a line ("... as Supplementary
+    # Figure~S7"), because the source text and the printed line break are not
+    # the same string.  Measured case: the caption of the conditioning figure
+    # carried a hand-written S7 that had already gone stale when a float was
+    # inserted ahead of it, and this gate reported clean.
+    stale = re.findall(r"as\s+Supplementary\s+(?:Table|Figure)~\s*S?\d",
+                       re.sub(r"\s+", " ", si_raw))
+    stale += re.findall(r"as\s+Supplementary\s+(?:Table|Figure)~\s*S?\d",
+                        si_raw)
     if stale:
         bad("an SI caption still names its own number by hand: %s" % stale[:3])
 
