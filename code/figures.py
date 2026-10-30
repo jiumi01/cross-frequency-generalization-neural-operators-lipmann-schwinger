@@ -381,16 +381,23 @@ def born_order1(d, vmax):
 def fig_main(evals, out):
     """Error vs frequency, one panel per contrast arm (FNO).
 
-    The y axis is shared.  The point of the strip is that the cliff sits at
-    the same frequency for every contrast while the plateau height moves by a
-    factor of nine, and a separate axis per panel would rescale that
-    difference away.
+    Laid out 3 + 2 rather than as one strip of five.  Five panels across a
+    17 cm column leaves 3.2 cm each, at which the tick labels and the error
+    bars interleave; 3 + 2 leaves 5.2 cm and keeps one shared y axis, so the
+    comparison the strip exists for -- one cliff, five plateau heights -- is
+    still made at a single scale.
     """
     set_style()
     arms = C.VMAX_LIST
-    fig, axes = plt.subplots(1, len(arms), figsize=(FULL_W, FULL_W * 0.42),
-                             sharey=True, layout="constrained")
-    for k, (ax, vmax) in enumerate(zip(axes, arms)):
+    fig = plt.figure(figsize=(FULL_W, FULL_W * 0.62))
+    gs = fig.add_gridspec(2, 6, hspace=0.66, wspace=0.20)
+    cells = [gs[0, 0:2], gs[0, 2:4], gs[0, 4:6], gs[1, 1:3], gs[1, 3:5]]
+    axes, first = [], None
+    for k, vmax in enumerate(arms):
+        ax = fig.add_subplot(cells[k], sharey=first)
+        if first is None:
+            first = ax
+        axes.append(ax)
         tag = "a%03d" % int(round(vmax * 100))
         names = arm_names(evals, tag)
         if not names:
@@ -402,17 +409,25 @@ def fig_main(evals, out):
         ax.plot(F, b1, color=INK, lw=1.1, ls=(0, (4, 2)), clip_on=False,
                 zorder=2)
         band(ax)
+        # Mark the first node past the band edge.  The edge rule says where
+        # the band stops; the ring says where the error has already left, and
+        # the two are one node apart on the coarsest contrast.
+        beyond = np.where(np.asarray(F, float) > 4.0 + 1e-9)[0]
+        if len(beyond):
+            i_out = int(beyond[0])
+            ax.plot([F[i_out]], [M[i_out]], marker="o", ms=9.0, mfc="none",
+                    mec=VERMILION, mew=1.1, clip_on=False, zorder=4)
         ax.set_yscale("log")
         ax.set_ylim(0.008, 4.5)
         decades(ax, numticks=3)
         sweep_axis(ax)
         panel_label(ax, "abcde"[k], r"$v_{\max}=%.2f$" % vmax)
-        if k == 0:
+        if k % 3 == 0:
             ax.set_ylabel(r"relative $L_2$ error")
         else:
             ax.tick_params(labelleft=False)
-    end_labels(axes[-1], [(float(M[-1]), "FNO", BLUE),
-                          (float(b1[-1]), r"Born $n{=}1$", INK)])
+    end_labels(axes[2], [(float(M[-1]), "FNO", BLUE),
+                         (float(b1[-1]), r"Born $n{=}1$", INK)])
     save(fig, os.path.join(out, "fig_main_cliff"))
 
 
@@ -875,20 +890,26 @@ def fig_bound(evals, out):
     axes[1].set_ylim(1e-5, 3.0)
     panel_label(axes[1], "b", fontsize=8)
     if any_:
-        h, l = [], []
+        # Two-level legend: colour carries the mode budget, line style carries
+        # the physical quantity.  The single row of seven entries this replaces
+        # forced the reader to decode both mappings from one string.
+        hM, lM = [], []
         for col, Mb in zip(cols, budgets):
-            h.append(Line2D([], [], color=col, marker="o", ls="-", lw=1.1,
-                            ms=2.8))
-            l.append(r"$M=%d$" % Mb)
-        h.append(Line2D([], [], color="k", ls="-", lw=1.3))
-        l.append("measured error")
-        # Seven entries in one row.  Legend entries for the dashed and dotted
-        # reference curves are deliberately absent: each belongs to one panel
-        # only, so it is named in that panel's caption instead of in a legend
-        # that would imply it appears in both.
-        fig.legend(h, l, fontsize=8, ncol=7, loc="lower center",
-                   bbox_to_anchor=(0.5, 1.005), handlelength=1.7,
-                   columnspacing=1.1, labelspacing=0.3)
+            hM.append(Line2D([], [], color=col, lw=2.2))
+            lM.append(r"$M=%d$" % Mb)
+        hQ = [Line2D([], [], color="k", ls="-", lw=1.3),
+              Line2D([], [], color="k", ls="--", lw=1.1),
+              Line2D([], [], color="k", ls=":", lw=1.6)]
+        lQ = ["measured model error",
+              "reference out-of-band fraction",
+              "correction out-of-band energy"]
+        fig.legend(hM, lM, fontsize=8, ncol=6, loc="lower center",
+                   bbox_to_anchor=(0.5, 1.075), handlelength=1.6,
+                   columnspacing=1.0, frameon=False,
+                   title="retained modes", title_fontsize=8)
+        fig.legend(hQ, lQ, fontsize=8, ncol=3, loc="lower center",
+                   bbox_to_anchor=(0.5, 1.005), handlelength=2.6,
+                   columnspacing=1.4, frameon=False)
     save(fig, os.path.join(out, "fig_bound"))
 
 
@@ -1553,7 +1574,7 @@ def fig_realgeo(out):
     fig = plt.figure(figsize=(FULL_W, FULL_W * 0.40))
     # wspace wide enough that panel (b)'s y-axis label clears the colourbar
     # of panel (a); at 0.30 the two printed on top of each other.
-    gs = fig.add_gridspec(1, 3, width_ratios=[1.55, 1.0, 1.0], wspace=0.45)
+    gs = fig.add_gridspec(1, 3, width_ratios=[1.55, 1.0, 1.0], wspace=0.52)
 
     # ---- (a) the model and where the windows were taken --------------------
     ax = fig.add_subplot(gs[0, 0])
@@ -1567,7 +1588,7 @@ def fig_realgeo(out):
         x0, x1, z0, z1 = wins[k]
         ax.add_patch(Rectangle((x0, 0), x1 - x0, 150, fc=RULER[i], ec="none"))
         ax.axvline(x0, color="w", lw=0.9, ls=["-", "--", ":"][i])
-        ax.text(0.5 * (x0 + x1), 75, ["i", "ii", "iii"][i], color="k",
+        ax.text(0.5 * (x0 + x1), 75, ["I", "II", "III"][i], color="k",
                 ha="center", va="center", fontsize=8, fontweight="bold")
     ax.set_xlabel("horizontal distance (km)")
     ax.set_ylabel("depth (km)")
@@ -1575,12 +1596,17 @@ def fig_realgeo(out):
     ax.set_xticklabels(["0", "2", "4", "6", "8"])
     ax.set_yticks([0, 1000, 2000, 3000])
     ax.set_yticklabels(["0", "1", "2", "3"])
-    panel_label(ax, "a", r"Marmousi, windows i--iii")
+    panel_label(ax, "a", r"Marmousi velocity model, windows I--III")
     # Colourbar OUTSIDE panel (a): an in-panel bar occludes the velocity image,
     # and an axis-label collision with panel (b) was the earlier failure mode.
     cb = fig.colorbar(im, ax=ax, location="right", pad=0.03, shrink=0.85,
                       aspect=20)
-    cb.set_label("$c$ (m/s)", fontsize=8, labelpad=1)
+    # The colourbar label goes ABOVE the bar, not beside it: placed beside, it
+    # shares a column with panel (b)'s y-axis label and the two print as one
+    # string ("c (m/s)relative L2 error").
+    cb.set_label("$c$ (km/s)", fontsize=7.5, labelpad=2)
+    cb.set_ticks([2000, 3500, 5000])
+    cb.set_ticklabels(["2", "3.5", "5"])
     cb.set_ticks([2000, 3500, 5000])
     cb.ax.tick_params(labelsize=6.8, length=1.6)
     cb.outline.set_linewidth(0.5)
@@ -1592,9 +1618,9 @@ def fig_realgeo(out):
     ax = fig.add_subplot(gs[0, 1])
     for fam, names, col, ls, lab in (
             ("real", [g for g in d["order"] if g.startswith("geo_")],
-             VERMILION, "-", "real geology"),
+             VERMILION, "-", "Marmousi velocity model"),
             ("syn", [g for g in d["order"] if g.startswith("syn_")],
-             BLUE, "--", "synthetic")):
+             BLUE, "--", "Synthetic Gaussian media")):
         # Collapse the three windows of each family to a mean curve with a
         # min--max band over windows (and their seed spans).  This reduces the
         # six raw curves to the two families the labels name.
@@ -1648,7 +1674,7 @@ def fig_realgeo(out):
             ax.plot(Md, y, ls, color=col, lw=1.3, clip_on=False, zorder=2)
         y_end = float(np.mean([d["bands"][g][str(Md[-1])] for g in names]))
         ends.append((min(max(y_end, 2e-14), 0.5),
-                     "real geology" if fam == "real" else "synthetic", col))
+                     "Marmousi" if fam == "real" else "synthetic", col))
     ax.set_yscale("log")
     # The synthetic control's energy falls to ~1e-13 by mode 24 (it is
     # band-limited by construction) and the real windows stop at ~3e-3; a
@@ -1659,8 +1685,8 @@ def fig_realgeo(out):
     decades(ax, numticks=5)
     require_inside(ax)
     ax.set_xlabel("mode index $M$")
-    ax.set_ylabel("field energy outside $M$")
-    panel_label(ax, "c", "contrast field")
+    ax.set_ylabel(r"out-of-band energy fraction")
+    panel_label(ax, "c", "input contrast field")
     ax.set_xticks([4, 8, 12, 16, 20, 24])
     despine(ax)
     end_labels(ax, ends, fs=7.2)

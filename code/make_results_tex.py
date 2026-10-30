@@ -339,6 +339,26 @@ def fmt(x, n=3):
     return ("%%.%df" % n) % x if np.isfinite(x) else "--"
 
 
+def fmt_tiny(x, n=3):
+    """Like fmt, but a small non-zero value never prints as a row of zeros.
+
+    A paired effect of 2e-4 is not zero, and a table that prints it as `0.000`
+    tells the reader two different things at once: that the effect was exactly
+    nil, and that the authors did not look.  Below half a unit in the last
+    printed place the value switches to scientific notation; an exact zero
+    stays `0`, which is a claim the data can actually support.
+    """
+    if not np.isfinite(x):
+        return "--"
+    if x == 0:
+        return "0"
+    if abs(x) < 0.5 * 10.0 ** (-n):
+        s = "%.1e" % x
+        mant, exp = s.split("e")
+        return "$%s\\times10^{%d}$" % (mant, int(exp))
+    return ("%%.%df" % n) % x
+
+
 def fmt_p(p):
     """Exact p to three decimals above 0.001, scientific notation below.
 
@@ -2039,7 +2059,7 @@ def macros(ev, arms, res):
         # main contrast sweep uses
         cor20 = np.array([r["u_out_rel"]["20"] for r in rows25], float)
         L.append("\\newcommand{\\CorrFracInTwenty}{%s}"
-                 % fmt(float(cor20[inb].max())))
+                 % fmt_tiny(float(cor20[inb].max())))
         L.append("\\newcommand{\\CorrFracOutTwenty}{%s}" % fmt(float(cor20[-1])))
         _pb = runs_for(ev, "mode_m08_")
         if _pb:
@@ -3281,7 +3301,7 @@ def deep_macros():
     m["DAPlatSel"] = fmt(arm(v025)["plateau_sel"])
     m["DAInSel"] = fmt(arm(v025)["in_band_sel"])
     m["DAPlatMTwo"] = fmt(arm(v025)["plateau_m2"])
-    m["DAPlatWeak"] = fmt(arm(0.05)["plateau_sel"])
+    m["DAPlatWeak"] = fmt_tiny(arm(0.05)["plateau_sel"])
     m["DAPlatStrong"] = fmt(arm(v100)["plateau_sel"])
 
     ref = arm_curves(ev, v025) if ev else None
@@ -4231,7 +4251,7 @@ def res_macros():
                 m["GeoSur%s%s%s" % (pre, side, tag)] = sgn + ("%.3f" % abs(val))
             if pre == "Plat":
                 lo, hi = sorted([abs(v["ci"][0]), abs(v["ci"][1])])
-                m["GeoSurPlatLo%s" % tag] = "%.3f" % lo
+                m["GeoSurPlatLo%s" % tag] = fmt_tiny(lo)
                 m["GeoSurPlatHi%s" % tag] = "%.3f" % hi
             m["GeoSur%sP%s" % (pre, tag)] = fmt_p(v["p"])
             m["GeoSur%sDevPct%s" % (pre, tag)] = "%.1f" % (
@@ -4557,7 +4577,14 @@ def main():
                 # a table only one language has (the SI is English-only)
                 continue
             p = os.path.join(d, "gen_tab_%s.tex" % label)
-            open(p, "w", encoding="utf-8").write(hdr + tabs[label])
+            # A cell that reads 0.000 says the effect was exactly nil, which a
+            # three-decimal display cannot support.  Cells are rewritten to the
+            # bound they actually establish; a value that really is zero is
+            # still true under "< 0.001".
+            body = re.sub(r"\$\+?0\.000\$", r"$<0.001$", tabs[label])
+            body = re.sub(r"(?<=[&\s])(\+?0\.000)(?=[\s&\\\\])",
+                          r"$<0.001$", body)
+            open(p, "w", encoding="utf-8").write(hdr + body)
             print("wrote", p)
         # the concatenated file is no longer input by main.tex; drop it so a
         # stale copy cannot be compiled by accident
