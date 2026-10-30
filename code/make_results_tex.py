@@ -60,9 +60,10 @@ CAP = { "en": dict(
         "unity mean the series is worse than predicting zero."),
   realgeo=("Third level: the Marmousi windows against the synthetic control. "
            "Columns are $\\varepsilon_{\\mathrm{in}}$, $\\varepsilon_{\\infty}$ "
-           "and $r$ of Table~\\ref{tab:summary}; both groups are means over the "
+           "and $r$ of the main-text summary table; both groups are means over the "
            "same \\RealWinN{} windows rather than the \\MainNMedia{} paired "
-           "media of Table~\\ref{tab:main}, and differ only in geometry."),
+           "media of the main-text per-frequency table, and differ only in "
+           "geometry."),
   paired=("Paired tests on the per-sample errors. $n$: entries averaged; "
           "$\\Delta=\\bar e_{A}-\\bar e_{B}$: mean paired difference, negative "
           "when $A$ is the more accurate, 95\\% interval resampling media; $p$: "
@@ -111,10 +112,10 @@ CAP = { "en": dict(
        "$f^{\\star}$, jump and errors only."),
   res_note=("$\\varepsilon_{\\infty}$ averages $f>5$ in (a), (b), as in "
             "Table~\\ref{tab:main}, and $f\\ge5$ in (c), (d), as in "
-            "Supplementary Table~\\siTab{tab:si_realgeo}."),
+            "Supplementary Table~\\siTab{tab:realgeo}."),
   banddown=("Below-band FNO behaviour per contrast arm: mean relative "
             "$L_2$ error over \\NumSeeds\\ seeds at the left band edge and "
-            "below, against the in-band floor (Table~\\ref{tab:summary}) and "
+            "below, against the in-band floor of the main-text summary table and "
             "the trivial baseline at $f=0.5$; the last column is the ratio."),
   data=("Training-set-size ladder at the reference budget ($M=20$, "
         "$v_{\\max}=0.25$, $f\\in[1,4]$), \\NDataRunsPerRung\\ seeds per rung. "
@@ -138,7 +139,7 @@ CAP = { "en": dict(
     jump_unet_pmatch_a025="U-Net (matched) $f=5$ $-$ $f=4$",
     jump_don_a025="DeepONet $f=5$ $-$ $f=4$",
   ),
-  realgeo_h=("real geology", "synthetic"),
+  realgeo_h=("Marmousi model", "synthetic control"),
   h_lab=("train band", "model", "order", "params (M)"),
   cost=("Per-sample cost on the $64\\times64$ problem, one GPU, batch 32. The "
         "solver row carries its own timings. Speed-up is quoted at both ends of "
@@ -236,7 +237,7 @@ CAP = { "en": dict(
     jump_unet_pmatch_a025="U-Net（匹配）$f=5$ $-$ $f=4$",
     jump_don_a025="DeepONet $f=5$ $-$ $f=4$",
   ),
-  realgeo_h=("真实地质", "合成对照"),
+  realgeo_h=("Marmousi 模型", "合成对照"),
   h_lab=("训练频带", "模型", "阶数", "参数量 (M)"),
   cost=("$64\\times64$ 问题上的单样本开销（同一 GPU，批大小 32）。"
         "求解器行给出其自身的耗时，训练列为每轮秒数；加速比在测试频段两端"
@@ -932,7 +933,7 @@ def table_si_paired(cap):
         return ""
     d = json.load(open(p, encoding="utf-8"))
     lab = cap["paired_lab"]
-    t = ("\\begin{table}[t]\n\\centering\n\\caption{%s}\n\\label{tab:si_paired}\n"
+    t = ("\\begin{table}[t]\n\\centering\n\\caption{%s}\n\\label{tab:paired}\n"
          "\\small\n\\setlength{\\tabcolsep}{3.6pt}\n"
          "\\begin{tabular}{lrrrrrr}\n\\toprule\n"
          " & $n$ & $\\bar e_{A}$ & $\\bar e_{B}$ & $\\Delta$ (95\\%% CI) & $p$ "

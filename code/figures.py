@@ -418,6 +418,17 @@ def fig_main(evals, out):
             i_out = int(beyond[0])
             ax.plot([F[i_out]], [M[i_out]], marker="o", ms=9.0, mfc="none",
                     mec=VERMILION, mew=1.1, clip_on=False, zorder=4)
+            # One local mark for the step itself, on the first panel only: an
+            # arrow from the last in-band node to the first node past the edge,
+            # i.e. from the level the operator holds to the level it falls to.
+            # No numeral is printed here.  The step is quoted as a range over
+            # the five arms and lives in the macro \\CliffLo--\\CliffHi; a
+            # figure-local factor would be a second, ungated number for the
+            # same quantity.
+            if k == 0 and i_out > 0:
+                ratio_arrow(ax, float(F[i_out]) + 0.55,
+                            float(M[i_out]), float(M[i_out - 1]), "step",
+                            fs=7.2, color=VERMILION)
         ax.set_yscale("log")
         ax.set_ylim(0.008, 4.5)
         decades(ax, numticks=3)

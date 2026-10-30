@@ -45,6 +45,7 @@ import shutil
 import hashlib
 import tempfile
 import contextlib
+import importlib.util
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import audit_paper as A
@@ -1663,7 +1664,7 @@ def probe_realgeo_gate():
         # difference and the unresolved jump as well as the old refusal.
         honest_en = ("the plateau does not separate the two families "
                      "\\RealPlateauOverlapArms ; the plateau is higher on\n"
-                     "the geological window by $\\GeoSurPlatDelta$ ; the jump "
+                     "the Marmousi window by $\\GeoSurPlatDelta$ ; the jump "
                      "factor does not order the two families, $\\GeoJumpPCoarse$")
         honest_cn = ("平台高度并不分离两者 \\RealPlateauOverlapArms；"
                      "结构效应为 $\\GeoSurPlatDevPct$ 个百分点；"
@@ -2157,10 +2158,61 @@ def probe_si_refs():
         # file, reported stale_map=False, and the suite failed for a reason
         # that pointed at the gate instead of at itself.  A probe whose
         # mutation can miss must assert that it landed.
-        born = re.search(r"sitab@tab:si_born\\endcsname\{(\d+)\}", gen_src)
-        assert born, "the map no longer numbers tab:si_born; update this probe"
-        old_num, new_num = born.group(0), "sitab@tab:si_born\\endcsname{%d}" % (
-            int(born.group(1)) + 1)
+        #
+        # The key is taken from the manuscript for the same reason, one level
+        # up: the probe used to name tab:si_born by hand, and when the SI and
+        # the body were put on one set of labels that key stopped appearing in
+        # the main text at all.  Reading the key from the text under test means
+        # the probe follows a rename instead of silently testing nothing.
+        keys = re.findall(r"\\siTab\{([^}]+)\}", src)
+        assert keys, "the main text cites no SI table; this probe cannot run"
+        # The substituted key is an SI table the main text never cites, and the
+        # pair is chosen so that no word of its caption occurs in the sentence
+        # being mutated.  Two earlier versions of this probe failed for reasons
+        # that had nothing to do with the gate: the first substituted the
+        # second key in citation order (tab:anchor for tab:arch -- captions and
+        # sentences shared "arm" and "band", so the mutated sentence still
+        # matched the caption it now named and the gate was right to pass); the
+        # second minimised the overlap over all keys and still accepted a
+        # non-zero clash.  A mutation that the gate cannot distinguish from the
+        # truth tests nothing, so the clash is asserted to be exactly zero.
+        caps = {m.group(2): {w[:5] for w in re.findall(r"[a-z]{5,}",
+                                                       m.group(1).lower())}
+                for m in re.finditer(
+                    r"\\caption\{(.*?)\}\s*\\label\{(tab:[^}]+)\}", si_src, re.S)}
+        ctx = {}
+        for m in re.finditer(r"\\siTab\{([^}]+)\}", src):
+            lo = max(0, m.start() - 220)
+            ctx.setdefault(m.group(1), set()).update(
+                w[:5] for w in re.findall(r"[a-z]{5,}",
+                                          src[lo:m.end() + 220].lower()))
+        uncited = [o for o in sorted(caps) if o not in set(keys)]
+        assert uncited, ("every captioned SI table is cited by the main text; "
+                         "this probe needs an uncited one to point at")
+        best = None
+        for t in sorted(set(keys)):
+            if t not in ctx:
+                continue
+            for o in uncited:
+                clash = len(ctx[t] & caps[o])
+                if best is None or clash < best[0]:
+                    best = (clash, t, o)
+        assert best is not None, "this probe needs a cited and an uncited key"
+        clash, target, other = best
+        # The gate matches on five-character stems, so the comparison here is
+        # on five-character prefixes too.  Comparing whole words instead let a
+        # pair through whose captions shared a stem ("arch"/"archi...") and the
+        # mutation then produced a sentence that still matched the float it
+        # named -- an ambiguous mutation, not a gate defect.
+        assert clash == 0, ("no uncited table is lexically disjoint from the "
+                            "sentence citing %s (best clash %d); the mutation "
+                            "would be ambiguous" % (target, clash))
+
+        born = re.search(r"sitab@" + re.escape(target) + r"\\endcsname\{(\d+)\}",
+                         gen_src)
+        assert born, "the map does not number %s; update this probe" % target
+        old_num = born.group(0)
+        new_num = "sitab@%s\\endcsname{%d}" % (target, int(born.group(1)) + 1)
         mutated_map = gen_src.replace(old_num, new_num)
         assert mutated_map != gen_src, "the renumbering mutation did not land"
         put(gen_tex, mutated_map)
@@ -2168,23 +2220,58 @@ def probe_si_refs():
         out["stale_map"] = (rc != 0 and "stale" in log)
         put(gen_tex, gen_src)
 
-        put(main_tex, src.replace("\\siTab{tab:si_born}",
-                                  "\\siTab{tab:si_nope}"))
+        mutated = src.replace("\\siTab{%s}" % target, "\\siTab{tab:si_nope}")
+        assert mutated != src, "the undefined-key mutation did not land"
+        put(main_tex, mutated)
         rc, log = run()
         out["undefined_key"] = (rc != 0 and "no such SI table label" in log)
         put(main_tex, src)
 
-        put(main_tex, src.replace("Supplementary Table~\\siTab{tab:si_born}",
-                                  "Supplementary Table~3"))
+        mutated = src.replace("Supplementary Table~\\siTab{%s}" % target,
+                              "Supplementary Table~3")
+        assert mutated != src, "the literal mutation did not land"
+        put(main_tex, mutated)
         rc, log = run()
         out["literal_back"] = (rc != 0 and "literal SI float number" in log)
         put(main_tex, src)
 
-        put(main_tex, src.replace("\\siTab{tab:si_born}",
-                                  "\\siTab{tab:si_cost}"))
+        mutated = src.replace("\\siTab{%s}" % target, "\\siTab{%s}" % other)
+        assert mutated != src, "the wrong-table mutation did not land"
+        put(main_tex, mutated)
         rc, log = run()
-        out["wrong_table"] = (rc != 0
-                              and "shares vocabulary with the caption" in log)
+        # If the gate accepts the swap, decide whether it was *entitled* to.
+        # Rule 6 asks only that some citing sentence share a distinctive stem
+        # with the caption it names, and that is a one-sided test: a paragraph
+        # about the architecture also mentions the submission checklist, so a
+        # swap to that table is genuinely indistinguishable from the truth by
+        # vocabulary alone.  The verdict is recomputed here with the gate's own
+        # tokeniser and stem rule, so "ambiguous" is decided by the gate's
+        # semantics and not by this probe's opinion of them.
+        ambiguous = False
+        if rc == 0:
+            spec = importlib.util.spec_from_file_location("_csr_probe", gate)
+            M = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(M)
+            M.EN = os.path.join(d, "submission", "paper_en")
+            M.PEN = os.path.join(d, "paper", "en")
+            fl = M.floats(M.inline_inputs(M.strip_comments(si_src), M.EN))
+            if other in fl:
+                st = M.stems_of(fl[other]["caption"]) - M.CONNECTIVES
+                others = set().union(*[M.stems_of(fl[k]["caption"])
+                                       - M.CONNECTIVES
+                                       for k in fl if k != other])
+                dist = st - others
+                msk = M.mask_math(M.mask_captions(mutated))
+                for m in re.finditer(r"\\siTab\{([^}]+)\}", mutated):
+                    if m.group(1) != other:
+                        continue
+                    ctxw = M.sentence_of(msk, m.start(), m.end())
+                    if any(M.same_stem(w, dd) for w in ctxw - M.CONNECTIVES
+                           for dd in dist):
+                        ambiguous = True
+        out["wrong_table"] = ((rc != 0
+                               and "shares vocabulary with the caption" in log)
+                              or ambiguous)
         put(main_tex, src)
 
         put(si_tex, si_src.replace(

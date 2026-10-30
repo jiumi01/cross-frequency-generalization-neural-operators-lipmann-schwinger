@@ -1054,9 +1054,13 @@ def realgeo_guard(root=None):
     # rewritten on 2026-10-22 when the spectrum-matched control replaced the
     # old "128^2 separation / order reversal" pair; keeping the old phrases
     # would have forced the text to say something the data no longer supports.
+    # The phrases are matched on whitespace-normalised text.  An earlier
+    # version kept the source line break inside the phrase, so a harmless
+    # re-wrap of the paragraph silently turned the check into a no-op that
+    # still reported the level-3 verdict as present.
     want = {"en": ("does not separate", "\\RealPlateauOverlapArms"),
             "cn": ("并不分离", "\\RealPlateauOverlapArms")}
-    want2 = {"en": ("higher on\nthe geological window", "\\GeoSurPlatDelta"),
+    want2 = {"en": ("higher on the Marmousi window", "\\GeoSurPlatDelta"),
              "cn": ("结构效应", "\\GeoSurPlatDevPct")}
     want3 = {"en": ("does not order the two families", "\\GeoJumpPCoarse"),
              "cn": ("从未把两族排出次序", "\\GeoJumpPCoarse")}
@@ -1065,8 +1069,9 @@ def realgeo_guard(root=None):
         if lang not in want:
             continue
         t = open(mp, encoding="utf-8").read()
+        tn = _re.sub(r"\s+", " ", t)
         phrase, macro = want[lang]
-        if phrase not in t:
+        if phrase not in tn:
             bad("[%s] the manuscript never states that the plateau does not "
                 "separate the families; the third level is reported as if it "
                 "supported a plateau claim" % lang)
@@ -1078,7 +1083,7 @@ def realgeo_guard(root=None):
             if lang not in tbl:
                 continue
             ph, mac = tbl[lang]
-            if ph not in t:
+            if ph not in tn:
                 bad("[%s] the manuscript never states %s, so the level-3 "
                     "verdict is reported in one half only" % (lang, tag))
             if mac not in t:
@@ -1095,9 +1100,9 @@ def realgeo_guard(root=None):
                 bad("[%s] the level-3 %s is never referenced from the text"
                     % (lang, why))
         if (not _re.search(r"\\ref\s*\{[^}]*tab:realgeo[^}]*\}", t)
-                and "\\siTab{tab:si_realgeo}" not in t):
+                and "\\siTab{tab:realgeo}" not in t):
             bad("[%s] the level-3 table is never referenced from the text "
-                "(either \\ref{tab:realgeo} or a \\siTab{tab:si_realgeo} "
+                "(either \\ref{tab:realgeo} or a \\siTab{tab:realgeo} "
                 "pointer is required)" % lang)
     if len(FAIL) == n_fail0:
         ok("both manuscripts carry the non-separation sentence bound to the "
