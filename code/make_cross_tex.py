@@ -201,7 +201,9 @@ $f$ & $N$ & $\varepsilon$ & $f'$ & $N'$ & $\varepsilon'$ & ratio \\
 \begin{table}[t]
 \centering
 \caption{Every cell of the cross: seed-mean relative $L_2$ error at each of the
-%d frequencies and each mesh. The complete records behind Table~\ref{tab:cross}.}
+%d frequencies and each mesh. The complete records behind the main text's cross
+table, named rather than referenced because the supplement is a separate
+document.}
 \label{tab:si_cross_full}
 \small
 \begin{tabular}{c%s}

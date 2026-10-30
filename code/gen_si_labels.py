@@ -138,7 +138,10 @@ def main():
     root = os.path.abspath(a.root)
     text, tables, figures = build(root)
     unlabeled = [n for n, l in tables + figures if not l]
-    for lang in ("en",):
+    # Both languages cite the supplement through the same macros: the Chinese
+    # manuscript points at the same PDF, so a hand-written "Supplementary
+    # Table 9" there would drift exactly as the English one did.
+    for lang in ("en", "cn"):
         out = os.path.join(root, "paper", lang, "gen_si_refs.tex")
         if not os.path.isdir(os.path.dirname(out)):
             continue

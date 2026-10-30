@@ -70,25 +70,31 @@ def main():
     # what happened on the first attempt after the tree-slot fix.  Match on the
     # tree instead: an API-published head is a rewrite of a local commit that
     # has the same tree, and that commit is the correct diff base.
-    base, base_note = head, ""
-    if subprocess.run(["git", "cat-file", "-e", head + "^{commit}"],
-                      cwd=ROOT, capture_output=True).returncode != 0:
-        base, base_note = None, ""
-        for c in sh("git", "rev-list", "--all", "-n", "500").split():
-            if sh("git", "rev-parse", c + "^{tree}").strip() == head_tree:
-                base = c
-                break
-        if base is None:
-            raise SystemExit("remote head %s is neither local nor a rewrite of a "
-                             "local commit (no commit has tree %s); refusing"
-                             % (head[:7], head_tree[:7]))
-        print("remote head %s is an API rewrite of local %s (same tree)"
-              % (head[:7], base[:7]))
+    #
+    # The test is "does some local commit have the remote head's tree", not
+    # "is the remote head absent from the object store".  Those two differ the
+    # moment anyone runs `git fetch`: the published head then *is* local, the
+    # old branch of this check ran `merge-base --is-ancestor`, and it refused to
+    # publish a tree the remote already had -- a self-inflicted deadlock that
+    # only looked like a repository problem.  A fetched head is still a rewrite;
+    # ask about trees, which fetch cannot change.
+    base, base_note = None, ""
+    for c in sh("git", "rev-list", "--all", "-n", "500").split():
+        if sh("git", "rev-parse", c + "^{tree}").strip() == head_tree:
+            base = c
+            break
+    if base is not None:
+        if base != head:
+            print("remote head %s is an API rewrite of local %s (same tree)"
+                  % (head[:7], base[:7]))
     else:
+        # No local commit has this tree, so the remote head is a genuine
+        # ancestor (a plain push) or unrelated history.
         rc = subprocess.run(["git", "merge-base", "--is-ancestor", head, local],
                             cwd=ROOT).returncode
         if rc != 0:
             raise SystemExit("remote head is not an ancestor of local HEAD; refusing")
+        base = head
 
     diff = sh("git", "diff", "--name-status", "%s..%s" % (base, local)).strip().splitlines()
     changes = []

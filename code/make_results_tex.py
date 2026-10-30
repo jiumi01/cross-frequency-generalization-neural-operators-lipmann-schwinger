@@ -179,8 +179,8 @@ CAP = { "en": dict(
         "直接预测零更差。"),
   realgeo=("第三级：Marmousi 窗口与合成对照。列为表 \\ref{tab:summary} 的 "
            "$\\varepsilon_{\\mathrm{in}}$、$\\varepsilon_{\\infty}$ 与 $r$；"
-           "两组均为同一批 \\RealWinN{} 个窗口上的均值，而非表 "
-           "\\ref{tab:main} 的 \\MainNMedia{} 个配对介质，且两组只差几何。"),
+           "两组均为同一批 \\RealWinN{} 个窗口上的均值，而非逐频率全表的 "
+           "\\MainNMedia{} 个配对介质，且两组只差几何。"),
   paired=("配对检验。$A$、$B$ 为首列两配置；$n$ 为条目数（介质 $\\times$ 种子 "
           "$\\times$ 频点）；$\\Delta$ 为平均配对差值，95\\% 区间对\\emph{介质}重抽样；"
           "$p$ 为双侧符号翻转置换检验（保留一位有效数字）；星号表示区间不含 0。"),
@@ -3466,7 +3466,10 @@ def table_deep(cap):
                  fmt(a["plateau_sel"]),
                  ratio_to_fno(a["plateau_sel"], ref)))
         ib2 = a["in_band"].get("2") if isinstance(a["in_band"], dict) else None
-        t += (" & analytic head, $M=2$ (Table~\\ref{tab:anchor}) & $2$ & "
+        # No \ref here: the depth table now lives in the supplement, which is a
+        # separate document and cannot resolve the anchor table's label.  The
+        # row still says which arm it is -- the shallow head the main text fits.
+        t += (" & analytic head, $M=2$ & $2$ & "
               "$%s$ & $%s$ & $%s$ \\\\\n"
               % (fmt(ib2) if ib2 is not None else "n/a",
                  fmt(a["plateau_m2"]),
