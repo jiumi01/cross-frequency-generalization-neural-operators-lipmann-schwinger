@@ -2752,7 +2752,8 @@ def paired_macros():
         L.append("\\newcommand{\\%sCILo}{%s}" % (mac, fmt(c["lo"])))
         L.append("\\newcommand{\\%sCIHi}{%s}"
                  % (mac, ("+" if c["hi"] >= 0 else "") + fmt(c["hi"])))
-        L.append("\\newcommand{\\%sP}{%s}" % (mac, fmt(c["p"])))
+        # fmt_p, not fmt: a p of 4e-7 formatted to two decimals prints 0.00
+        L.append("\\newcommand{\\%sP}{%s}" % (mac, fmt_p(c["p"])))
     for mac, label in sorted(PAIRED_SIGNED_ROWS.items()):
         c = by.get(label)
         L.append("\\newcommand{\\%s}{%s}"
@@ -4183,12 +4184,12 @@ def res_macros():
     jp = ga.get("jump")
     if jp:
         m["ResJumpPairedT"] = "%.2f" % jp["t"]
-        m["ResJumpPairedP"] = "%.3f" % jp["p"]
+        m["ResJumpPairedP"] = fmt_p(jp["p"])
         m["ResJumpPairedLo"] = "%+.2f" % jp["ci"][0]
         m["ResJumpPairedHi"] = "%+.2f" % jp["ci"][1]
     pp = ga.get("plateau5")
     if pp:
-        m["ResPlatPairedP"] = "%.2f" % pp["p"]
+        m["ResPlatPairedP"] = fmt_p(pp["p"])
 
     # window-level spread of the Marmousi jump, which is the quantity that
     # explains why three windows cannot order two families
@@ -4198,7 +4199,7 @@ def res_macros():
         if not rec:
             continue
         m["GeoJumpDiff%s" % tag] = "%.3f" % abs(rec["diff"])
-        m["GeoJumpP%s" % tag] = "%.3f" % rec["p"]
+        m["GeoJumpP%s" % tag] = fmt_p(rec["p"])
         m["GeoJumpCILo%s" % tag] = "%+.3f" % rec["ci"][0]
         m["GeoJumpCIHi%s" % tag] = "%+.3f" % rec["ci"][1]
         rv = np.asarray(rec.get("real") or [], float)
@@ -4232,7 +4233,7 @@ def res_macros():
                 lo, hi = sorted([abs(v["ci"][0]), abs(v["ci"][1])])
                 m["GeoSurPlatLo%s" % tag] = "%.3f" % lo
                 m["GeoSurPlatHi%s" % tag] = "%.3f" % hi
-            m["GeoSur%sP%s" % (pre, tag)] = "%.3f" % v["p"]
+            m["GeoSur%sP%s" % (pre, tag)] = fmt_p(v["p"])
             m["GeoSur%sDevPct%s" % (pre, tag)] = "%.1f" % (
                 100.0 * abs(v["diff"]) / max(abs(v["a"]), 1e-30))
         m["GeoSurWinN"] = str(s.get("n_windows"))
@@ -4242,7 +4243,7 @@ def res_macros():
             m["GeoSurBandMedPct%s" % tag] = "%.1f" % (100.0 * s["band_match_med_dev"])
         no = s.get("jump_nonoverlap")
         if no:
-            m["GeoSurJumpNonOverP%s" % tag] = "%.2f" % no["p"]
+            m["GeoSurJumpNonOverP%s" % tag] = fmt_p(no["p"])
 
     bc = _load_results("bound_cross.json") or {}
     if bc.get("n"):
@@ -4453,7 +4454,7 @@ def bax_macros():
             for what, pre in (("in_band", "In"), ("plateau", "Plat")):
                 s = t.get(what)
                 if s:
-                    m["BaxVsMain%sP%s" % (pre, vk)] = "%.3f" % s["p"]
+                    m["BaxVsMain%sP%s" % (pre, vk)] = fmt_p(s["p"])
                     m["BaxVsMain%sLo%s" % (pre, vk)] = "%+.3g" % s["ci"][0]
                     m["BaxVsMain%sHi%s" % (pre, vk)] = "%+.3g" % s["ci"][1]
     for k in keys:
@@ -4532,6 +4533,18 @@ def main():
         mac, tabs = build(lang)
         if tabs is None:
             continue
+        # No macro whose name ends in P may read as a bare zero.  Every one of
+        # them is a p-value, and `p = 0.000` reports the formatter, not the
+        # test.  Seven of them used to be built with "%.3f"/"%.2f" directly
+        # instead of fmt_p(), so a p of 4e-7 reached the PDF as 0.000 while the
+        # manuscript's own front matter promised the opposite.  The assertion
+        # is on the emitted text, not on the code path, so a future site that
+        # formats a p by hand is caught the same way.
+        bad = re.findall(r"\\newcommand\{\\(\w*P)\}\{([+-]?0(?:\.0+)?)\}",
+                         mac)
+        if bad:
+            raise SystemExit("p-value macro(s) printed as a bare zero: %s -- "
+                             "format p with fmt_p()" % (bad,))
         d = os.path.join(C.ROOT, "paper", folder)
         os.makedirs(d, exist_ok=True)
         open(os.path.join(d, "gen_macros.tex"), "w",
