@@ -2150,9 +2150,20 @@ def probe_si_refs():
         rc, log = run()
         out["clean"] = (rc == 0)
 
-        put(gen_tex, gen_src.replace(
-            "sitab@tab:si_born\\endcsname{3}",
-            "sitab@tab:si_born\\endcsname{4}"))
+        # The number this probe renumbers is read off the map, not written
+        # into the probe.  The hard-coded "{3}" survived two restructures and
+        # then stopped matching when the supplement was renumbered: str.replace
+        # is silent on a miss, so the probe ran the gate against an unmodified
+        # file, reported stale_map=False, and the suite failed for a reason
+        # that pointed at the gate instead of at itself.  A probe whose
+        # mutation can miss must assert that it landed.
+        born = re.search(r"sitab@tab:si_born\\endcsname\{(\d+)\}", gen_src)
+        assert born, "the map no longer numbers tab:si_born; update this probe"
+        old_num, new_num = born.group(0), "sitab@tab:si_born\\endcsname{%d}" % (
+            int(born.group(1)) + 1)
+        mutated_map = gen_src.replace(old_num, new_num)
+        assert mutated_map != gen_src, "the renumbering mutation did not land"
+        put(gen_tex, mutated_map)
         rc, log = run()
         out["stale_map"] = (rc != 0 and "stale" in log)
         put(gen_tex, gen_src)
