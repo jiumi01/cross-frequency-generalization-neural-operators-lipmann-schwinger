@@ -326,7 +326,7 @@ def stage_audit():
     # than discarded: an audit that failed silently would let a pipeline report
     # success on numbers that no longer match the text.
     gates = ["audit_paper", "check_claims", "lint_style", "check_math_macros",
-             "check_math_delims"]
+             "check_math_delims", "check_prose"]
     failed = []
     for g in gates:
         p = run([PY, os.path.join(HERE, g + ".py")], check=False)

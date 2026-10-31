@@ -410,24 +410,30 @@ def fig_main(evals, out):
         ax.plot(F, b1, color=INK, lw=1.1, ls=(0, (4, 2)), clip_on=False,
                 zorder=2)
         band(ax)
-        # Mark the first node past the band edge.  The edge rule says where
-        # the band stops; the ring says where the error has already left, and
-        # the two are one node apart on the coarsest contrast.
+        # The open ring means one thing across every figure in the paper: the
+        # grid node at THIS curve's training-band edge.  The band-width figure
+        # rings five different edges, the cross-contrast figure rings the
+        # matched contrast's edge and the depth figure rings the residual's;
+        # this panel used to ring the node one step PAST the edge instead,
+        # which made the same glyph mean "edge" in three figures and "first
+        # node past the edge" in the fourth.  The step itself is the arrow in
+        # panel (a), and the arrow starts on the ring, so nothing is lost.
+        k4 = int(np.argmin(np.abs(np.asarray(F, float) - 4.0)))
+        ax.plot([F[k4]], [M[k4]], marker="o", ms=9.0, mfc="none",
+                mec=BLUE, mew=1.1, clip_on=False, zorder=4)
         beyond = np.where(np.asarray(F, float) > 4.0 + 1e-9)[0]
         if len(beyond):
             i_out = int(beyond[0])
-            ax.plot([F[i_out]], [M[i_out]], marker="o", ms=9.0, mfc="none",
-                    mec=VERMILION, mew=1.1, clip_on=False, zorder=4)
             # One local mark for the step itself, on the first panel only: an
-            # arrow from the last in-band node to the first node past the edge,
-            # i.e. from the level the operator holds to the level it falls to.
+            # arrow from the edge node to the first node past it, i.e. from the
+            # level the operator holds to the level it falls to.
             # No numeral is printed here.  The step is quoted as a range over
             # the five arms and lives in the macro \\CliffLo--\\CliffHi; a
             # figure-local factor would be a second, ungated number for the
             # same quantity.
-            if k == 0 and i_out > 0:
+            if k == 0 and i_out > k4:
                 ratio_arrow(ax, float(F[i_out]) + 0.55,
-                            float(M[i_out]), float(M[i_out - 1]), "step",
+                            float(M[i_out]), float(M[k4]), "step",
                             fs=7.2, color=VERMILION)
         ax.set_yscale("log")
         ax.set_ylim(0.008, 4.5)
@@ -1449,10 +1455,14 @@ def fig_deep(out):
                 clip_on=False, zorder=3, label=lab)
         msel = sel["arms"][vk]["M_sel"]
         if msel in ms:
-            ax.plot([msel], [ps_[ms.index(msel)]], color=col, marker="o",
-                    markersize=7, mfc="none", mew=1.2, clip_on=False, zorder=4)
+            # Open SQUARE, not the open ring: the ring is the band-edge glyph
+            # in every frequency panel, and M_sel is a hyper-parameter on a
+            # panel whose abscissa is not frequency at all.  Reusing the ring
+            # here is what made the same symbol mean two things in one figure.
+            ax.plot([msel], [ps_[ms.index(msel)]], color=col, marker="s",
+                    markersize=6.4, mfc="none", mew=1.2, clip_on=False, zorder=4)
         ends_a.append((float(ps_[-1]), lab, col))
-    ax.plot([], [], color="#444444", marker="o", markersize=7, mfc="none",
+    ax.plot([], [], color="#444444", marker="s", markersize=6.4, mfc="none",
             mew=1.2, ls="none", label="$M_{\\mathrm{sel}}$, chosen in band")
     ax.set_yscale("log")
     # Under two decades: round ticks, not the default mantissa ladder that
