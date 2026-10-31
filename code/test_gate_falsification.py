@@ -809,6 +809,16 @@ def main():
     else:
         print("PROBE 27: MISBEHAVED %s" % dt)
 
+    print("-- probe 29 (float placement and its two-column exemption) --")
+    fp = probe_float_place()
+    if all(fp.values()):
+        print("PROBE 29: a one-page gap stays quiet for both classes, a "
+              "two-page gap stays quiet only for a two-column float, three "
+              "pages and an uncited float fire for both, and the class is read "
+              "off the source rather than defaulted")
+    else:
+        print("PROBE 29: MISBEHAVED %s" % fp)
+
     good = (caught and ignored and named and duped and good3 and bad3 and fin3
             and good4 and bad4t and bad4c and all(sty.values())
             and fresh_stale and fresh_ok
@@ -834,6 +844,7 @@ def main():
             and all(sr.values())
             and all(sc.values())
             and all(dt.values())
+            and all(fp.values())
             and all(pr.values()))
     after = _tree_fingerprint()
     touched = sorted(k for k, v in after.items() if before.get(k) != v)
@@ -2482,7 +2493,15 @@ def probe_prose():
             "doubled": lambda s: s.replace(
                 r"\end{document}", "The the operator converges.\n"
                 r"\end{document}", 1),
-            "untied": lambda s: s.replace("Section~\\ref", "Section \\ref", 1),
+            # Inserted, not substituted: the manuscript no longer carries any
+            # "Section~\\ref" for a replace() to hit, so a substitution-based
+            # mutation silently became a no-op and the probe reported the gate
+            # as blind when the gate was fine.  A probe that depends on the
+            # text it guards drifts with that text.
+            "untied": lambda s: s.replace(
+                r"\end{document}",
+                "As shown in Section \\ref{sec:form} and in Section \\ref"
+                "{sec:protocol}.\n" r"\end{document}", 1),
             "pair": lambda s: s.replace(
                 r"\end{document}", "This dataset differs from that data set.\n"
                 r"\end{document}", 1),
@@ -2502,6 +2521,48 @@ def probe_prose():
             out[name] = (rc != 0 and want[name] in log)
     finally:
         shutil.rmtree(d, ignore_errors=True)
+    return out
+
+
+def probe_float_place():
+    """probe 29: the float-placement rule and its one exemption.
+
+    The gate allows a float to be printed one page after it is first cited, and
+    two if it is a two-column float, because a ``figure*``/``table*`` takes the
+    whole top block of a page and two of them cannot share it.  An exemption is
+    exactly the kind of rule that quietly stops guarding anything, so the probe
+    checks four directions: a two-page gap is quiet for a two-column float and
+    fires for a single-column one, a three-page gap fires for both, and a float
+    that is never cited fires whatever its class.  The class itself must come
+    from the source: the probe asserts that the real manuscript classifies a
+    known ``figure*`` as two-column and a known single-column figure and table
+    as single-column, so a parser that returned one class for everything would
+    fail here rather than grant the exemption to the whole document.
+    """
+    import check_float_place as F
+    fig = lambda n: ("Figure", n)
+    single = {fig(1): "single"}
+    dbl = {fig(1): "dbl"}
+    out = {}
+    # cited one page before it is printed: quiet for both classes
+    out["single_ok"] = F.judge({fig(1): 11}, {fig(1): 10}, single) == []
+    out["dbl_ok"] = F.judge({fig(1): 11}, {fig(1): 10}, dbl) == []
+    # two pages: quiet for a two-column float, a failure for a single-column one
+    out["dbl_two"] = F.judge({fig(1): 12}, {fig(1): 10}, dbl) == []
+    out["single_two_fires"] = len(F.judge({fig(1): 12}, {fig(1): 10},
+                                          single)) == 1
+    # three pages is beyond both classes
+    out["single_three_fires"] = len(F.judge({fig(1): 13}, {fig(1): 10},
+                                            single)) == 1
+    out["dbl_three_fires"] = len(F.judge({fig(1): 13}, {fig(1): 10},
+                                         dbl)) == 1
+    # an uncited float is a problem whatever its class
+    out["uncited_fires"] = len(F.judge({("Table", 9): 5}, {}, {})) == 1
+    # the class is read off the source, not defaulted
+    en = F.float_classes("en")
+    out["parser"] = (en.get(("Figure", 1)) == "dbl"
+                     and en.get(("Figure", 3)) == "single"
+                     and en.get(("Table", 3)) == "single")
     return out
 
 

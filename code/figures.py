@@ -50,7 +50,8 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle, Patch
 from matplotlib.lines import Line2D
 from matplotlib.legend_handler import HandlerTuple
-from matplotlib.ticker import LogLocator, NullFormatter, FixedLocator
+from matplotlib.ticker import (LogLocator, NullFormatter, FixedLocator,
+                                NullLocator)
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import common as C
@@ -180,6 +181,41 @@ def data_inside_axes(fig, tol=1.0):
     return bad
 
 
+def text_outside_canvas(fig):
+    """Text that overflows the canvas horizontally.
+
+    Deliberately narrow.  ``bbox_inches="tight"`` grows the written box to
+    cover the artists it collects, so most overhang is harmless; the case
+    that does damage is a label whose anchor lies beyond the right edge, which
+    is printed clipped at the page margin.  The vertical direction is not
+    checked because panel labels are sunk below the axes on purpose and sit at
+    negative canvas coordinates by design: a check that fired on them would
+    fire on every figure and would be switched off within a day, which is
+    worse than no check.
+    """
+    fig.canvas.draw()
+    W = fig.bbox.x1
+    tol = 2.0
+    bad = []
+    texts = list(fig.texts)
+    for ax in fig.axes:
+        texts += list(ax.texts)
+        texts.append(ax.title)
+        texts.append(ax.xaxis.label)
+        texts.append(ax.yaxis.label)
+    for t in texts:
+        if not t.get_text().strip():
+            continue
+        try:
+            bb = t.get_window_extent(fig.canvas.get_renderer())
+        except Exception:
+            continue
+        if bb.x0 < -tol or bb.x1 > W + tol:
+            bad.append("%r spans x %.0f..%.0f of a %.0f px canvas"
+                       % (t.get_text()[:28], bb.x0, bb.x1, W))
+    return bad
+
+
 _CONTAINED = []
 
 
@@ -196,6 +232,13 @@ def save(fig, path):
             print("   !! data outside axes -- " + msg)
         raise SystemExit("%s: plotted data escapes its axes; fix the limit, "
                          "do not widen clip_on" % os.path.basename(path))
+    stray = text_outside_canvas(fig)
+    if stray:
+        for msg in stray[:8]:
+            print("   !! text outside canvas -- " + msg)
+        raise SystemExit("%s: a label falls outside the canvas; place it from "
+                         "a transform that is inside, do not widen the canvas"
+                         % os.path.basename(path))
     fig.savefig(path + ".pdf", bbox_inches="tight", pad_inches=0.03)
     fig.savefig(path + ".png", dpi=400, bbox_inches="tight", pad_inches=0.03)
     plt.close(fig)
@@ -232,8 +275,14 @@ def panel_label(ax, letter, text="", dy=-13, fontsize=8.5, weight="bold"):
                       fontweight=weight)
 
     def _sink(_evt=None):
-        off = dy - 13 if ax.get_xlabel().strip() else dy
-        ann.set_position((0, off))
+        # Annotation.set_position() moves the ANCHOR (xy), not the text
+        # offset, so the previous version of this callback changed the anchor
+        # from (0.5, 0) to (0, dy) in axes fractions and left xytext at -13 pt.
+        # The labels therefore never sank: every panel identifier printed on
+        # the x-axis title line.  Measured, not assumed -- the label sat at the
+        # same height with dy=-13 and with dy=-34.
+        off = dy - 27 if ax.get_xlabel().strip() else dy
+        ann.xyann = (0.0, off)
 
     _sink()
     ax.figure.canvas.mpl_connect("draw_event", _sink)
@@ -414,11 +463,8 @@ def fig_main(evals, out):
         if not names:
             continue
         F, M, S = mean_curve(evals, names, vmax)
-        b1 = born_order1(evals[names[0]], vmax)
         ax.errorbar(F, M, yerr=S, color=BLUE, marker="o", ms=3.4, lw=1.2,
                     capsize=1.6, clip_on=False, zorder=3)
-        ax.plot(F, b1, color=INK, lw=1.1, ls=(0, (4, 2)), clip_on=False,
-                zorder=2)
         band(ax)
         # The open ring means one thing across every figure in the paper: the
         # grid node at THIS curve's training-band edge.  The band-width figure
@@ -454,8 +500,12 @@ def fig_main(evals, out):
             ax.set_ylabel(r"relative $L_2$ error")
         else:
             ax.tick_params(labelleft=False)
-    end_labels(axes[2], [(float(M[-1]), "FNO", BLUE),
-                         (float(b1[-1]), r"Born $n{=}1$", INK)])
+    # One label, one curve.  The first-order Born reference used to be drawn
+    # here as a dashed curve with the tail label "Born n=1"; that label carried
+    # a symbol the figure never defines and, at this y range, it printed above
+    # the canvas as "Born n =".  The reference belongs to the anchor figure,
+    # where the Born depth is the subject, so it is not repeated here.
+    end_labels(axes[2], [(float(M[-1]), "FNO", BLUE)])
     save(fig, os.path.join(out, "fig_main_cliff"))
 
 
@@ -614,21 +664,18 @@ def fig_band(evals, out):
         # says WHICH edge it is.
         ends.append((float(M[-1]), r"train $[1,%.0f]$" % fedge, col))
     band(ax)
-    # The shading is the REFERENCE band, not the band of every curve: the
-    # figure's whole argument is that each curve has a different one.  Saying
-    # so on the patch itself keeps the grey from being read as "the band".
-    ax.annotate(r"reference band $[1,4]$", xy=(1.05, 0.0105), fontsize=7.0 * Z,
-                color="#555555", ha="left", va="bottom",
-                bbox=dict(boxstyle="round,pad=0.10", fc="white", ec="none",
-                          alpha=0.75))
+    # No lettering inside the panel.  The shaded strip is the reference band and
+    # each curve has its own; the two ring/ shading statements used to sit in
+    # the corners as free-standing prose ("reference band [1,4]" low left,
+    # "ring: train band edge" low right), far from the glyphs they named and
+    # within a panel that already carries five end labels.  Both are in the
+    # caption, which is where a reader looks once.
     ax.set_yscale("log")
     ax.set_ylim(0.008, 4.5)
     decades(ax, numticks=3)
     sweep_axis(ax)
     ax.set_ylabel(r"relative $L_2$ error")
     end_labels(ax, ends, fs=7.0 * Z, min_sep=10.5 * Z)
-    badge(ax, 0.985, 0.035, r"ring: train band edge", ha="right", va="bottom",
-          fs=7.4 * Z)
     save(fig, os.path.join(out, "fig_bandwidth"))
 
 
@@ -682,7 +729,11 @@ def fig_mode_phase(evals, out, band_tag, train_edge, fname):
                        fontsize=8)
     ax.set_yticks(range(len(modes)))
     ax.set_yticklabels([str(m) for m in modes])
-    ax.set_xlabel("frequency $f$")
+    # One cell per node.  The columns are equally wide and the frequencies are
+    # not: 4.2 and 4.5 occupy adjacent cells of the same width as 1.5 and 2.5.
+    # Without the second line the axis reads as a linear frequency axis, which
+    # is what a reader reported.
+    ax.set_xlabel("test frequency $f$\none cell per node; not to scale")
     ax.set_ylabel("retained modes $M$")
     xb = np.searchsorted(F, train_edge - 1e-9)
     # The edge rule is drawn twice: a white dash on the viridis fill (visible
@@ -1383,7 +1434,7 @@ def fig_anchor(out):
                 capsize=2.2, capthick=1.1, elinewidth=1.1, clip_on=False,
                 zorder=3, label="anchor, $aB_1+bB_2$")
     ax.plot(F, a["born1"], color=INK, lw=1.0, ls=(0, (4, 2)), clip_on=False,
-            zorder=2, label="Born series, order 1")
+            zorder=2, label="Born, order 1")
     ax.plot(F, a["trivial"], color=FAINT, lw=1.0, ls=(0, (1.5, 1.6)),
             clip_on=False, zorder=2, label="trivial, $\\hat u\\equiv0$")
     band(ax)
@@ -1394,7 +1445,7 @@ def fig_anchor(out):
     ax.set_ylabel(r"relative $L_2$ error")
     end_labels(ax, [(float(M[-1]), "trained FNO", BLUE),
                     (float(anch[-1]), "anchor", VERMILION),
-                    (float(np.asarray(a["born1"])[-1]), "Born $n{=}1$", INK),
+                    (float(np.asarray(a["born1"])[-1]), "Born, order 1", INK),
                     (float(np.asarray(a["trivial"])[-1]), "trivial", FAINT)],
                 fs=7.2)
     # The decisive reading of the panel: the anchor's plateau sits below the
@@ -1460,16 +1511,6 @@ def fig_anchor(out):
     end_labels(ax, [(float(fno[-1]), "trained FNO", BLUE),
                     (float(anchp[-1]), "anchor", VERMILION),
                     (float(trivp[-1]), "trivial", FAINT)], fs=7.2)
-    # The anchor stays below the trivial baseline across the whole contrast
-    # range: two fitted coefficients carry real out-of-band information at
-    # every contrast, which is the claim the trained operator cannot make.
-    if anchp[-1] < trivp[-1]:
-        # Upper left, two lines.  On one line the note ended at x ~ 0.3, which
-        # is exactly where the rising blue curve crosses the row it occupies;
-        # wrapping it halves the width and keeps the box above the crossing.
-        badge(ax, 0.03, 0.995,
-              "anchor below the trivial baseline\nat every contrast",
-              ha="left", va="top", fs=6.4)
     panel_label(ax, "b", r"out-of-band plateau")
     require_inside(ax)
     save(fig, os.path.join(out, "fig_anchor"))
@@ -2058,8 +2099,9 @@ def fig_plateau_coupling(evals, out):
     set_style(Z)
     spec = json.load(open(os.path.join(C.RES, "spectrum.json"),
                           encoding="utf-8"))
-    fig, ax = plt.subplots(figsize=(FULL_W * 0.72, FULL_W * 0.50),
-                           layout="constrained")
+    fig, (ax, axr) = plt.subplots(1, 2, figsize=(FULL_W * 0.92, FULL_W * 0.46),
+                                  layout="constrained",
+                                  gridspec_kw=dict(width_ratios=[1.35, 1.0]))
     coups, plats, trivs, sds = [], [], [], []
     for vk, vmax in zip(("a005", "a010", "a025", "a050", "a100"), C.VMAX_LIST):
         plateau = []
@@ -2086,48 +2128,76 @@ def fig_plateau_coupling(evals, out):
         coups.append(vmax / (2 * C.GAMMA))
     coups, plats, trivs = np.array(coups), np.array(plats), np.array(trivs)
     sds = np.array(sds)
-    # y = 1 is the "predict zero" level of the metric: a curve above it is
-    # worse than returning the incident field alone, which is what makes the
-    # plateau-versus-baseline comparison legible without a second axis.
+    ratio = plats / trivs
+    # (a) the two levels on one log axis.  Named y ticks rather than powers of
+    # ten: the span is 0.2 to 1.9, so LogLocator labelled exactly one tick
+    # (10^0) and the axis read as if it had no coordinates at all.
     ax.axhline(1.0, color=INK, lw=0.7, ls=(0, (2.0, 2.0)), zorder=1)
-    ax.annotate(r"$y=1$ (predict zero)", xy=(0.52, 1.02), fontsize=7.0 * Z,
-                color="#333333", va="bottom")
+    ax.annotate("predict zero", xy=(11.3, 1.0), xytext=(0, 2.4),
+                textcoords="offset points", ha="right", va="bottom",
+                fontsize=7.0 * Z, color="#333333")
     ax.errorbar(coups, plats, yerr=sds, fmt="-o", color=BLUE, lw=1.5, ms=4.6,
-                capsize=2.0, elinewidth=0.8,
-                clip_on=False, zorder=3, label="FNO plateau")
-    ax.plot(coups, trivs, "--s", color=VERMILION, lw=1.5, ms=4.2,
-            clip_on=False, zorder=3, label="trivial baseline")
+                capsize=2.0, elinewidth=0.8, clip_on=False, zorder=3)
+    ax.plot(coups, trivs, "--s", color=VERMILION, lw=1.4, ms=4.0,
+            clip_on=False, zorder=3)
     ax.set_xscale("log")
     ax.set_yscale("log")
     ax.set_xlim(0.4, 12)
-    ax.set_ylim(0.15, 3.2)
+    ax.set_ylim(0.15, 3.0)
     ax.set_xticks([0.5, 1, 2.5, 5, 10])
     ax.set_xticklabels(["0.5", "1", "2.5", "5", "10"])
-    decades(ax, numticks=4)
+    round_ticks(ax, "y", [0.2, 0.5, 1, 2], ["0.2", "0.5", "1", "2"])
+    ax.yaxis.set_minor_locator(NullLocator())
+    ax.xaxis.set_minor_formatter(NullFormatter())
     ax.set_xlabel(r"coupling $v_{\max}/(2\gamma)$")
-    ax.set_ylabel(r"mean relative $L_2$ error, $f \geq 6$")
+    ax.set_ylabel(r"plateau error, mean over $f\geq6$")
     despine(ax)
-    # The value of every point is printed: the figure carries the plateau
-    # numbers the text quotes, and a log axis without printed values makes
-    # the reader measure distances to guess them.
+    # Only the trained level is printed in (a): the two curves sit within 14%
+    # of each other, so a value above and a value below each node interleaved
+    # at the right-hand end.  The trivial level is read from the dashed curve,
+    # and the difference between the two is the whole of panel (b).
     for x, y in zip(coups, plats):
-        ax.annotate("%.2f" % y, xy=(x, y), xytext=(0, 5.5 * Z),
+        ax.annotate("%.2f" % y, xy=(x, y), xytext=(0, 5.0 * Z),
                     textcoords="offset points", ha="center", va="bottom",
-                    fontsize=8 * Z, color=BLUE)
-    for x, y in zip(coups, trivs):
-        ax.annotate("%.2f" % y, xy=(x, y), xytext=(0, -6.5 * Z),
-                    textcoords="offset points", ha="center", va="top",
-                    fontsize=8 * Z, color=VERMILION)
+                    fontsize=7.8 * Z, color=BLUE)
     end_labels(ax, [(float(plats[-1]), "FNO", BLUE),
-                    (float(trivs[-1]), "trivial", VERMILION)], fs=7.4 * Z)
-    # The excess is the quantity of interest and is stated twice: per point,
-    # in the printed values above, and summarised for the whole range in the
-    # badge.  The old ratio arrow sat at the low-coupling end, where the two
-    # curves coincide, and rendered as a degenerate zero-length glyph.
-    badge(ax, 0.03, 0.955,
-          r"excess over baseline: $%.2f\times$ $\rightarrow$ $%.2f\times$ "
-          r"across the range" % (plats[0] / trivs[0], plats[-1] / trivs[-1]),
-          ha="left", fs=6.9 * Z)
+                    (float(trivs[-1]), "trivial", VERMILION)], fs=7.2 * Z)
+    panel_label(ax, "a")
+
+    # (b) the excess as its own quantity.  In (a) the two curves nearly
+    # coincide at every node, and the former badge summarised the difference
+    # in words -- "excess over baseline: 1.00x -> 1.14x" -- without saying
+    # which of the two was the numerator.  Divided explicitly, the quantity
+    # has an axis of its own and a label that names both terms.
+    axr.plot(coups, ratio, "-o", color=BLUE, lw=1.5, ms=4.4, clip_on=False,
+             zorder=3)
+    # To the right of each node, not above it: the first node sits on y=1.00
+    # and a centred label above it printed through the marker.
+    for i, (x, y) in enumerate(zip(coups, ratio)):
+        # The first node sits exactly on the reference rule: a centred label
+        # printed through the dashes, and a label above the marker printed
+        # through the segment rising to the next node.  It goes below the
+        # rule, which is why the axis keeps a margin under 1.00.
+        below = i == 0
+        axr.annotate("%.2f" % y, xy=(x, y),
+                     xytext=(2.0, -8.5 * Z) if below else (5.5 * Z, 0),
+                     textcoords="offset points",
+                     ha="left",
+                     va="top" if below else "center",
+                     fontsize=7.8 * Z, color=BLUE)
+    axr.axhline(1.0, color=INK, lw=0.7, ls=(0, (2.0, 2.0)), zorder=1)
+    axr.set_xscale("log")
+    axr.set_xlim(0.4, 12)
+    axr.set_ylim(0.968, 1.20)
+    axr.set_xticks([0.5, 1, 2.5, 5, 10])
+    axr.set_xticklabels(["0.5", "1", "2.5", "5", "10"])
+    axr.xaxis.set_minor_formatter(NullFormatter())
+    round_ticks(axr, "y", [1.00, 1.05, 1.10, 1.15],
+                ["1.00", "1.05", "1.10", "1.15"])
+    axr.set_xlabel(r"coupling $v_{\max}/(2\gamma)$")
+    axr.set_ylabel(r"FNO plateau $/$ trivial")
+    despine(axr)
+    panel_label(axr, "b")
     save(fig, os.path.join(out, "fig_plateau_coupling"))
 
 

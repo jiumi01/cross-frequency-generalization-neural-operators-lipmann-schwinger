@@ -3220,7 +3220,7 @@ def table_anchor(cap, lang="en"):
     if d is None:
         return ""
     ev = load(RES_DIR)
-    t = ("\\begin{table}[ht]\n\\centering\n\\caption{%s}\n\\label{tab:anchor}\n"
+    t = ("\\begin{table}[!ht]\n\\centering\n\\caption{%s}\n\\label{tab:anchor}\n"
          "\\footnotesize\n\\setlength{\\tabcolsep}{4pt}\n"
          "\\begin{tabular}{llrrrrr}\n\\toprule\n"
          "$v_{\\max}$ & predictor & $\\varepsilon_{\\mathrm{in}}$ & "
