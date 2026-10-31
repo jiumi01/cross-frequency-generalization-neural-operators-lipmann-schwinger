@@ -148,13 +148,26 @@ def main():
         per_seed[s] = {}
         for i, n in enumerate(N):
             re, r1 = ratios(es[i])
-            per_seed[s][int(n)] = dict(jump=re, r1hz=r1,
+            # The locators are computed per seed as well, not only per arm: the
+            # table prints one row per mesh, so a reader cannot otherwise tell
+            # whether "f* = 4.25" is the shared answer of all three seeds or the
+            # mean of three disagreeing ones.  They are node-valued, so the SD
+            # beside them is zero whenever the seeds agree, which is the point.
+            st = loc_step(f, es[i], EDGE)
+            per_seed[s][int(n)] = dict(fstar=loc_fstar(f, es[i], EDGE),
+                                       onset=loc_onset(f, es[i], EDGE),
+                                       step=st, jump=re, r1hz=r1,
                                        inband=float(es[i][f < EDGE].mean()),
                                        plateau=float(es[i][f > EDGE + 1].mean()))
     for i, n in enumerate(N):
         for k in ("jump", "r1hz", "inband", "plateau"):
             vals = [per_seed[s][int(n)][k] for s in seeds]
             loc[int(n)]["sd_" + k] = float(np.std(vals, ddof=1)) if len(vals) > 1 else 0.0
+        # Kept as explicit lists rather than an "all equal" flag: the manuscript
+        # quotes the node values, and a boolean would hide which seed differed
+        # if a later rerun disagrees.
+        loc[int(n)]["seed_fstar"] = [per_seed[s][int(n)]["fstar"] for s in seeds]
+        loc[int(n)]["seed_step"] = [per_seed[s][int(n)]["step"] for s in seeds]
     # Paired mesh effect: same seed, 128^2 against 64^2.  Reported because the
     # seed-to-seed spread of the ratio is an order of magnitude larger than the
     # mesh-to-mesh one, so an unpaired reading of "0.6% across the ladder" would

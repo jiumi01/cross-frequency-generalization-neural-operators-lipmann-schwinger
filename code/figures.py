@@ -1339,8 +1339,16 @@ def fig_anchor(out):
                     capsize=2, clip_on=False, zorder=3,
                     label="Trained FNO")
     anch = np.array([r["mean"] for r in a["sweep"]])
-    ax.plot(F, anch, color=VERMILION, marker="D", ms=3.4, lw=1.3,
-            clip_on=False, zorder=3, label="anchor, $aB_1+bB_2$")
+    # The anchor is deterministic given its two fitted coefficients, so it has no
+    # seed spread; what it does have is a spread over the 200 media, and the bar
+    # drawn here is the standard error of their mean (n = 200), not a seed SD.
+    # Mixing the two would put a bar on one curve that is 40% of its own value
+    # beside a bar on the other that is 2%, and invite the reader to compare
+    # them.  The caption states which is which.
+    asem = np.array([r["sem"] for r in a["sweep"]])
+    ax.errorbar(F, anch, yerr=asem, color=VERMILION, marker="D", ms=3.4, lw=1.3,
+                capsize=2.2, capthick=1.1, elinewidth=1.1, clip_on=False,
+                zorder=3, label="anchor, $aB_1+bB_2$")
     ax.plot(F, a["born1"], color=INK, lw=1.0, ls=(0, (4, 2)), clip_on=False,
             zorder=2, label="Born series, order 1")
     ax.plot(F, a["trivial"], color=FAINT, lw=1.0, ls=(0, (1.5, 1.6)),

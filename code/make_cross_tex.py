@@ -23,13 +23,13 @@ import common as C
 
 LAB = {64: "A", 96: "B", 128: "C"}
 CAP_EN = (r"""One multi-resolution-trained model evaluated on three spatial
-resolutions; every mesh is seen in training, one grid per optimisation step.
+resolutions; every mesh is seen in training, each taking a third of the steps.
 Frequencies {%s}; %d media drawn at $384^{2}$ and restricted spectrally, so each
-row is the same medium. Mean $\pm$ SD over the %d seeds the meshes share."""
+row is the same medium. Mean $\pm$ SD over the shared %d seeds."""
            )
-CAP_CN = (r"""同一多分辨率训练模型在三种空间分辨率上的评估，三种网格都参与训练。
-频率集合为 {%s}；%d 个介质在 $384^{2}$ 生成后经谱限制，每行是同一连续介质；
-数值为三网格共用的 %d 个种子的均值 $\pm$ 标准差。""")
+CAP_CN = (r"""同一多分辨率训练模型评估三种空间分辨率，三网格均参与训练、
+各占三分之一优化步。频率集合 {%s}；%d 个介质在 $384^{2}$ 生成后经谱限制，
+每行同一连续介质；值为共用 %d 个种子的均值 $\pm$ 标准差。""")
 # Table note, kept out of the caption because the caption has a word budget and
 # the two ratios have to be defined where the reader meets them.
 NOTE_EN = (r"\footnotesize $r_{\mathrm{edge}}=\varepsilon(4.25)/\varepsilon(4)$"
@@ -42,6 +42,38 @@ NOTE_CN = (r"\footnotesize $r_{\mathrm{edge}}=\varepsilon(4.25)/\varepsilon(4)$"
            r"$r_{\mathrm{1Hz}}=\varepsilon(5)/\varepsilon(4)$（带缘后 1\,Hz）；"
            r"$\varepsilon_{\mathrm{in}}$ 为 $f<4$ 的均值；"
            r"$\varepsilon_{\infty}$ 为 $f\geq6$ 的均值。")
+
+
+def note_for(lang, d):
+    """Table note: the two ratio definitions plus the per-seed locators.
+
+    The locators (f*, largest step) are node-valued, so a mean+-SD would be
+    unreadable: either the three seeds agree and the SD is 0, or they do not and
+    no average is a node.  The sentence is therefore built from the records, not
+    asserted: if a later rerun puts a seed on a different node the note says so
+    instead of claiming agreement.
+    """
+    base = NOTE_EN if lang == "en" else NOTE_CN
+    locs = d["loc"]
+    fst = {tuple(v["seed_fstar"]) for v in locs.values()}
+    stp = {tuple(tuple(x) for x in v["seed_step"]) for v in locs.values()}
+    one_f = len(fst) == 1 and len(next(iter(fst))) == len(d["seeds"])
+    one_s = len(stp) == 1 and len(next(iter(stp))) == len(d["seeds"])
+    if one_f and one_s:
+        f = list(fst)[0][0]
+        s = list(stp)[0][0]
+        if lang == "en":
+            return base + (r" All three seeds return the same locators at every"
+                           r" mesh ($f^{\star}=%s$, largest step $%.2f\to%.2f$),"
+                           r" so the $\pm$ applies to the ratios and errors only."
+                           % (("%g" % f), s[0], s[1]))
+        return base + (r" 三种子在每个网格上给出相同定位（$f^{\star}=%s$，"
+                       r"最大单步 $%.2f\to%.2f$），$\pm$ 只作用于比值与误差。"
+                       % (("%g" % f), s[0], s[1]))
+    if lang == "en":
+        return base + (r" Seed locators are not all equal; the table prints the"
+                       r" arm value and each seed's own locator is in the archive.")
+    return base + r" 各种子定位不全相同；表中为整臂值，逐种子值见归档。"
 
 
 def fmt(x, n=2):
@@ -220,7 +252,7 @@ $N$ & $f^{\star}$/onset & largest step & $r_{\mathrm{edge}}$
 \vspace{2pt}
 %s
 \end{table}
-""" % (" ".join(cap.split()), rows, (NOTE_EN if lg == "en" else NOTE_CN))
+""" % (" ".join(cap.split()), rows, note_for(lg, d))
         open(os.path.join(dr, "gen_tab_cross.tex"), "w", encoding="utf-8").write(tab)
 
     prows = []
