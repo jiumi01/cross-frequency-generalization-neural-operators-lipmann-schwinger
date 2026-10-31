@@ -1333,8 +1333,13 @@ def fig_anchor(out):
     pl_a = float(np.mean(anch[F >= 6.0]))
     pl_f = float(np.mean(M[F >= 6.0]))
     if pl_a > 0 and pl_f > pl_a:
+        # Drawn at the right edge, vertical, with the ratio beside it: the
+        # panel's claim is a constant vertical gap, so the arrow spans the two
+        # plateaus rather than pointing at one of them.  Sized up from
+        # 8.8 pt/1.1 pt after review: at print size the 1.1 pt shaft was a
+        # hairline in the same grey as the axis rules.
         ratio_arrow(ax, 11.55, pl_a, pl_f,
-                    r"$%.1f\times$" % (pl_f / pl_a), fs=8.8, lw=1.1)
+                    r"$%.1f\times$" % (pl_f / pl_a), fs=9.6, lw=1.5)
     panel_label(ax, "a", r"$v_{\max}=0.25$")
 
     # ---- (b) plateau against contrast
@@ -1381,12 +1386,14 @@ def fig_anchor(out):
     # range: two fitted coefficients carry real out-of-band information at
     # every contrast, which is the claim the trained operator cannot make.
     if anchp[-1] < trivp[-1]:
-        # Upper left: at the low-contrast end the anchor and the baseline sit
-        # at the bottom of the frame, which is where this note used to print.
-        badge(ax, 0.03, 0.96,
-              "anchor below the trivial baseline at every contrast",
-              ha="left", va="top", fs=6.8)
+        # Upper left, two lines.  On one line the note ended at x ~ 0.3, which
+        # is exactly where the rising blue curve crosses the row it occupies;
+        # wrapping it halves the width and keeps the box above the crossing.
+        badge(ax, 0.03, 0.995,
+              "anchor below the trivial baseline\nat every contrast",
+              ha="left", va="top", fs=6.4)
     panel_label(ax, "b", r"out-of-band plateau")
+    require_inside(ax)
     save(fig, os.path.join(out, "fig_anchor"))
 
 
