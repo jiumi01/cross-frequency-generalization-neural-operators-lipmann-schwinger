@@ -34,10 +34,11 @@ CAP = { "en": dict(
         "marked $\\psi_{\\mathrm{inc}}$ are the trivial baseline "
         "$u_\\theta\\equiv0$."),
   summary=("Generalization cliff per contrast arm: mean relative $L_2$ error over "
-           "\\NumSeedsMain\\ seeds, with the seed standard deviation beside each "
-           "mean. $\\varepsilon_{\\mathrm{in}}$, "
-           "$\\varepsilon_{\\infty}$: in-band and plateau mean relative $L_2$; "
-           "$r$: $\\varepsilon(5)/\\varepsilon(4)$."),
+           "\\NumSeedsMain\\ seeds with its seed standard deviation. "
+           "$\\varepsilon_{\\mathrm{in}}$, "
+           "$\\varepsilon_{\\infty}$: in-band and plateau means; "
+           "$r_{\\mathrm{1Hz}}=\\varepsilon(5)/\\varepsilon(4)$: ratio over the "
+           "first hertz beyond the training edge."),
   propnorm=("Discrete operator norm of the Lippmann--Schwinger propagator, "
             "$\\max_{\\mathbf{n}}|\\kappa^{2}\\widehat{G}_{\\kappa}(\\mathbf{n})|$, "
             "on the $64\\times64$ grid. The continuum is flat in $f$ at "
@@ -88,10 +89,11 @@ CAP = { "en": dict(
         "and seeds; each changes one ingredient only (input encoding of $f$, "
         "loss, or initialisation). Onset is the interval in which the error "
         "first leaves $3\\times$ its own in-band level. 3-seed means."),
-  anchor=("Analytic anchor on every other arm's protocol: paired media, "
-          "$n=200$, seeds shared with the trained rows. $a,b$ are fitted on a "
-          "prefix of the training cache only, with no test medium and no "
-          "out-of-band frequency. The learned residual is identically zero."),
+  anchor=("Two-term analytic anchor on each arm's protocol: 200 paired media, "
+          "seeds shared with the trained rows. $a,b$: least squares on 512 "
+          "in-band samples, no out-of-band frequency. Columns average over "
+          "seeds and media; the depth-selected head of Figure~\\ref{fig:deep} "
+          "is a different predictor."),
   deep=("Analytic head depth on the common protocol: paired media, $n=200$, "
         "shared seeds. Each row is fitted on one in-band prefix; $M$ counts "
         "Born corrections, $M_{\\mathrm{sel}}$ is picked in band. The last "
@@ -157,10 +159,10 @@ CAP = { "en": dict(
   main=("FNO 的跨频率泛化：\\NumSeedsMain\\ 个种子、每个频率 200 个配对介质的"
         "平均相对 $L_2$ 误差。训练仅使用 $f\\in[1,4]$；表头在该边处拆分各列。"
         "标为 $\\psi_{\\mathrm{inc}}$ 的行是平凡基线 $u_\\theta\\equiv0$。"),
-  summary=("各对比度臂的泛化悬崖汇总：为 \\NumSeedsMain\\ 个随机种子的均值，"
-           "紧邻的一列为该窗口上的种子标准差。$\\varepsilon_{\\mathrm{in}}$：训练频带内、"
-           "留出介质上的平均相对 $L_2$ 误差；$\\varepsilon_{\\infty}$：$f\\ge6$ 的"
-           "平均值；$r$：$\\varepsilon(5)/\\varepsilon(4)$。"),
+  summary=("各对比度臂的泛化悬崖汇总：为 \\NumSeedsMain\\ 个随机种子的均值与其种子标准差。"
+           "$\\varepsilon_{\\mathrm{in}}$：训练频带内、留出介质上的平均相对 $L_2$ 误差；"
+           "$\\varepsilon_{\\infty}$：$f\\ge6$ 的平均值；"
+           "$r_{\\mathrm{1Hz}}=\\varepsilon(5)/\\varepsilon(4)$：带缘后 1\\,Hz 的误差比。"),
   propnorm=("Lippmann--Schwinger 传播子在 $64\\times64$ 网格上的离散算子范数 "
             "$\\max_{\\mathbf{n}}|\\kappa^{2}\\widehat{G}_{\\kappa}(\\mathbf{n})|$。"
             "连续符号对 $f$ 为 $\\PropNominal$；网格上取到的范数介于 "
@@ -194,9 +196,9 @@ CAP = { "en": dict(
   disc=("判别实验各臂：所有臂与基线共享介质、协议与种子，每次只改动一个环节"
         "（$f$ 的输入编码、损失或初始化）。onset 指误差首次超过自身带内水平 "
         "3 倍所在的网格区间。3 种子均值。"),
-  anchor=("解析锚定，按与其余各臂完全相同的协议评分（$n=200$，介质与种子配对）。"
-          "系数 $a,b$ 仅由训练缓存前缀拟合：不含测试介质，不含带外频率。"
-          "学习残差恒为零。"),
+  anchor=("两项解析锚定，按各臂同一协议（200 个配对介质，种子共用）。"
+          "$a,b$ 由 512 个带内样本最小二乘拟合，不含带外频率。"
+          "各列为种子与介质均值；图~\\ref{fig:deep} 的深度选择头是另一个预测器。"),
   deep=("解析头深度：$n=200$，配对介质与种子。每行由同一带内前缀拟合；"
         "$M$ 为 Born 项数。末列为训练算子平台与本头平台之比。"),
   gridthree=("(a) 参考解收敛性：同一介质在 $256^2$ 上生成并降采样。(b) FNO "
@@ -537,15 +539,27 @@ def table_summary(ev, arms, cap):
         a, r2 = fit_alpha(F, M, 4.0)
         # Seed spread of the plateau, from the same three seeds as the mean.
         psd = float(np.mean(S[F >= 6])) if (F >= 6).any() else np.nan
-        rows.append((vmax, ib, ibs, plateau, cliff, a, r2, psd))
+        # Seed spread of r_1Hz, read the same way the mean is: one curve per
+        # seed, then eps(5)/eps(4).  Quoted because the arm-to-arm spread of r
+        # is what the text calls larger than seed noise, and that comparison
+        # needs the seed noise printed rather than asserted.
+        rs = []
+        for n in names:
+            F1, M1, _ = mean_over_seeds(ev, [n], vmax)
+            e4, e5 = M1[np.isclose(F1, 4.0)], M1[np.isclose(F1, 5.0)]
+            if e4.size and e5.size and e4[0] > 0:
+                rs.append(float(e5[0] / e4[0]))
+        rsd = float(np.std(rs, ddof=1)) if len(rs) > 1 else np.nan
+        rows.append((vmax, ib, ibs, plateau, cliff, a, r2, psd, rsd))
     t = ("\\begin{table}[t]\n\\centering\n\\caption{%s}\n\\label{tab:summary}\n"
-         "\\small\n\\setlength{\\tabcolsep}{4.6pt}\n"
-         "\\begin{tabular}{lccccc}\n\\toprule\n"
+         "\\small\n\\setlength{\\tabcolsep}{4.2pt}\n"
+         "\\begin{tabular}{lcccccc}\n\\toprule\n"
          " & \\multicolumn{2}{c}{$\\varepsilon_{\\mathrm{in}}$} & "
-         "\\multicolumn{2}{c}{$\\varepsilon_{\\infty}$} & \\\\\n"
-         "\\cmidrule(lr){2-3}\\cmidrule(lr){4-5}\n"
-         "$v_{\\max}$ & mean & $\\mathrm{SD}$ & mean & $\\mathrm{SD}$ & $r$ "
-         "\\\\\n\\midrule\n"
+         "\\multicolumn{2}{c}{$\\varepsilon_{\\infty}$} & "
+         "\\multicolumn{2}{c}{$r_{\\mathrm{1Hz}}$} \\\\\n"
+         "\\cmidrule(lr){2-3}\\cmidrule(lr){4-5}\\cmidrule(lr){6-7}\n"
+         "$v_{\\max}$ & mean & $\\mathrm{SD}$ & mean & $\\mathrm{SD}$ "
+         "& mean & $\\mathrm{SD}$ \\\\\n\\midrule\n"
          % cap["summary"])
     # Two separate SD columns would be indistinguishable if both were headed
     # `SD`; the grouped header names the quantity each SD belongs to.  The
@@ -554,9 +568,10 @@ def table_summary(ev, arms, cap):
     # range over fit windows (Section on the step), where it is used to argue
     # that no single exponent is identifiable; printing one point estimate here
     # would contradict that argument in the same manuscript.
-    for (vmax, ib, ibs, plateau, cliff, a, r2, psd) in rows:
-        t += ("%.2f & $%s$ & $%s$ & $%s$ & $%s$ & $%s$ \\\\\n"
-              % (vmax, fmt(ib), fmt(ibs), fmt(plateau), fmt(psd), fmt(cliff, 2)))
+    for (vmax, ib, ibs, plateau, cliff, a, r2, psd, rsd) in rows:
+        t += ("%.2f & $%s$ & $%s$ & $%s$ & $%s$ & $%s$ & $%s$ \\\\\n"
+              % (vmax, fmt(ib), fmt(ibs), fmt(plateau), fmt(psd), fmt(cliff, 2),
+                 fmt(rsd, 2)))
     return t + "\\bottomrule\n\\end{tabular}\n\\end{table}\n", rows
 
 
@@ -1459,7 +1474,7 @@ NDATA_MACROS = ("NDataN", "NDataList", "NDataInList", "NDataPlatList",
                 "NDataPlatSpread",
                 "NDataOutSpread", "NDataEdgeSpread", "NDataEdgeLo",
                 "NDataEdgeHi", "NDataStepSpread", "NDataTop", "NDataPool",
-                "NDataFstarList", "NDataRunsPerRung")
+                "NDataFstarList", "NDataRunsPerRung", "NDataSizeFactor")
 
 
 def _ndata_rows(ev):
@@ -1536,6 +1551,14 @@ def ndata_macros(ev):
              % ", ".join(na_or(r["fstar"]) for r in rungs))
     L.append("\\newcommand{\\NDataSpan}{%s}"
              % fmt(rungs[0]["inband"] / rungs[-1]["inband"], 1))
+    # The size ratio of the ladder, which is NOT NDataSpan: the ladder grows the
+    # training set by this factor and the in-band floor falls by NDataSpan.  The
+    # two were once conflated in the Introduction ("a 2.9x training set"), which
+    # states a data multiplier an order of magnitude smaller than the one run.
+    _szf = float(rungs[-1]["n"]) / float(rungs[0]["n"])
+    L.append("\\newcommand{\\NDataSizeFactor}{%s}"
+             % (("%d" % int(round(_szf))) if abs(_szf - round(_szf)) < 1e-9
+                else fmt(_szf, 1)))
     # The last doubling on its own.  Quoted because the ladder's first rungs are
     # cheap and a reader is entitled to ask whether the top rung is still doing
     # anything; if this ever comes out near 1.0 the sentence "has not saturated"
@@ -1760,6 +1783,21 @@ def macros(ev, arms, res):
                     if vals else "--"))
     L.append("\\newcommand{\\CliffLo}{%s}" % (fmt(min(cliffs), 2) if cliffs else "--"))
     L.append("\\newcommand{\\CliffHi}{%s}" % (fmt(max(cliffs), 2) if cliffs else "--"))
+    # The two band-edge readings on the reference arm, so the prose can name
+    # which statistic it is quoting instead of typing "0.81" and "5.7x" beside
+    # a table whose rows are six-seed means of a different quantity.
+    _ref = None
+    _rn = runs_for(ev, "main_fno_a025_")
+    if _rn:
+        _F, _M, _ = mean_over_seeds(ev, _rn, 0.25)
+        _e4 = float(_M[np.isclose(_F, 4.0)][0]) if np.isclose(_F, 4.0).any() else np.nan
+        _e425 = float(_M[np.isclose(_F, 4.25)][0]) if np.isclose(_F, 4.25).any() else np.nan
+        if np.isfinite(_e4) and _e4 > 0:
+            _ref = (_e4, _e425, _e425 / _e4)
+    for _k, _v, _d in (("RefEpsEdge", 0 if not _ref else _ref[0], 3),
+                       ("RefEpsFirst", 0 if not _ref else _ref[1], 3),
+                       ("RefEdgeRatio", 0 if not _ref else _ref[2], 1)):
+        L.append("\\newcommand{\\%s}{%s}" % (_k, fmt(_v, _d) if _ref else "--"))
     L.append("\\newcommand{\\JumpLo}{%s}" % (fmt(min(jumps)) if jumps else "--"))
     L.append("\\newcommand{\\JumpHi}{%s}" % (fmt(max(jumps)) if jumps else "--"))
     L.append("\\newcommand{\\NumCliffArms}{%d}" % len(cliffs))
@@ -3187,7 +3225,8 @@ def table_anchor(cap):
          "\\begin{tabular}{llrrrrr}\n\\toprule\n"
          "$v_{\\max}$ & predictor & $\\varepsilon_{\\mathrm{in}}$ & "
          "$\\varepsilon(4)$ & $\\varepsilon(5)$ & $\\varepsilon_{\\infty}$ & "
-         "$r=\\varepsilon(5)/\\varepsilon(4)$ \\\\\n\\midrule\n" % cap["anchor"])
+         "$r_{\\mathrm{1Hz}}=\\varepsilon(5)/\\varepsilon(4)$ \\\\\n\\midrule\n"
+         % cap["anchor"])
     for vmax in C.VMAX_LIST:
         a = d["arms"]["%.2f" % vmax]
         ref = None

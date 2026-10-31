@@ -97,6 +97,56 @@ def cluster_se(X, resid, clusters):
     return adj * XtX_inv @ meat @ XtX_inv
 
 
+def bootstrap_beta(d, B=1000, rng_seed=20261031):
+    """Media-cluster bootstrap of beta.
+
+    The 25 200 records are 200 media x 14 frequencies x 3 meshes x 3 seeds, so
+    they are not 25 200 independent observations and a row-level bootstrap would
+    return an interval several times too narrow.  Resampling the 200 media with
+    replacement keeps a medium's whole block together, which is the unit the
+    design actually replicates.  This is a second instrument for the same
+    interval `cluster_se` returns analytically: if the two disagree the analytic
+    one is wrong, and the manuscript quotes both.
+    """
+    med = np.unique(d["m"])
+    logq = np.log(d["N"] / d["f"])
+    fl = np.unique(d["f"])
+    idx_by_m = {m: np.where(d["m"] == m)[0] for m in med}
+    rng = np.random.default_rng(rng_seed)
+    # Group codes for (seed, resampled copy) are rebuilt each draw, so the
+    # demeaning has to be vectorised rather than reuse `demean`'s Python loop
+    # over groups: the loop is fine once, and 1000 times over 25 200 rows it is
+    # not.
+    def fast_demean(v, key):
+        _, inv = np.unique(key, return_inverse=True)
+        cnt = np.bincount(inv, minlength=inv.max() + 1).astype(float)
+        s = np.bincount(inv, weights=v, minlength=inv.max() + 1)
+        return v - (s / cnt)[inv]
+
+    betas = []
+    for _ in range(B):
+        pick = rng.choice(med, size=len(med), replace=True)
+        idx = np.concatenate([idx_by_m[m] for m in pick])
+        # One cluster id per *resampled copy*: a medium drawn twice contributes
+        # two independent clusters, which is what "resample the unit" means.
+        inst = np.repeat(np.arange(len(pick)), [len(idx_by_m[m]) for m in pick])
+        s, f, n, y = d["seed"][idx], d["f"][idx], d["N"][idx], d["y"][idx]
+        key = s.astype(np.int64) * 100003 + inst.astype(np.int64)
+        yd = fast_demean(y, key)
+        qd = fast_demean(logq[idx], key)
+        F = np.stack([fast_demean((f == v).astype(float), key) for v in fl[1:]],
+                     axis=1)
+        X = np.hstack([F, qd[:, None]])
+        b, *_ = np.linalg.lstsq(X, yd, rcond=None)
+        betas.append(float(b[-1]))
+    betas = np.array(betas, float)
+    return dict(beta_boot_mean=float(betas.mean()),
+                beta_boot_se=float(betas.std(ddof=1)),
+                beta_ci_boot=[float(np.percentile(betas, 2.5)),
+                              float(np.percentile(betas, 97.5))],
+                beta_boot_n=int(B), beta_boot_seed=int(rng_seed))
+
+
 # ---------------------------------------------------------------- f* scan
 def edge_node(f, edge):
     band = f[f <= edge + 1e-9]
@@ -202,6 +252,7 @@ def main():
         identified_by="cross_mesh_only",
     )
     out["locator_thresholds"] = locator_scan()
+    out.update(bootstrap_beta(d))
 
     p = os.path.join(RES, "cross_cond.json")
     json.dump(out, open(p, "w", encoding="utf-8"), indent=1, sort_keys=True)

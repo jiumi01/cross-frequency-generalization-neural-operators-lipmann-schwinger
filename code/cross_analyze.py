@@ -109,21 +109,69 @@ def main():
     for j, fj in enumerate(f):
         print("%5.2f  %s" % (fj, "".join("  %6.4f" % e[i, j] for i in range(len(N)))))
 
+    # Two ratios are read off every row and they are NOT the same quantity:
+    #   r_edge = eps(4.25)/eps(4.00)  the first out-of-band node against the edge
+    #   r_1Hz  = eps(5.00)/eps(4.00)  the whole first hertz beyond the edge
+    # The manuscript quotes both, so both are emitted together with the seed
+    # dispersion of each, and with the per-seed values so the paired mesh effect
+    # can be quoted as a paired quantity rather than as two marginal means.
+    i425 = int(np.where(np.isclose(f, 4.25))[0][0])
+    i400 = int(np.where(np.isclose(f, 4.0))[0][0])
+    i500 = int(np.where(np.isclose(f, 5.0))[0][0])
+
+    def ratios(y):
+        return (float(y[i425] / y[i400]), float(y[i500] / y[i400]))
+
     print("\nlocators (edge f=4, f* rule = %.0fx the edge node)" % MULT)
-    loc = {}
+    loc, per_seed = {}, {}
     for i, n in enumerate(N):
         st = loc_step(f, e[i], EDGE)
+        re, r1 = ratios(e[i])
         loc[int(n)] = dict(fstar=loc_fstar(f, e[i], EDGE),
                            onset=loc_onset(f, e[i], EDGE),
                            step=st,
                            inband=float(e[i][f < EDGE].mean()),
                            plateau=float(e[i][f > EDGE + 1].mean()),
-                           jump=float(e[i][np.where(f == 4.25)[0][0]] /
-                                      e[i][np.where(f == 4.0)[0][0]]))
+                           jump=re, r1hz=r1)
         L = loc[int(n)]
-        print("  N=%3d  f*=%s  onset=%s  step=%s  jump=%.2f  in=%0.4f  plat=%.4f"
-              % (n, L["fstar"], L["onset"], L["step"], L["jump"],
+        print("  N=%3d  f*=%s  onset=%s  step=%s  r_edge=%.2f  r_1Hz=%.2f"
+              "  in=%0.4f  plat=%0.4f"
+              % (n, L["fstar"], L["onset"], L["step"], L["jump"], L["r1hz"],
                  L["inband"], L["plateau"]))
+
+    # Per-seed locators, same code path as above but on one seed's curve.  The
+    # SD of the three seeds is what the table prints beside each mean: the three
+    # meshes share their seeds, so a within-mesh SD would understate nothing and
+    # would let a reader mistake a seed-level quantity for a mesh-level one.
+    for s in seeds:
+        _, _, es = curve(data[s])
+        per_seed[s] = {}
+        for i, n in enumerate(N):
+            re, r1 = ratios(es[i])
+            per_seed[s][int(n)] = dict(jump=re, r1hz=r1,
+                                       inband=float(es[i][f < EDGE].mean()),
+                                       plateau=float(es[i][f > EDGE + 1].mean()))
+    for i, n in enumerate(N):
+        for k in ("jump", "r1hz", "inband", "plateau"):
+            vals = [per_seed[s][int(n)][k] for s in seeds]
+            loc[int(n)]["sd_" + k] = float(np.std(vals, ddof=1)) if len(vals) > 1 else 0.0
+    # Paired mesh effect: same seed, 128^2 against 64^2.  Reported because the
+    # seed-to-seed spread of the ratio is an order of magnitude larger than the
+    # mesh-to-mesh one, so an unpaired reading of "0.6% across the ladder" would
+    # be indistinguishable from seed noise while the paired one is not.
+    d_edge = [per_seed[s][int(max(N))]["jump"] - per_seed[s][int(min(N))]["jump"]
+              for s in seeds]
+    d_1hz = [per_seed[s][int(max(N))]["r1hz"] - per_seed[s][int(min(N))]["r1hz"]
+             for s in seeds]
+    print("\npaired mesh effect %d^2 - %d^2 over seeds: r_edge %+.3f (%s),"
+          " r_1Hz %+.3f" % (max(N), min(N), float(np.mean(d_edge)),
+                            ", ".join("%+.3f" % v for v in d_edge),
+                            float(np.mean(d_1hz))))
+    loc_extra = dict(mesh_pair=[int(min(N)), int(max(N))],
+                     d_edge=float(np.mean(d_edge)),
+                     d_edge_seeds=[float(v) for v in d_edge],
+                     d_1hz=float(np.mean(d_1hz)),
+                     d_edge_lo=float(min(d_edge)), d_edge_hi=float(max(d_edge)))
 
     # ---- S1, S2 -----------------------------------------------------------
     s1 = len({(loc[int(n)]["fstar"], loc[int(n)]["onset"],
@@ -188,6 +236,7 @@ def main():
 
     out = dict(seeds=seeds, n=data[seeds[0]]["n"], f=f.tolist(),
                N=N.tolist(), eps=e.tolist(), loc={str(k): v for k, v in loc.items()},
+               paired_mesh=loc_extra, per_seed={str(k): v for k, v in per_seed.items()},
                r2=dict(f=r2_f, q=r2_q, fN=r2_fn, full=r2_full),
                pairs=[list(p) for p in pairs], tests={str(k): v for k, v in tests.items()},
                s1=bool(s1), s2=bool(s2), s3=bool(s3), verdict=verdict)

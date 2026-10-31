@@ -610,13 +610,14 @@ def main():
                                 % (b_ok, b_lit, b_drift)))
 
     print("-- probe 8 (third level: real geology) --")
-    r_ok, r_drift, r_word, r_float, r_over, r_half = probe_realgeo_gate()
-    if all((r_ok, r_drift, r_word, r_float, r_over, r_half)):
-        print("PROBE 8: honest record accepted and all five defects rejected")
+    r_ok, r_drift, r_word, r_float, r_si, r_over, r_half = probe_realgeo_gate()
+    if all((r_ok, r_drift, r_word, r_float, r_si, r_over, r_half)):
+        print("PROBE 8: honest record accepted, supplement pointer accepted, "
+              "and all five defects rejected")
     else:
         print("PROBE 8: MISBEHAVED accepted=%s drift=%s wording=%s float=%s "
-              "overclaim=%s half=%s"
-              % (r_ok, r_drift, r_word, r_float, r_over, r_half))
+              "si_pointer=%s overclaim=%s half=%s"
+              % (r_ok, r_drift, r_word, r_float, r_si, r_over, r_half))
 
     print("-- probe 9 (macro spacing after a control word) --")
     msp = probe_macro_spacing()
@@ -1650,7 +1651,7 @@ def probe_realgeo_gate():
         with open(jp, "w", encoding="utf-8") as fh:
             json.dump(obj, fh)
 
-    def write_paper(phrase_en, phrase_cn, drop_float=False):
+    def write_paper(phrase_en, phrase_cn, drop_float=False, si_pointer=False):
         for lang, phrase in (("en", phrase_en), ("cn", phrase_cn)):
             os.makedirs(os.path.join(d, "paper", lang), exist_ok=True)
             with open(os.path.join(d, "paper", lang, "gen_macros.tex"), "w",
@@ -1658,7 +1659,10 @@ def probe_realgeo_gate():
                 fh.write("\\newcommand{\\RealPlateauOverlapArms}{3}\n"
                          "\\newcommand{\\RealMirrorR}{0.88}\n")
             body = phrase
-            if not drop_float:
+            if si_pointer:
+                body += (" see \\siFig{figS:realgeo} and "
+                         "\\siTab{tab:realgeo}")
+            elif not drop_float:
                 body += " see \\ref{fig:realgeo} and \\ref{tab:realgeo}"
             with open(os.path.join(d, "paper", lang, "main.tex"), "w",
                       encoding="utf-8") as fh:
@@ -1706,6 +1710,17 @@ def probe_realgeo_gate():
         run(d, K.realgeo_guard, d)
         float_rejected = bool(K.FAIL)
 
+        # (5) the same pointer expressed through the supplement map, which is
+        # how the delivered English text now points at a figure that lives in
+        # the supplement.  A guard that only accepts \ref would fail the real
+        # manuscript for a legitimate layout choice, so the safe direction is
+        # probed too: this form must be ACCEPTED.  Paired with (4), which must
+        # still reject, so "accepts nothing" cannot masquerade as a pass.
+        write_paper(honest_en, honest_cn, si_pointer=True)
+        del K.FAIL[:]
+        run(d, K.realgeo_guard, d)
+        si_pointer_ok = not K.FAIL
+
         # (5) the measurement no longer supports the non-separation sentence
         write_json(_synthetic_realgeo(overlap_arms=1))
         write_paper(honest_en, honest_cn)
@@ -1729,11 +1744,12 @@ def probe_realgeo_gate():
         shutil.rmtree(d, ignore_errors=True)
     print("   honest record accepted = %s ; protocol drift rejected = %s ; "
           "missing refusal rejected = %s ; unreferenced float rejected = %s ; "
+          "supplement pointer accepted = %s ; "
           "unsupported refusal rejected = %s ; half-verdict rejected = %s"
           % (honest_ok, drift_rejected, wording_rejected, float_rejected,
-             overclaim_rejected, half_rejected))
+             si_pointer_ok, overclaim_rejected, half_rejected))
     return honest_ok, drift_rejected, wording_rejected, float_rejected, \
-        overclaim_rejected, half_rejected
+        si_pointer_ok, overclaim_rejected, half_rejected
 
 
 def probe_freshness_gate():

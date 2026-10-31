@@ -22,13 +22,26 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import common as C
 
 LAB = {64: "A", 96: "B", 128: "C"}
-CAP_EN = (r"""Same model, three meshes, one boundary. Frequencies {%s};
-%d media drawn at $384^{2}$ and restricted spectrally, so each row is the same
-medium. Locators as Section~\ref{sec:scaling}, seed mean."""
+CAP_EN = (r"""One multi-resolution-trained model evaluated on three spatial
+resolutions; every mesh is seen in training, one grid per optimisation step.
+Frequencies {%s}; %d media drawn at $384^{2}$ and restricted spectrally, so each
+row is the same medium. Mean $\pm$ SD over the %d seeds the meshes share."""
            )
-CAP_CN = (r"""同一模型、三种网格、一条边界。频率集合为 {%s}；
-%d 个介质在 $384^{2}$ 生成后经谱限制，每行是同一连续介质；
-定位量同第~\ref{sec:scaling}~节，取种子均值。""")
+CAP_CN = (r"""同一多分辨率训练模型在三种空间分辨率上的评估，三种网格都参与训练。
+频率集合为 {%s}；%d 个介质在 $384^{2}$ 生成后经谱限制，每行是同一连续介质；
+数值为三网格共用的 %d 个种子的均值 $\pm$ 标准差。""")
+# Table note, kept out of the caption because the caption has a word budget and
+# the two ratios have to be defined where the reader meets them.
+NOTE_EN = (r"\footnotesize $r_{\mathrm{edge}}=\varepsilon(4.25)/\varepsilon(4)$"
+           r" (first out-of-band node against the edge); "
+           r"$r_{\mathrm{1Hz}}=\varepsilon(5)/\varepsilon(4)$ (first hertz beyond it); "
+           r"$\varepsilon_{\mathrm{in}}$, mean over $f<4$; "
+           r"$\varepsilon_{\infty}$, mean over $f\geq6$.")
+NOTE_CN = (r"\footnotesize $r_{\mathrm{edge}}=\varepsilon(4.25)/\varepsilon(4)$"
+           r"（首个带外节点相对带缘）；"
+           r"$r_{\mathrm{1Hz}}=\varepsilon(5)/\varepsilon(4)$（带缘后 1\,Hz）；"
+           r"$\varepsilon_{\mathrm{in}}$ 为 $f<4$ 的均值；"
+           r"$\varepsilon_{\infty}$ 为 $f\geq6$ 的均值。")
 
 
 def fmt(x, n=2):
@@ -76,8 +89,23 @@ def main():
         mac("CrossOnset" + s, fmt(L["onset"], 2))
         mac("CrossStep" + s, ("%.2f--%.2f" % tuple(L["step"])) if L["step"] else "n/a")
         mac("CrossJump" + s, fmt(L["jump"], 2))
+        mac("CrossJumpSD" + s, fmt(L.get("sd_jump", 0.0), 2))
+        mac("CrossRoneHz" + s, fmt(L["r1hz"], 2))
+        mac("CrossRoneHzSD" + s, fmt(L.get("sd_r1hz", 0.0), 2))
         mac("CrossIn" + s, fmt(L["inband"], 4))
+        mac("CrossInSD" + s, fmt(L.get("sd_inband", 0.0), 4))
         mac("CrossPlat" + s, fmt(L["plateau"], 4))
+        mac("CrossPlatSD" + s, fmt(L.get("sd_plateau", 0.0), 4))
+    # Paired mesh effect, same seed evaluated on the finest and the coarsest
+    # mesh: the unpaired reading of the ladder ("0.6% across N") is smaller than
+    # the seed-to-seed spread of the same ratio, so only the paired version says
+    # whether the mesh moves it at all.
+    _pm = d.get("paired_mesh") or {}
+    mac("CrossPairedEdge", "%+.2f" % _pm.get("d_edge", 0.0))
+    mac("CrossPairedEdgeLo", "%+.2f" % _pm.get("d_edge_lo", 0.0))
+    mac("CrossPairedEdgeHi", "%+.2f" % _pm.get("d_edge_hi", 0.0))
+    mac("CrossPairedNlo", "%d" % (_pm.get("mesh_pair", [64, 128])[0]))
+    mac("CrossPairedNhi", "%d" % (_pm.get("mesh_pair", [64, 128])[1]))
     mac("CrossRtwoF", fmt(d["r2"]["f"], 3))
     mac("CrossRtwoQ", fmt(d["r2"]["q"], 3))
     mac("CrossRtwoFN", fmt(d["r2"]["fN"], 3))
@@ -100,6 +128,14 @@ def main():
     mac("CondBeta", "%.4f" % c["beta_logq"])
     mac("CondBetaCILo", "%.4f" % c["beta_ci"][0])
     mac("CondBetaCIHi", "%.4f" % c["beta_ci"][1])
+    # The same interval from a second, independent instrument: media-cluster
+    # bootstrap instead of the analytic CR0 sandwich.  Quoted because the 25 200
+    # records are 200 media x 14 f x 3 N x 3 seeds and a reader is right to ask
+    # that the interval not treat them as independent.
+    if "beta_ci_boot" in c:
+        mac("CondBetaBootLo", "%.4f" % c["beta_ci_boot"][0])
+        mac("CondBetaBootHi", "%.4f" % c["beta_ci_boot"][1])
+        mac("CondBetaBootN", "%d" % c["beta_boot_n"])
     mac("CondPartialRtwo", sci(c["partial_r2_logq"]))
     mac("CondRtwoFonly", "%.3f" % c["r2_freq"])
     mac("CondRtwoFQ", "%.3f" % c["r2_freq_plus_logq"])
@@ -127,11 +163,23 @@ def main():
         for ff in f) if cell else ""
 
     qs = [n / 4.25 for n in N]
+    pm = d["paired_mesh"]
+
+    def pmv(m, s):
+        return "$%s\\pm%s$" % (fmt(m, 2), fmt(s, 2))
+
+    def pmv3(m, s):
+        return "$%s\\pm%s$" % (fmt(m, 3), fmt(s, 3))
+
     rows = "\n".join("%d & %s & %s & %s & %s & %s & %s \\\\"
-                     % (n, fmt(loc[n]["fstar"], 2), fmt(loc[n]["onset"], 2),
+                     % (n,
+                        "%.2f/%.2f" % (loc[n]["fstar"], loc[n]["onset"]),
                         "%.2f--%.2f" % tuple(loc[n]["step"]),
-                        fmt(loc[n]["jump"], 2), fmt(loc[n]["inband"], 3),
-                        fmt(loc[n]["plateau"], 3)) for n in N)
+                        pmv(loc[n]["jump"], loc[n].get("sd_jump", 0.0)),
+                        pmv(loc[n]["r1hz"], loc[n].get("sd_r1hz", 0.0)),
+                        pmv3(loc[n]["inband"], loc[n].get("sd_inband", 0.0)),
+                        pmv3(loc[n]["plateau"], loc[n].get("sd_plateau", 0.0)))
+                     for n in N)
 
     for lg, dr in dirs:
         open(os.path.join(dr, "gen_cross.tex"), "w", encoding="utf-8").write(body)
@@ -140,8 +188,9 @@ def main():
         # different one and a reader is entitled to see which nodes this table
         # was evaluated at.
         fset = ", ".join(("%g" % v) for v in f)
-        cap = ((CAP_EN % (fset, d["n"])) if lg == "en"
-               else (CAP_CN % (fset, d["n"])))
+        nseed = len(d["seeds"])
+        cap = ((CAP_EN % (fset, d["n"], nseed)) if lg == "en"
+               else (CAP_CN % (fset, d["n"], nseed)))
         # The caption is checked against the manuscript's own reading budget
         # here, at generation, not only by lint_style.py afterwards: a caption
         # that grows past the budget with the data would otherwise be caught
@@ -157,17 +206,21 @@ def main():
 \centering
 \caption{%s}
 \label{tab:cross}
-\small
-\setlength{\tabcolsep}{4pt}
+\footnotesize
+\setlength{\tabcolsep}{3pt}
 \begin{tabular}{ccccccc}
 \toprule
-$N$ & $f^{\star}$ & onset & largest step & jump & in band & plateau \\
+$N$ & $f^{\star}$/onset & largest step & $r_{\mathrm{edge}}$
+& $r_{\mathrm{1Hz}}$ & $\varepsilon_{\mathrm{in}}$ & $\varepsilon_{\infty}$ \\
 \midrule
 %s
 \bottomrule
 \end{tabular}
+
+\vspace{2pt}
+%s
 \end{table}
-""" % (" ".join(cap.split()), rows)
+""" % (" ".join(cap.split()), rows, (NOTE_EN if lg == "en" else NOTE_CN))
         open(os.path.join(dr, "gen_tab_cross.tex"), "w", encoding="utf-8").write(tab)
 
     prows = []

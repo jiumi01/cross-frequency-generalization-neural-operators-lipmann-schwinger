@@ -1089,16 +1089,19 @@ def realgeo_guard(root=None):
             if mac not in t:
                 bad("[%s] the sentence carrying %s is not bound to \\%s"
                     % (lang, tag, mac.strip("\\")))
-        # a \label is not a citation: require the float to be *pointed at*, or
-        # a manuscript could carry the label while never showing the reader the
-        # figure that the level-3 sentences refer to. The level-3 table may
-        # live in the supplementary material, in which case the main text
-        # points at it by name, through the generated \\siTab map, instead of
-        # by \ref, which would dangle in a separately compiled document.
-        for need, why in (("fig:realgeo", "figure"),):
-            if not _re.search(r"\\ref\s*\{[^}]*" + need + r"[^}]*\}", t):
-                bad("[%s] the level-3 %s is never referenced from the text"
-                    % (lang, why))
+        # The level-3 table may also live in the supplementary material, in
+        # which case the main text points at it by name, through the generated
+        # \\siTab map, instead of by \ref, which would dangle in a separately
+        # compiled document.  The same holds for the level-3 FIGURE, which was
+        # moved into the supplement to keep the main text inside its page
+        # budget: a \ref there would print a question mark, so the accepted
+        # pointer is \siFig{figS:realgeo}, generated from the supplement's aux.
+        fig_ref = _re.search(r"\\ref\s*\{[^}]*fig:realgeo[^}]*\}", t)
+        fig_si = "\\siFig{figS:realgeo}" in t
+        if not (fig_ref or fig_si):
+            bad("[%s] the level-3 figure is never referenced from the text "
+                "(either \\ref{fig:realgeo} or a \\siFig{figS:realgeo} "
+                "pointer is required)" % lang)
         if (not _re.search(r"\\ref\s*\{[^}]*tab:realgeo[^}]*\}", t)
                 and "\\siTab{tab:realgeo}" not in t):
             bad("[%s] the level-3 table is never referenced from the text "

@@ -80,19 +80,28 @@ ARMS5 = [ORANGE, SKY, GREEN, BLUE, VERMILION]           # contrast arms
 MODES6 = [GREY, ORANGE, SKY, GREEN, BLUE, VERMILION]    # retained-mode budgets
 
 
-def set_style():
+def set_style(scale=1.0):
+    """Global style.  `scale` exists for the two figures a referee found too
+    small: their natural width was half a column, so at the 1:1 inclusion rule
+    `fig_widths.py` enforces the labels printed at their nominal size inside a
+    8 cm panel.  Enlarging the panel without enlarging the type would leave the
+    same complaint, so both move together here and the numeric arguments in
+    those two functions are multiplied by the same factor."""
     plt.rcParams.update({
         "pdf.fonttype": 42, "ps.fonttype": 42,
         "font.family": "serif", "font.serif": ["Times New Roman", "DejaVu Serif"],
         "mathtext.fontset": "stix",
-        "font.size": 9, "axes.labelsize": 9.5, "axes.titlesize": 9.5,
-        "legend.fontsize": 8, "xtick.labelsize": 8.5, "ytick.labelsize": 8.5,
-        "axes.linewidth": 0.8, "lines.linewidth": 1.4, "lines.markersize": 4.2,
+        "font.size": 9 * scale, "axes.labelsize": 9.5 * scale,
+        "axes.titlesize": 9.5 * scale,
+        "legend.fontsize": 8 * scale, "xtick.labelsize": 8.5 * scale,
+        "ytick.labelsize": 8.5 * scale,
+        "axes.linewidth": 0.8 * scale, "lines.linewidth": 1.4 * scale,
+        "lines.markersize": 4.2 * scale,
         "xtick.direction": "in", "ytick.direction": "in",
-        "xtick.major.width": 0.8, "ytick.major.width": 0.8,
-        "xtick.major.size": 3.2, "ytick.major.size": 3.2,
+        "xtick.major.width": 0.8 * scale, "ytick.major.width": 0.8 * scale,
+        "xtick.major.size": 3.2 * scale, "ytick.major.size": 3.2 * scale,
         "legend.frameon": False, "savefig.dpi": 600, "figure.dpi": 150,
-        "axes.axisbelow": True, "axes.labelpad": 3.0,
+        "axes.axisbelow": True, "axes.labelpad": 3.0 * scale,
     })
 
 
@@ -549,8 +558,13 @@ def fig_arch(evals, out):
 # Figure -- training-band width: the gain sits just beyond the new edge
 # ---------------------------------------------------------------------------
 def fig_band(evals, out):
-    set_style()
-    fig, ax = plt.subplots(figsize=(HALF_W, HALF_W * 0.92), layout="constrained")
+    # 0.78 of the text block at 1:1 (fig_widths derives the fraction from the
+    # MediaBox), with the type 1.2x: five curves with end labels were crowded
+    # in a half-column panel at nominal size.
+    Z = 1.2
+    set_style(Z)
+    fig, ax = plt.subplots(figsize=(FULL_W * 0.78, FULL_W * 0.47),
+                           layout="constrained")
     specs = [("A025", "band_a025", 4.0, ARMS5[0]),
              ("A025_b2", "band_b2", 2.0, ARMS5[1]),
              ("A025_b3", "band_b3", 3.0, ARMS5[2]),
@@ -586,7 +600,7 @@ def fig_band(evals, out):
     # The shading is the REFERENCE band, not the band of every curve: the
     # figure's whole argument is that each curve has a different one.  Saying
     # so on the patch itself keeps the grey from being read as "the band".
-    ax.annotate(r"reference band $[1,4]$", xy=(1.05, 0.0105), fontsize=7.0,
+    ax.annotate(r"reference band $[1,4]$", xy=(1.05, 0.0105), fontsize=7.0 * Z,
                 color="#555555", ha="left", va="bottom",
                 bbox=dict(boxstyle="round,pad=0.10", fc="white", ec="none",
                           alpha=0.75))
@@ -595,9 +609,9 @@ def fig_band(evals, out):
     decades(ax, numticks=3)
     sweep_axis(ax)
     ax.set_ylabel(r"relative $L_2$ error")
-    end_labels(ax, ends, fs=7.0, min_sep=10.5)
+    end_labels(ax, ends, fs=7.0 * Z, min_sep=10.5 * Z)
     badge(ax, 0.985, 0.035, r"ring: train band edge", ha="right", va="bottom",
-          fs=7.4)
+          fs=7.4 * Z)
     save(fig, os.path.join(out, "fig_bandwidth"))
 
 
@@ -675,11 +689,19 @@ def fig_mode_phase(evals, out, band_tag, train_edge, fname):
             if np.isnan(Mat[i, j]):
                 continue
             ax.text(j, i, "%.2f" % Mat[i, j], ha="center", va="center",
-                    fontsize=8.6,
+                    fontsize=9.4,
                     color="k" if Mat[i, j] > 0.5 * vmax_c else "w")
     cb = fig.colorbar(im, ax=ax, fraction=0.046, pad=0.03)
     cb.outline.set_linewidth(0.5)
     cb.ax.tick_params(labelsize=7.5)
+    # The bar's own maximum is printed as a tick: an auto-located top tick sat
+    # below the largest cell (1.11) and a reader checking the scale against the
+    # hottest cell had no tick to check it against.
+    _lo, _hi = float(np.nanmin(Mat)), float(vmax_c)
+    _ticks = sorted({round(_lo + (_hi - _lo) * k / 4.0, 2) for k in range(5)}
+                    | {round(_hi, 2)})
+    cb.set_ticks(_ticks)
+    cb.set_ticklabels(["%.2f" % t for t in _ticks])
     cb.set_label(r"relative $L_2$ error", fontsize=8)
     save(fig, os.path.join(out, fname))
 
@@ -1768,9 +1790,9 @@ def fig_realgeo(out):
     ax = fig.add_subplot(gs[0, 1])
     for fam, names, col, ls, lab in (
             ("real", [g for g in d["order"] if g.startswith("geo_")],
-             VERMILION, "-", "Marmousi velocity model"),
+             VERMILION, "-", "Marmousi"),
             ("syn", [g for g in d["order"] if g.startswith("syn_")],
-             BLUE, "--", "Synthetic Gaussian media")):
+             BLUE, "--", "synthetic")):
         # Collapse the three windows of each family to a mean curve with a
         # min--max band over windows (and their seed spans).  This reduces the
         # six raw curves to the two families the labels name.
@@ -1802,8 +1824,14 @@ def fig_realgeo(out):
     # In-panel legend instead of right-edge end labels: the labels used to
     # land in the inter-panel gap and on top of panel (c)'s axis label.  The
     # region below the plateau on the right is empty.
-    ax.legend(fontsize=8, loc="lower right", frameon=False,
-              handlelength=2.6, labelspacing=0.35)
+    # The label text must fit INSIDE the panel: at "synthetic control
+    # (unmatched)" the legend box was wider than the axes, so matplotlib kept
+    # its right edge on the right and spilled the left edge over panel (a)'s
+    # colourbar, printing the two strings on top of each other.  The caption
+    # already says the control is unmatched, so the entry is shortened rather
+    # than the panel widened.
+    ax.legend(fontsize=7.6, loc="lower right", frameon=False,
+              handlelength=2.2, labelspacing=0.3, borderaxespad=0.3)
     panel_label(ax, "b", r"$v_{\max}=%.2f$, FNO" % VMAX)
     despine(ax)
 
@@ -1835,7 +1863,7 @@ def fig_realgeo(out):
     decades(ax, numticks=5)
     require_inside(ax)
     ax.set_xlabel("mode index $M$")
-    ax.set_ylabel(r"out-of-band energy fraction")
+    ax.set_ylabel(r"out-of-band energy fraction of $v$")
     panel_label(ax, "c", "input contrast field")
     ax.set_xticks([4, 8, 12, 16, 20, 24])
     despine(ax)
@@ -1946,10 +1974,15 @@ def fig_plateau_coupling(evals, out):
     the model tracking the baseline across the 20x coupling range, with the
     excess (model over baseline) growing slowly with coupling.
     """
-    set_style()
+    # Single five-point panel: at half a column it left more white space than
+    # information.  Emitted at 0.72 of the text block, 1.25x type, so the
+    # points, the printed values and the y=1 rule all print larger.
+    Z = 1.25
+    set_style(Z)
     spec = json.load(open(os.path.join(C.RES, "spectrum.json"),
                           encoding="utf-8"))
-    fig, ax = plt.subplots(figsize=(HALF_W, HALF_W * 0.92), layout="constrained")
+    fig, ax = plt.subplots(figsize=(FULL_W * 0.72, FULL_W * 0.50),
+                           layout="constrained")
     coups, plats, trivs, sds = [], [], [], []
     for vk, vmax in zip(("a005", "a010", "a025", "a050", "a100"), C.VMAX_LIST):
         plateau = []
@@ -1980,7 +2013,7 @@ def fig_plateau_coupling(evals, out):
     # worse than returning the incident field alone, which is what makes the
     # plateau-versus-baseline comparison legible without a second axis.
     ax.axhline(1.0, color=INK, lw=0.7, ls=(0, (2.0, 2.0)), zorder=1)
-    ax.annotate(r"$y=1$ (predict zero)", xy=(0.52, 1.02), fontsize=7.0,
+    ax.annotate(r"$y=1$ (predict zero)", xy=(0.52, 1.02), fontsize=7.0 * Z,
                 color="#333333", va="bottom")
     ax.errorbar(coups, plats, yerr=sds, fmt="-o", color=BLUE, lw=1.5, ms=4.6,
                 capsize=2.0, elinewidth=0.8,
@@ -2001,15 +2034,15 @@ def fig_plateau_coupling(evals, out):
     # numbers the text quotes, and a log axis without printed values makes
     # the reader measure distances to guess them.
     for x, y in zip(coups, plats):
-        ax.annotate("%.2f" % y, xy=(x, y), xytext=(0, 5.5),
+        ax.annotate("%.2f" % y, xy=(x, y), xytext=(0, 5.5 * Z),
                     textcoords="offset points", ha="center", va="bottom",
-                    fontsize=8, color=BLUE)
+                    fontsize=8 * Z, color=BLUE)
     for x, y in zip(coups, trivs):
-        ax.annotate("%.2f" % y, xy=(x, y), xytext=(0, -6.5),
+        ax.annotate("%.2f" % y, xy=(x, y), xytext=(0, -6.5 * Z),
                     textcoords="offset points", ha="center", va="top",
-                    fontsize=8, color=VERMILION)
+                    fontsize=8 * Z, color=VERMILION)
     end_labels(ax, [(float(plats[-1]), "FNO", BLUE),
-                    (float(trivs[-1]), "trivial", VERMILION)], fs=7.4)
+                    (float(trivs[-1]), "trivial", VERMILION)], fs=7.4 * Z)
     # The excess is the quantity of interest and is stated twice: per point,
     # in the printed values above, and summarised for the whole range in the
     # badge.  The old ratio arrow sat at the low-coupling end, where the two
@@ -2017,7 +2050,7 @@ def fig_plateau_coupling(evals, out):
     badge(ax, 0.03, 0.955,
           r"excess over baseline: $%.2f\times$ $\rightarrow$ $%.2f\times$ "
           r"across the range" % (plats[0] / trivs[0], plats[-1] / trivs[-1]),
-          ha="left", fs=6.9)
+          ha="left", fs=6.9 * Z)
     save(fig, os.path.join(out, "fig_plateau_coupling"))
 
 
