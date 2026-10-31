@@ -34,7 +34,15 @@ import glob
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                     ".."))
-TEXTWIDTH_PT = 470.6           # MDPI class, a4paper, left=right=2.2 cm
+CANVAS_PT = 470.6             # the 16.6 cm canvas figures.py draws on
+REAL_TEXTWIDTH_PT = 392.9       # measured: caption right edge on the built PDF
+# The mdpi class at a4paper sets left=5.87 cm (1.27 + 0.51 + 4.10 marginpar)
+# and right=1.27 cm, so the real \textwidth is 21 - 5.87 - 1.27 = 13.86 cm
+# = 392.9 pt, not the canvas width.  Every figure is therefore placed at
+# 392.9/470.6 = 0.835 of its natural size -- uniformly, which is what keeps
+# EN and CN identical, but it is NOT 1:1: the 9 pt / 8.5 pt nominal type
+# renders at 7.5 pt / 7.1 pt.  Named for what it is rather than for what
+# the layout would need.
 DOCS = [
     os.path.join(ROOT, "submission", "paper_en", "main.tex"),
     os.path.join(ROOT, "submission", "paper_cn", "main.tex"),
@@ -72,7 +80,7 @@ def frac_of(w_pt):
     """Inclusion fraction: 1.0 (i.e. \\textwidth) at or above 0.995, else two
     decimals.  A figure wider than the text block is an error, not a number
     the manuscripts should compensate for."""
-    f = w_pt / TEXTWIDTH_PT
+    f = w_pt / CANVAS_PT
     if f > 1.0 + 1e-9:
         return None, f
     if f >= 0.995:
@@ -136,7 +144,7 @@ def check(widths):
             if want is None:
                 print("[FAIL] %s: %s is %.1f pt wide, past the %.1f pt text "
                       "block" % (os.path.basename(doc), base, widths[base],
-                                 TEXTWIDTH_PT))
+                                 CANVAS_PT))
                 bad += 1
                 continue
             if wopt != want:
@@ -152,8 +160,13 @@ def check(widths):
                 bad += 1
             seen[base] = wopt
     if not bad:
-        print("[ok]   %d figures: inclusion width equals the measured natural "
-              "width in every manuscript, EN and CN agree" % len(seen))
+        scale = REAL_TEXTWIDTH_PT / CANVAS_PT
+        print("[ok]   %d figures: placed at the same fraction of their natural "
+              "width in both manuscripts (uniform %.3f scale), EN and CN agree"
+              % (len(seen), scale))
+        print("[note] canvas %.1f pt vs class text block %.1f pt -> nominal 9/8.5 "
+              "pt type renders at %.1f/%.1f pt"
+              % (CANVAS_PT, REAL_TEXTWIDTH_PT, 9 * scale, 8.5 * scale))
     return bad
 
 

@@ -49,6 +49,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle, Patch
 from matplotlib.lines import Line2D
+from matplotlib.legend_handler import HandlerTuple
 from matplotlib.ticker import LogLocator, NullFormatter, FixedLocator
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -584,11 +585,27 @@ def fig_band(evals, out):
         # Each arm has its own training edge, so a single shared vertical rule
         # would mark only one of the five.  Marking the edge with a ring on
         # the arm's own curve locates it without five full-height rules
-        # cutting the panel into stripes.  The edge frequency is printed next
-        # to the ring: five rings at five heights are otherwise the same
-        # glyph, and the reader has to count rings against the legend.
-        k = int(np.argmin(np.abs(F - fedge)))
-        ax.plot([F[k]], [M[k]], marker="o", ms=9.0, mfc="none", mec=col,
+        # cutting the panel into stripes.
+        #
+        # The ring sits at the arm's EDGE FREQUENCY, not at the nearest node.
+        # Two of the five bands end between sweep nodes ([1,2] and [1,3] on a
+        # grid of 1.5, 2.5, 3.5), and snapping the ring to the nearest node put
+        # it half a hertz inside the band -- next to the foot of the rise but
+        # labelled as its edge.  Where the edge falls between two nodes the
+        # ring is placed on the interpolated segment (log-log, as drawn), so
+        # the glyph is where the caption says it is.
+        Fr = np.asarray(F, float)
+        exact = np.where(np.isclose(Fr, fedge))[0]
+        if exact.size:
+            xr, yr = float(Fr[exact[0]]), float(M[exact[0]])
+        else:
+            j = int(np.searchsorted(Fr, fedge))
+            j = min(max(j, 1), len(Fr) - 1)
+            t = (fedge - Fr[j - 1]) / (Fr[j] - Fr[j - 1])
+            xr = float(fedge)
+            yr = float(10.0 ** (np.log10(M[j - 1])
+                                + t * (np.log10(M[j]) - np.log10(M[j - 1]))))
+        ax.plot([xr], [yr], marker="o", ms=9.0, mfc="none", mec=col,
                 mew=1.3, clip_on=False, zorder=4)
         # No number beside the ring: the right-edge label already reads
         # "train [1,N]", so a second copy of N inside the plot only collided
@@ -1176,7 +1193,10 @@ def fig_crosscontrast(evals, out):
                         mec=ARMS5[i], mew=1.4, zorder=5, clip_on=False)
         band(ax)
         ax.set_yscale("log")
-        ax.set_ylim(0.012, 5.0)
+        # Bottom at 0.0095, not 0.012: the weakest arm's in-band floor is
+        # 0.0114, so the old limit sat ABOVE the first two nodes of the
+        # matched curve and they were drawn on top of the axis rule.
+        ax.set_ylim(0.0095, 5.0)
         decades(ax, numticks=3)
         sweep_axis(ax)
         panel_label(ax, "ab"[k], ttl, fontsize=8.5)
@@ -1191,15 +1211,25 @@ def fig_crosscontrast(evals, out):
     h = [Line2D([], [], color=ARMS5[i], marker="o", ls="-", lw=1.2, ms=3.0)
          for i in range(len(C.VMAX_LIST))]
     l = [r"$v_{\max}=%.2f$" % v for v in C.VMAX_LIST]
-    h.append(Line2D([], [], color="#555555", marker="o", ls="-", lw=2.4,
-                    ms=3.0))
+    # The two convention handles are drawn in TWO colours each, not in grey.
+    # A single grey handle was a sample of a series that is not in the plot:
+    # the thick curve is the matched arm, and that arm's colour differs between
+    # the two panels (vermilion in (a), blue in (b)), so a grey sample told the
+    # reader to look for a curve that does not exist.  Two half-length samples
+    # in the two extreme arm colours say "whatever the colour, the width (or
+    # the ring) is the cue" without adding a legend row or widening the strip.
+    h.append((Line2D([], [], color=ARMS5[0], lw=2.6, ls="-"),
+              Line2D([], [], color=ARMS5[-1], lw=2.6, ls="-")))
     l.append("train-matched")
-    h.append(Line2D([], [], color="none", marker="o", ms=8, mfc="none",
-                    mec="#555555", mew=1.3))
+    h.append((Line2D([], [], color="none", marker="o", ms=7.0, mfc="none",
+                     mec=ARMS5[0], mew=1.3),
+              Line2D([], [], color="none", marker="o", ms=7.0, mfc="none",
+                     mec=ARMS5[-1], mew=1.3)))
     l.append("band edge")
     fig.legend(h, l, fontsize=7.6, ncol=len(h), loc="lower center",
-               bbox_to_anchor=(0.5, 1.005), handlelength=1.4,
+               bbox_to_anchor=(0.5, 1.005), handlelength=2.0,
                columnspacing=0.8, labelspacing=0.3,
+               handler_map={tuple: HandlerTuple(ndivide=None)},
                title="eval contrast", title_fontsize=7.6)
     save(fig, os.path.join(out, "fig_crosscontrast"))
 
@@ -1575,6 +1605,33 @@ def fig_deep(out):
             ax.plot([Fm[k4]], [M[k4]], marker="o", ms=7.5, mfc="none",
                     mec=GREEN, mew=1.2, clip_on=False, zorder=5)
     band(ax)
+    # The surviving rise is the claim of this panel and the caption quotes it
+    # as \BATwoR; the number is printed here so the reader can see WHICH
+    # feature the caption is talking about.  That makes the figure a second
+    # rendering of one quantity, so it is computed from the same records the
+    # macro is built from and then checked against the macro itself: if the
+    # data move and only one of the two paths is regenerated, the build stops
+    # instead of shipping a figure and a caption that disagree.
+    deep = [n for n in sorted(ev) if n.startswith("ba_fno_a025_m8_s")
+            and list(ev[n].get("f_test") or []) == list(C.F_TEST)]
+    if deep:
+        Fd, Md, _ = mean_curve(ev, deep, 0.25)
+        if np.isclose(Fd, 4.0).any() and np.isclose(Fd, 5.0).any():
+            r1 = float(Md[np.isclose(Fd, 5.0)][0]
+                       / Md[np.isclose(Fd, 4.0)][0])
+            try:
+                _mac = open(os.path.join(C.ROOT, "paper", "en",
+                                         "gen_macros.tex"),
+                            encoding="utf-8").read()
+                _m = re.search(r"\\newcommand\{\\BATwoR\}\{([\d.]+)\}", _mac)
+                if _m:
+                    assert abs(float(_m.group(1)) - r1) < 5e-3, (
+                        "fig_deep prints %.3f but \\BATwoR is %s"
+                        % (r1, _m.group(1)))
+            except IOError:
+                pass
+            badge(ax, 0.30, 0.07, r"$r_{\mathrm{1Hz}}=%.2f$ at the ring" % r1,
+                  fs=7.8, ha="left", va="bottom")
     ax.set_yscale("log")
     # The four objects span three decades here (the head alone is an order of
     # magnitude below the trained operator inside the band), so the limit is
