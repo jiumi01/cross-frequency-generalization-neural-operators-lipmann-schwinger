@@ -95,6 +95,13 @@ def main():
               (vmax, a.real, a.imag, b.real, b.imag), flush=True)
 
         rows, ib_rows, tv_rows, bn_rows = [], [], [], []
+        # Per-media curves above 6 Hz, kept so the plateau can carry a spread.
+        # A plateau is one number per media (that media's mean error over
+        # f >= 6), and only then averaged over media; averaging the per-f means
+        # first and attaching the spread of those means would report the
+        # frequency-to-frequency wobble of a single curve, not the media
+        # dispersion the anchor curve is supposed to be uncertain about.
+        pl_vals, tv_vals = [], []
         # in band, same protocol and seeds as every trained arm
         d = D.sample_batch(N, 70000 + vi, DEV, f_lo=1.0, f_hi=4.0,
                            vmax_lo=vmax, vmax_hi=vmax)
@@ -124,6 +131,9 @@ def main():
                              std=float(anch.std()),
                              sem=float(anch.std() / np.sqrt(N))))
             tv_rows.append(float(triv.mean()))
+            if f >= 6.0:
+                pl_vals.append(anch)
+                tv_vals.append(triv)
             bn_rows.append([float(born1.mean()), float(born2.mean())])
             if fi % 4 == 0:
                 print("   f=%5.2f  anchor %.3f  trivial %.3f  born1 %.3f"
@@ -131,6 +141,15 @@ def main():
                       flush=True)
         plateau = float(np.mean([r["mean"] for r in rows
                                  if r["f"] >= 6.0]))
+        # Same plateau, resolved per media, so panel (b) of the anchor figure
+        # can carry a bar at every contrast point.  The mean of the per-media
+        # plateaus is by construction the mean of the per-f means; the assert
+        # keeps the two bookkeeping routes from drifting apart.
+        pl = np.mean(np.stack(pl_vals), axis=0)
+        tv = np.mean(np.stack(tv_vals), axis=0)
+        assert abs(float(pl.mean()) - plateau) < 1e-12, \
+            "per-media plateau %.12f != per-f plateau %.12f" % (pl.mean(),
+                                                                plateau)
         out["arms"]["%.2f" % vmax] = dict(
             a=[float(a.real), float(a.imag)], b=[float(b.real), float(b.imag)],
             in_band=float(np.mean(ib_rows)), sweep=rows,
@@ -138,8 +157,11 @@ def main():
             born1=[float(x[0]) for x in bn_rows],
             born2=[float(x[1]) for x in bn_rows],
             plateau=plateau,
+            plateau_sd=float(pl.std(ddof=1)),
+            plateau_sem=float(pl.std(ddof=1) / np.sqrt(N)),
             trivial_plateau=float(np.mean([tv_rows[i] for i, f in
                                            enumerate(C.F_TEST) if f >= 6.0])),
+            trivial_plateau_sem=float(tv.std(ddof=1) / np.sqrt(N)),
             e4=float(rows[[r["f"] for r in rows].index(4.0)]["mean"]),
             e5=float(rows[[r["f"] for r in rows].index(5.0)]["mean"]))
         print("   -> in-band %.3f | e(4) %.3f e(5) %.3f | plateau %.3f "

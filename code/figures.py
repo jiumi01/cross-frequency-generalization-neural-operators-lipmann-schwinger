@@ -1316,6 +1316,9 @@ def fig_anchor(out):
       (b) the plateau against contrast for the same three learned/analytic
           objects, which is where the complementarity lives: the trained
           operator wins inside the band and the anchor wins outside it.
+          Every point on the anchor curve carries a bar here too -- the
+          standard error of its per-media plateau -- so a contrast trend is
+          not read off a wobble that a bar would have covered.
     Read from results/anchor_baseline.json and the evaluation records, so the
     figure and the anchor table cannot drift apart.  No GPU.
     """
@@ -1383,8 +1386,17 @@ def fig_anchor(out):
     vm = np.array([float(k) for k in sorted(d["arms"])])
     anchp = np.array([d["arms"]["%.2f" % v]["plateau"] for v in vm])
     trivp = np.array([d["arms"]["%.2f" % v]["trivial_plateau"] for v in vm])
-    ax.plot(vm, anchp, color=VERMILION, marker="D", ms=4.0, lw=1.3,
-            clip_on=False, zorder=3, label="anchor")
+    # Every anchor point carries a bar, not just the ones in panel (a).  The
+    # bar is the standard error of the per-media plateau (each media's mean
+    # error over f >= 6, then averaged), i.e. the same quantity as the anchor's
+    # bars in (a); the media SD is 11-85% of the value and would swamp the
+    # panel on a log axis.  The trained operator's bar stays the seed SD,
+    # because its per-media errors are not archived -- the caption says so, and
+    # the two bars are therefore not to be compared with each other.
+    pse = np.array([d["arms"]["%.2f" % v]["plateau_sem"] for v in vm])
+    ax.errorbar(vm, anchp, yerr=pse, color=VERMILION, marker="D", ms=4.0,
+                lw=1.3, capsize=2.2, capthick=1.1, elinewidth=1.1,
+                clip_on=False, zorder=3, label="anchor")
     ax.plot(vm, trivp, color=FAINT, lw=1.0, ls=(0, (1.5, 1.6)),
             clip_on=False, zorder=2, label="trivial, $\\hat u\\equiv0$")
     fno, keep, fsd = [], [], []

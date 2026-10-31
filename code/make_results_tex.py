@@ -3206,7 +3206,7 @@ def anchor_macros():
     return ["\\newcommand{\\%s}{%s}" % (k, v.get(k, "--")) for k in keys]
 
 
-def table_anchor(cap):
+def table_anchor(cap, lang="en"):
     """The analytic anchor against the trained operator (Section sec:anchor).
 
     Two rows per contrast: the anchor and, on the same media and seeds, the
@@ -3247,7 +3247,31 @@ def table_anchor(cap):
               % fmt(a["trivial_plateau"]))
         if vmax != C.VMAX_LIST[-1]:
             t += "\\midrule\n"
-    return t + "\\bottomrule\n\\end{tabular}\n\\end{table}\n"
+    # The plateau's dispersion, in numbers rather than in pixels.  The bars of
+    # Figure~\ref{fig:anchor}(b) are drawn at +/-1 SEM but are smaller than the
+    # markers at that panel's scale, so the table carries the values: an SEM of
+    # 0.001-0.014 over the 200 media, against gaps between the three predictors
+    # that are never below a factor of three.
+    sem = [d["arms"]["%.2f" % v].get("plateau_sem") for v in C.VMAX_LIST]
+    note = ""
+    if all(s is not None for s in sem):
+        lo, hi = float(min(sem)), float(max(sem))
+        note = {"en": "$\\varepsilon_{\\infty}$: standard error over the 200 "
+                      "paired media, $%s$ to $%s$. The anchor is fixed by its "
+                      "two coefficients, so no seed SD is defined for it."
+                      % (fmt(lo, 3), fmt(hi, 3)),
+                "cn": "$\\varepsilon_{\\infty}$ 一列为 200 个配对介质上的"
+                      "标准误，$%s$ 至 $%s$；锚定由两个系数唯一确定，"
+                      "不存在种子间离散，该标准误亦小于图中标记。"
+                      % (fmt(lo, 3), fmt(hi, 3))}.get(
+                          lang, "")
+    # The blank line after \end{tabular} is not cosmetic: without it LaTeX is
+    # still in the paragraph that holds the tabular box, and the note is
+    # typeset into the leftover horizontal space to the right of the table --
+    # it came out as a narrow column running into the page margin.
+    return (t + "\\bottomrule\n\\end{tabular}\n\n"
+            + ("\\vspace{2pt}\n{\\footnotesize %s}\n" % note if note else "")
+            + "\\end{table}\n")
 
 
 # ---------------------------------------------------------------- deep anchor
@@ -4563,7 +4587,7 @@ def build(lang):
         "arms": table_arms(ev, cap),
         "c1": table_c1(cap),
         "disc": table_disc(cap),
-        "anchor": table_anchor(cap),
+        "anchor": table_anchor(cap, lang),
         "deep": table_deep(cap),
         "gridthree": table_gridthree(cap),
         "ci": table_ci(cap),
