@@ -369,6 +369,23 @@ def self_test():
     return bad
 
 
+def targets():
+    """Files to read, overridable so the probe can point the same rules at a
+    mutated copy.  Without an override a gate can only be tested by editing the
+    manuscript, which makes the test and the defect the same object."""
+    root = None
+    for i, a in enumerate(sys.argv):
+        if a == "--root" and i + 1 < len(sys.argv):
+            root = sys.argv[i + 1]
+    root = root or os.environ.get("PROSE_PAPER_ROOT")
+    if root:
+        base = (os.path.join(root, "paper")
+                if os.path.isdir(os.path.join(root, "paper", "en")) else root)
+        return [os.path.join(base, "en", "main.tex"),
+                os.path.join(base, "en", "SI_main.tex")]
+    return FILES
+
+
 def main():
     if "--self-test" in sys.argv:
         print("=== check_prose self-test ===")
@@ -376,7 +393,7 @@ def main():
 
     total_words = 0
     findings = []
-    for path in FILES:
+    for path in targets():
         if not os.path.exists(path):
             print("[FAIL] missing %s" % path)
             sys.exit(1)

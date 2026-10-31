@@ -789,6 +789,15 @@ def main():
     else:
         print("PROBE 26: MISBEHAVED %s" % sc)
 
+    print("-- probe 28 (the mechanical proofreading gate) --")
+    pr = probe_prose()
+    if all(pr.values()):
+        print("PROBE 28: the real prose accepted; a US spelling, a doubled "
+              "word, an untied cross-reference, a coexisting variant pair and "
+              "a literal multiplication sign all rejected")
+    else:
+        print("PROBE 28: MISBEHAVED %s" % pr)
+
     print("-- probe 27 (the envelope documents outside every .tex gate) --")
     dt = probe_delivery_texts()
     if all(dt.values()):
@@ -823,7 +832,8 @@ def main():
             and all(bx.values())
             and all(sr.values())
             and all(sc.values())
-            and all(dt.values()))
+            and all(dt.values())
+            and all(pr.values()))
     after = _tree_fingerprint()
     touched = sorted(k for k, v in after.items() if before.get(k) != v)
     if touched:
@@ -2408,6 +2418,72 @@ def probe_delivery_texts():
         fails = D.archive_failures(d)
         out["archive_seed"] = any("missing seeds" in f for f in fails)
         out["archive_manifest"] = any("MANIFEST claims" in f for f in fails)
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+    return out
+
+
+def probe_prose():
+    """probe 28: the mechanical proofreading gate.
+
+    check_prose decides spelling, compound consistency, doubled words and
+    cross-reference form.  A gate of that kind has an obvious failure mode --
+    reporting clean because it read nothing, or because its masking ate the
+    very tokens it tests -- so the probe runs it on a copy of the real
+    manuscript, once untouched and once with each of five defects spliced in.
+    Each mutation must be rejected by name, and the untouched copy must pass:
+    a gate that rejects everything is as useless as one that rejects nothing.
+    """
+    import subprocess
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    gate = os.path.join(root, "code", "check_prose.py")
+    src_dir = os.path.join(root, "submission", "paper_en")
+    out = {}
+    d = tempfile.mkdtemp(prefix="_prose_probe_")
+    try:
+        paper = os.path.join(d, "paper", "en")
+        os.makedirs(paper)
+        body = io.open(os.path.join(src_dir, "main.tex"),
+                       encoding="utf-8").read()
+        si = io.open(os.path.join(src_dir, "SI_main.tex"),
+                     encoding="utf-8").read()
+
+        def run_on(text):
+            io.open(os.path.join(paper, "main.tex"), "w",
+                    encoding="utf-8").write(text)
+            io.open(os.path.join(paper, "SI_main.tex"), "w",
+                    encoding="utf-8").write(si)
+            q = subprocess.run([sys.executable, gate, "--root", d],
+                               capture_output=True, text=True)
+            return q.returncode, q.stdout + q.stderr
+
+        rc, log = run_on(body)
+        out["clean"] = (rc == 0 and "prose gate passed" in log)
+
+        cases = {
+            # a word this manuscript spells the British way
+            "us_spelling": lambda s: s.replace("normalised", "normalized", 1),
+            "doubled": lambda s: s.replace(
+                r"\end{document}", "The the operator converges.\n"
+                r"\end{document}", 1),
+            "untied": lambda s: s.replace("Section~\\ref", "Section \\ref", 1),
+            "pair": lambda s: s.replace(
+                r"\end{document}", "This dataset differs from that data set.\n"
+                r"\end{document}", 1),
+            "literal": lambda s: s.replace(
+                r"\end{document}", "a 3\u00d7 larger step.\n"
+                r"\end{document}", 1),
+        }
+        want = {"us_spelling": "us-spelling", "doubled": "doubled-word",
+                "untied": "untied-reference", "pair": "variant-pairs",
+                "literal": "bad-unicode"}
+        for name, fn in cases.items():
+            mutated = fn(body)
+            if mutated == body:      # the mutation did not land
+                out[name] = False
+                continue
+            rc, log = run_on(mutated)
+            out[name] = (rc != 0 and want[name] in log)
     finally:
         shutil.rmtree(d, ignore_errors=True)
     return out
