@@ -38,7 +38,10 @@ normalisation), not structural, so they survive reformatting:
      archive copies of both, and the S23 checklist;
   4. the Data Availability statement and the cover letter agree on when the DOI
      exists, and neither asserts a DOI that does not;
-  5. the supplementary material is declared in both manuscripts;
+  5. the English manuscript declares the supplement it ships, and the Chinese
+     manuscript -- which ships none -- neither declares nor cites one, because
+     a pointer into an absent file is the one statement a reader can refute by
+     looking for the file;
   6. the archive's evaluation records cover every arm and seed the live results
      directory has, and its MANIFEST describes the files actually on disk.
 
@@ -276,13 +279,41 @@ def doi_failures(das, cover, *others):
 # --------------------------------------------------------------------------
 # 5. supplementary declaration
 # --------------------------------------------------------------------------
+def _strip_comments(tex):
+    """Drop LaTeX comments, so a comment about the supplement is not a pointer.
+
+    A line such as "% 中文稿不附补充材料" mentions the word; the reader never
+    sees it.  Counting it would force the source to be silent about a design
+    decision, which is the opposite of what this gate is for.
+    """
+    return "\n".join(re.sub(r"(?<!\\)%.*$", "", ln)
+                     for ln in tex.split("\n"))
+
+
 def supplementary_failures(en, cn):
     fails = []
     if "\\supplementary{" not in en:
         fails.append("paper_en: no \\supplementary{...} statement, which the "
                      "MDPI class expects when a supplement is uploaded")
-    if "section*{补充材料}" not in cn:
-        fails.append("paper_cn: no 补充材料 section")
+    # The Chinese manuscript is delivered without a supplement.  It used to be
+    # required to *declare* one, which is exactly backwards: the delivery
+    # shipped no such PDF, so the declaration promised a file no reader could
+    # open.  The requirement is now the opposite one, and it is stronger --
+    # neither a declaration nor a citation may survive.
+    cn_body = _strip_comments(cn)
+    if "section*{补充材料}" in cn_body or "\\supplementary{" in cn_body:
+        fails.append("paper_cn: declares a supplement, but the Chinese "
+                     "delivery ships none -- the statement promises a file "
+                     "the reader cannot open")
+    # Any surviving mention is a pointer of some form: "补充材料表 S7",
+    # "补充材料第 S19 节", "见补充材料".  Zero is the only count that cannot
+    # dangle, so the rule is zero rather than a list of phrasing patterns --
+    # a pattern list is what let "补充材料 S1" through in the first draft.
+    hits = re.findall(r"补充材料[^\s，。；]{0,4}", cn_body)
+    if hits:
+        fails.append("paper_cn: %d reference(s) into a supplement that is not "
+                     "shipped (%s)" % (len(hits),
+                                       ", ".join(sorted(set(hits))[:4])))
     return fails
 
 
@@ -455,7 +486,8 @@ def main():
           % ", ".join("%s %s" % kv for kv in
                       sorted(_pins_yml(t["env"]).items())))
     print("  [ok]   DOI deferral wording agrees; no unfilled placeholder")
-    print("  [ok]   supplement declared in both manuscripts")
+    print("  [ok]   paper_en declares the supplement it ships; paper_cn cites "
+          "none")
     print("  [ok]   archive covers every arm and seed in results/, MANIFEST "
           "matches the tree")
     print("delivery-text gate passed")

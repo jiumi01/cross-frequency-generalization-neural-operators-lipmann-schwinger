@@ -551,7 +551,10 @@ def table_summary(ev, arms, cap):
                 rs.append(float(e5[0] / e4[0]))
         rsd = float(np.std(rs, ddof=1)) if len(rs) > 1 else np.nan
         rows.append((vmax, ib, ibs, plateau, cliff, a, r2, psd, rsd))
-    t = ("\\begin{table}[t]\n\\centering\n\\caption{%s}\n\\label{tab:summary}\n"
+    # [!ht]: this is the table the surrounding prose reads its numbers from, and
+    # a plain [t] let it drift two pages past its first citation once another
+    # float was queued ahead of it.  "h" first, then the top of the next page.
+    t = ("\\begin{table}[!ht]\n\\centering\n\\caption{%s}\n\\label{tab:summary}\n"
          "\\small\n\\setlength{\\tabcolsep}{4.2pt}\n"
          "\\begin{tabular}{lcccccc}\n\\toprule\n"
          " & \\multicolumn{2}{c}{$\\varepsilon_{\\mathrm{in}}$} & "
@@ -3986,7 +3989,11 @@ def table_locators(cap):
     d = _loc_load()
     if d is None:
         return ""
-    t = ("\\begin{table}[t]\n\\centering\n\\caption{%s}\n\\label{tab:locators}\n"
+    # [!ht] rather than [t]: the table covers four ladders and is nearly half a
+    # page, so on the page where it is first cited the top block is already
+    # taken and a plain [t] pushes it two pages out.  "!" lets LaTeX relax the
+    # class's \topfraction rather than wait for a page whose top is free.
+    t = ("\\begin{table}[!ht]\n\\centering\n\\caption{%s}\n\\label{tab:locators}\n"
          "\\footnotesize\n\\setlength{\\tabcolsep}{3.6pt}\n"
          "\\begin{tabular}{llcccc}\n\\toprule\n"
          "ladder & rung & $f^{\\star}$ & onset & largest step & "

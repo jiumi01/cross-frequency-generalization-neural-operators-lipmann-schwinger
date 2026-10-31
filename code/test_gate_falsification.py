@@ -804,8 +804,10 @@ def main():
     if all(dt.values()):
         print("PROBE 27: the current envelope is accepted; a drifted title, a "
               "retired claim, a wrong version pin, a conflicting DOI sentence, "
-              "an undeclared supplement, an abstract span that swallows the "
-              "front-matter sidebar, and two archive defects are all rejected")
+              "a Chinese pointer into a supplement that is not shipped, the "
+              "same defect written as a declaration, an abstract span that "
+              "swallows the front-matter sidebar, and two archive defects are "
+              "all rejected")
     else:
         print("PROBE 27: MISBEHAVED %s" % dt)
 
@@ -2413,9 +2415,23 @@ def probe_delivery_texts():
     m["cover"] = t["cover"].replace("on acceptance", "on publication", 1)
     out["doi"] = any("cover letter" in f for f in D.run(texts=m))
 
+    # The Chinese manuscript ships no supplement, so a pointer into one is the
+    # failure.  The mutation is an *insertion*: the old one replaced every
+    # "补充材料" with "附录", which under the current rule produces a clean
+    # document -- the probe passed by deleting the thing it was meant to test.
     m = dict(t)
-    m["paper_cn"] = t["paper_cn"].replace("补充材料", "附录")
-    out["supp"] = any("paper_cn" in f for f in D.run(texts=m))
+    m["paper_cn"] = t["paper_cn"].replace(
+        "\\end{document}", "补充材料表 S7 给出该值。\\n\\end{document}", 1)
+    ins = any("paper_cn" in f for f in D.run(texts=m))
+    # and a declaration with no file behind it is the same failure in a
+    # different grammatical form
+    m = dict(t)
+    m["paper_cn"] = t["paper_cn"].replace(
+        "\\end{document}",
+        "\\section*{补充材料}\\n补充材料汇集了自正文移出的材料。\\n\\end{document}",
+        1)
+    decl = any("paper_cn" in f for f in D.run(texts=m))
+    out["supp"] = ins and decl
 
     # The abstract cap is counted on rendered text, and the region used to run
     # from "Abstract" to "Keywords:", which swallows the journal's front-matter
