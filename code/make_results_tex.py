@@ -38,8 +38,8 @@ CAP = { "en": dict(
            "\\NumSeedsMain\\ seeds with its seed standard deviation. "
            "$\\varepsilon_{\\mathrm{in}}$: mean over $f<4$; "
            "$\\varepsilon_{\\infty}$: mean over $f\\ge6$; "
-           "$r_{\\mathrm{1Hz}}=\\varepsilon(5)/\\varepsilon(4)$: ratio over the "
-           "first hertz beyond the training edge."),
+           "$r_{1}=\\varepsilon(5)/\\varepsilon(4)$: ratio over one unit of $f$ "
+           "past the training edge."),
   propnorm=("Discrete operator norm of the Lippmann--Schwinger propagator, "
             "$\\max_{\\mathbf{n}}|\\kappa^{2}\\widehat{G}_{\\kappa}(\\mathbf{n})|$, "
             "on the $64\\times64$ grid. The continuum is flat in $f$ at "
@@ -92,12 +92,12 @@ CAP = { "en": dict(
         "and seeds; each changes one ingredient only (input encoding of $f$, "
         "loss, or initialisation). Onset is the interval in which the error "
         "first leaves $3\\times$ its own in-band level. 3-seed means."),
-  anchor=("Two-term analytic anchor on each arm's protocol: 200 paired media, "
+  anchor=("Two-term Born anchor on each arm's protocol: 200 paired media, "
           "seeds shared with the trained rows. $a,b$: least squares on 512 "
           "in-band samples, no out-of-band frequency. Columns average over "
           "seeds and media; the depth-selected head of Figure~\\ref{fig:deep} "
           "is a different predictor."),
-  deep=("Analytic head depth on the common protocol: paired media, $n=200$, "
+  deep=("Depth-selected Born head on the common protocol: paired media, $n=200$, "
         "shared seeds. Each row is fitted on one in-band prefix; $M$ counts "
         "Born corrections, $M_{\\mathrm{sel}}$ is picked in band. The last "
         "column is the trained plateau over the head's."),
@@ -165,7 +165,7 @@ CAP = { "en": dict(
   summary=("各对比度臂的泛化悬崖汇总：为 \\NumSeedsMain\\ 个随机种子的均值与其种子标准差。"
            "$\\varepsilon_{\\mathrm{in}}$：训练频带内、留出介质上的平均相对 $L_2$ 误差；"
            "$\\varepsilon_{\\infty}$：$f\\ge6$ 的平均值；"
-           "$r_{\\mathrm{1Hz}}=\\varepsilon(5)/\\varepsilon(4)$：带缘后 1\\,Hz 的误差比。"),
+           "$r_{1}=\\varepsilon(5)/\\varepsilon(4)$：带缘后一个频率单位内的误差比。"),
   propnorm=("Lippmann--Schwinger 传播子在 $64\\times64$ 网格上的离散算子范数 "
             "$\\max_{\\mathbf{n}}|\\kappa^{2}\\widehat{G}_{\\kappa}(\\mathbf{n})|$。"
             "连续符号对 $f$ 为 $\\PropNominal$；网格上取到的范数介于 "
@@ -543,7 +543,7 @@ def table_summary(ev, arms, cap):
         a, r2 = fit_alpha(F, M, 4.0)
         # Seed spread of the plateau, from the same three seeds as the mean.
         psd = float(np.mean(S[F >= 6])) if (F >= 6).any() else np.nan
-        # Seed spread of r_1Hz, read the same way the mean is: one curve per
+        # Seed spread of r_1, read the same way the mean is: one curve per
         # seed, then eps(5)/eps(4).  Quoted because the arm-to-arm spread of r
         # is what the text calls larger than seed noise, and that comparison
         # needs the seed noise printed rather than asserted.
@@ -563,7 +563,7 @@ def table_summary(ev, arms, cap):
          "\\begin{tabular}{lcccccc}\n\\toprule\n"
          " & \\multicolumn{2}{c}{$\\varepsilon_{\\mathrm{in}}$} & "
          "\\multicolumn{2}{c}{$\\varepsilon_{\\infty}$} & "
-         "\\multicolumn{2}{c}{$r_{\\mathrm{1Hz}}$} \\\\\n"
+         "\\multicolumn{2}{c}{$r_{1}$} \\\\\n"
          "\\cmidrule(lr){2-3}\\cmidrule(lr){4-5}\\cmidrule(lr){6-7}\n"
          "$v_{\\max}$ & mean & $\\mathrm{SD}$ & mean & $\\mathrm{SD}$ "
          "& mean & $\\mathrm{SD}$ \\\\\n\\midrule\n"
@@ -3233,7 +3233,7 @@ def table_anchor(cap, lang="en"):
          "\\begin{tabular}{llrrrrr}\n\\toprule\n"
          "$v_{\\max}$ & predictor & $\\varepsilon_{\\mathrm{in}}$ & "
          "$\\varepsilon(4)$ & $\\varepsilon(5)$ & $\\varepsilon_{\\infty}$ & "
-         "$r_{\\mathrm{1Hz}}=\\varepsilon(5)/\\varepsilon(4)$ \\\\\n\\midrule\n"
+         "$r_{1}=\\varepsilon(5)/\\varepsilon(4)$ \\\\\n\\midrule\n"
          % cap["anchor"])
     for vmax in C.VMAX_LIST:
         a = d["arms"]["%.2f" % vmax]
@@ -3555,7 +3555,7 @@ def table_deep(cap):
                 F, plateau, e4, e5, ratio, names = rr
                 ib, _ = inband(ev, names, vmax)
                 ref = (ib, plateau)
-        t += ("$%.2f$ & analytic head, $M=M_{\\mathrm{sel}}$ & $%d$ & $%s$ & "
+        t += ("$%.2f$ & depth-selected head & $%d$ & $%s$ & "
               "$%s$ & $%s$ \\\\\n"
               % (vmax, a["M_sel"], fmt(a["in_band_sel"]),
                  fmt(a["plateau_sel"]),
@@ -3564,7 +3564,7 @@ def table_deep(cap):
         # No \ref here: the depth table now lives in the supplement, which is a
         # separate document and cannot resolve the anchor table's label.  The
         # row still says which arm it is -- the shallow head the main text fits.
-        t += (" & analytic head, $M=2$ & $2$ & "
+        t += (" & two-term anchor & $2$ & "
               "$%s$ & $%s$ & $%s$ \\\\\n"
               % (fmt(ib2) if ib2 is not None else "n/a",
                  fmt(a["plateau_m2"]),

@@ -111,7 +111,7 @@ def main():
 
     # Two ratios are read off every row and they are NOT the same quantity:
     #   r_edge = eps(4.25)/eps(4.00)  the first out-of-band node against the edge
-    #   r_1Hz  = eps(5.00)/eps(4.00)  the whole first hertz beyond the edge
+    #   r_1    = eps(5.00)/eps(4.00)  the whole first unit of f beyond the edge
     # The manuscript quotes both, so both are emitted together with the seed
     # dispersion of each, and with the per-seed values so the paired mesh effect
     # can be quoted as a paired quantity rather than as two marginal means.

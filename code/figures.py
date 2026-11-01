@@ -1739,7 +1739,7 @@ def fig_deep(out):
                         % (r1, _m.group(1)))
             except IOError:
                 pass
-            badge(ax, 0.30, 0.07, r"$r_{\mathrm{1Hz}}=%.2f$ at the ring" % r1,
+            badge(ax, 0.30, 0.07, r"$r_{1}=%.2f$ at the ring" % r1,
                   fs=7.8, ha="left", va="bottom")
     ax.set_yscale("log")
     # The four objects span three decades here (the head alone is an order of

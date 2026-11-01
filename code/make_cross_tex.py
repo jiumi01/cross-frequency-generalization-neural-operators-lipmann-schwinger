@@ -34,12 +34,12 @@ CAP_CN = (r"""同一多分辨率训练模型评估三种空间分辨率，三网
 # the two ratios have to be defined where the reader meets them.
 NOTE_EN = (r"\footnotesize $r_{\mathrm{edge}}=\varepsilon(4.25)/\varepsilon(4)$"
            r" (first out-of-band node against the edge); "
-           r"$r_{\mathrm{1Hz}}=\varepsilon(5)/\varepsilon(4)$ (first hertz beyond it); "
+           r"$r_{1}=\varepsilon(5)/\varepsilon(4)$ (one unit of $f$ beyond it); "
            r"$\varepsilon_{\mathrm{in}}$, mean over $f<4$; "
            r"$\varepsilon_{\infty}$, mean over $f\geq6$.")
 NOTE_CN = (r"\footnotesize $r_{\mathrm{edge}}=\varepsilon(4.25)/\varepsilon(4)$"
            r"（首个带外节点相对带缘）；"
-           r"$r_{\mathrm{1Hz}}=\varepsilon(5)/\varepsilon(4)$（带缘后 1\,Hz）；"
+           r"$r_{1}=\varepsilon(5)/\varepsilon(4)$（带缘后一个频率单位）；"
            r"$\varepsilon_{\mathrm{in}}$ 为 $f<4$ 的均值；"
            r"$\varepsilon_{\infty}$ 为 $f\geq6$ 的均值。")
 
@@ -243,7 +243,7 @@ def main():
 \begin{tabular}{ccccccc}
 \toprule
 $N$ & $f^{\star}$/onset & largest step & $r_{\mathrm{edge}}$
-& $r_{\mathrm{1Hz}}$ & $\varepsilon_{\mathrm{in}}$ & $\varepsilon_{\infty}$ \\
+& $r_{1}$ & $\varepsilon_{\mathrm{in}}$ & $\varepsilon_{\infty}$ \\
 \midrule
 %s
 \bottomrule
