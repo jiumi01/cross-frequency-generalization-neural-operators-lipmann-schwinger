@@ -318,6 +318,50 @@ def curve(d, vmax):
             np.array([r["sem"] for r in rows]))
 
 
+def seeds_available(evals, vk, limit=12):
+    """Every evaluation record that exists for one contrast arm, in order.
+
+    The main arms carry six seeds; the tables average all six (`Table 3` says
+    so in its caption).  These two seed loops used to say `range(3)`, so the
+    panels averaged seeds 0-2 while the table beside them averaged 0-5: at
+    v_max = 1.00 the plateau printed 1.87 against the table's 1.882, a 0.6%
+    gap with no other cause.  Enumerate the records instead of asserting a
+    count, so a figure cannot silently average a different set from the table.
+    """
+    return ["main_fno_%s_s%d" % (vk, s) for s in range(limit)
+            if "main_fno_%s_s%d" % (vk, s) in evals]
+
+
+def triv_curve(vmax, freqs):
+    """Trivial baseline ||u||_2/||psi||_2 on the 200 paired evaluation media.
+
+    The model curves this is subtracted from are seed means over those same
+    200 media.  `spectrum.json` holds a mean over 600 media -- the 200 plus
+    400 others -- so using it as the denominator puts a different sample
+    underneath the numerator: 2.7% per cell on average, 8.3% at worst
+    (results/triv_paired.json, `rel_diff_vs_600`).  That is the same size as
+    the excess panel (b) is about, and it is why the panel used to print 1.14
+    where the text printed 1.164: two denominators, not two findings.  The
+    paired table is used whenever it has the frequency; the 600-media one is
+    a fallback that announces itself.
+    """
+    p = os.path.join(C.RES, "triv_paired.json")
+    if os.path.exists(p):
+        d = json.load(open(p, encoding="utf-8"))
+        row = d["data"].get("%.2f" % float(vmax))
+        if row is not None:
+            keys = ["f=%g" % f for f in freqs]
+            if all(k in row for k in keys):
+                return np.array([float(np.mean(row[k])) for k in keys])
+    spec = json.load(open(os.path.join(C.RES, "spectrum.json"),
+                          encoding="utf-8"))
+    print("[fig] baseline for v_max=%.2f: triv_paired.json incomplete -- "
+          "falling back to the 600-media spectrum; the ratio then mixes "
+          "samples and will not match the macros" % float(vmax))
+    return np.array([spec["data"]["%.2f" % float(vmax)]["f=%g" % f]["triv"]
+                     for f in freqs])
+
+
 def mean_curve(evals, names, vmax):
     """Average curves over replicate runs (seeds)."""
     fs, ms, ss = [], [], []
@@ -463,8 +507,20 @@ def fig_main(evals, out):
         if not names:
             continue
         F, M, S = mean_curve(evals, names, vmax)
+        # The cap has to be WIDER than the marker or it never shows: a cap
+        # drawn at the bar's endpoint is a horizontal segment of length
+        # `capsize`, centred on the marker, so any capsize below `ms` sits
+        # entirely inside the filled disc and the reader sees no uncertainty
+        # at all.  Every errorbar in this file therefore uses
+        # `capsize = ms + 2.0`, which leaves 1.0 pt of cap visible on each
+        # side of the marker.  The bar's LENGTH is a property of the data
+        # (the seed spread, 2-3% of the level, is under 1 pt on this log
+        # axis) and is deliberately not exaggerated -- the caption says the
+        # bars are shorter than the markers.  `check_fig_caps.py` asserts the
+        # inequality for every call, so a future marker-size change cannot
+        # silently hide the caps again.
         ax.errorbar(F, M, yerr=S, color=BLUE, marker="o", ms=3.4, lw=1.2,
-                    capsize=2.4, capthick=0.9, elinewidth=0.9, barsabove=True,
+                    capsize=5.4, capthick=0.9, elinewidth=0.9, barsabove=True,
                     clip_on=False, zorder=3)
         band(ax)
         # The open ring means one thing across every figure in the paper: the
@@ -549,7 +605,7 @@ def fig_arch(evals, out):
                 continue
             F, M, S = mean_curve(evals, names, vmax)
             ax.errorbar(F, M, yerr=S, color=col, marker=mk, ms=3.0, lw=1.2,
-                        ls=line_of(lab), capsize=2.4, capthick=0.9,
+                        ls=line_of(lab), capsize=5.0, capthick=0.9,
                         elinewidth=0.9, barsabove=True, clip_on=False,
                         zorder=3)
         band(ax)
@@ -582,7 +638,7 @@ def fig_arch(evals, out):
         # make the band wider for the family with the higher plateau, which is
         # the opposite of what the normalised panel compares.
         axn.errorbar(F, M / pl.mean(), yerr=S / pl.mean(), color=col,
-                     marker=mk, ms=2.6, lw=1.2, ls=line_of(lab), capsize=1.4,
+                     marker=mk, ms=2.6, lw=1.2, ls=line_of(lab), capsize=4.6,
                      clip_on=False, zorder=3)
     axn.axhline(1.0, color="#666666", lw=0.8, ls=(0, (1.1, 1.5)), zorder=1)
     # Upper left: at the right edge of (c) the four curves converge on the
@@ -634,7 +690,7 @@ def fig_band(evals, out):
             continue
         F, M, S = mean_curve(evals, names, 0.25)
         ax.errorbar(F, M, yerr=S, color=col, marker="o", ms=3.2, lw=1.3,
-                    capsize=2.4, capthick=0.9, elinewidth=0.9, barsabove=True,
+                    capsize=5.2, capthick=0.9, elinewidth=0.9, barsabove=True,
                     clip_on=False, zorder=3)
         # Each arm has its own training edge, so a single shared vertical rule
         # would mark only one of the five.  Marking the edge with a ring on
@@ -1038,7 +1094,7 @@ def fig_bound(evals, out):
             Fv, Mv, Sv = mean_curve(evals, names, 0.25)
             for ax in axes:
                 ax.errorbar(Fv, Mv, yerr=Sv, color=col, marker="o", ms=2.8,
-                            lw=1.1, capsize=1.2, clip_on=False, zorder=3)
+                            lw=1.1, capsize=4.8, clip_on=False, zorder=3)
             any_ = True
     for ax in axes:
         band(ax)
@@ -1339,7 +1395,7 @@ def fig_c1(out):
     for key, col, mk, lab in specs:
         arm = d["arms"][key]
         ax.errorbar(arm["f"], arm["mean"], yerr=arm["sd"], color=col,
-                    marker=mk, ms=3.4, lw=1.3, capsize=2.6, capthick=0.9, elinewidth=0.9,
+                    marker=mk, ms=3.4, lw=1.3, capsize=5.4, capthick=0.9, elinewidth=0.9,
                     barsabove=True, clip_on=False,
                     zorder=3)
     lo, hi = d["arms"]["baseline"]["onset"]
@@ -1429,7 +1485,7 @@ def fig_anchor(out):
     if names:
         Fm, M, S = mean_curve(ev, names, 0.25)
         ax.errorbar(Fm, M, yerr=S, color=BLUE, marker="o", ms=3.4, lw=1.3,
-                    capsize=2.6, capthick=0.9, elinewidth=0.9, barsabove=True,
+                    capsize=5.4, capthick=0.9, elinewidth=0.9, barsabove=True,
                     clip_on=False, zorder=3,
                     label="Trained FNO")
     anch = np.array([r["mean"] for r in a["sweep"]])
@@ -1441,7 +1497,7 @@ def fig_anchor(out):
     # them.  The caption states which is which.
     asem = np.array([r["sem"] for r in a["sweep"]])
     ax.errorbar(F, anch, yerr=asem, color=VERMILION, marker="D", ms=3.4, lw=1.3,
-                capsize=2.2, capthick=1.1, elinewidth=1.1, clip_on=False,
+                capsize=5.4, capthick=1.1, elinewidth=1.1, clip_on=False,
                 zorder=3, label="anchor, $aB_1+bB_2$")
     ax.plot(F, a["born1"], color=INK, lw=1.0, ls=(0, (4, 2)), clip_on=False,
             zorder=2, label="Born, order 1")
@@ -1486,7 +1542,7 @@ def fig_anchor(out):
     # the two bars are therefore not to be compared with each other.
     pse = np.array([d["arms"]["%.2f" % v]["plateau_sem"] for v in vm])
     ax.errorbar(vm, anchp, yerr=pse, color=VERMILION, marker="D", ms=4.0,
-                lw=1.3, capsize=2.6, capthick=1.0, elinewidth=1.0, barsabove=True,
+                lw=1.3, capsize=6.0, capthick=1.0, elinewidth=1.0, barsabove=True,
                 clip_on=False, zorder=3, label="anchor")
     ax.plot(vm, trivp, color=FAINT, lw=1.0, ls=(0, (1.5, 1.6)),
             clip_on=False, zorder=2, label="trivial, $\\hat u\\equiv0$")
@@ -1507,7 +1563,7 @@ def fig_anchor(out):
         keep.append(float(v))
     if fno:
         ax.errorbar(np.array(keep), np.array(fno), yerr=np.array(fsd),
-                    color=BLUE, marker="o", ms=4.0, lw=1.3, capsize=2.6, capthick=0.9,
+                    color=BLUE, marker="o", ms=4.0, lw=1.3, capsize=6.0, capthick=0.9,
                     elinewidth=0.8, clip_on=False, zorder=3,
                     label="Trained FNO")
     ax.set_yscale("log")
@@ -1615,7 +1671,7 @@ def fig_deep(out):
     if ns:
         Fm, M, S = mean_curve(ev, ns, 0.25)
         ax.errorbar(Fm, M, yerr=S, color=BLUE, marker="o", ms=3.2, lw=1.3,
-                    capsize=2.6, capthick=0.9, elinewidth=0.9, barsabove=True,
+                    capsize=5.2, capthick=0.9, elinewidth=0.9, barsabove=True,
                     clip_on=False, zorder=3, label="Trained FNO")
         ends_b.append((float(M[-1]), "trained FNO", BLUE))
         vals_b.append(np.ravel(M))
@@ -1640,7 +1696,7 @@ def fig_deep(out):
             continue
         Fm, M, S = mean_curve(ev, ns, 0.25)
         ax.errorbar(Fm, M, yerr=S, color=col, marker=mk, ms=3.2, lw=1.3,
-                    capsize=2.6, capthick=0.9, elinewidth=0.9, barsabove=True,
+                    capsize=5.2, capthick=0.9, elinewidth=0.9, barsabove=True,
                     clip_on=False, zorder=3, label=lab)
         ends_b.append((float(M[-1]),
                        "deep head $+$ res." if "deep" in lab
@@ -2028,8 +2084,6 @@ def fig_banddown(evals, out):
     if not os.path.exists(p):
         print("no banddown.json"); return
     d = json.load(open(p, encoding="utf-8"))
-    spec = json.load(open(os.path.join(C.RES, "spectrum.json"),
-                          encoding="utf-8"))
     fig, ax = plt.subplots(figsize=(HALF_W, HALF_W * 0.88), layout="constrained")
     ax.axvspan(1.0, 4.0, color="#7a828c", alpha=0.12, lw=0, zorder=0)
     ax.axvline(1.0, color=INK, lw=0.7, ls=(0, (1.1, 1.5)), zorder=1)
@@ -2050,8 +2104,8 @@ def fig_banddown(evals, out):
         ax.plot(Fb, triv, "--", color=col, lw=1.0, alpha=0.65, zorder=2)
         # above band from the eval sweeps (seed means of the same checkpoints)
         Fa, Ma = [], []
-        for s in range(3):
-            dk = evals.get("main_fno_%s_s%d" % (vk, s))
+        for name in seeds_available(evals, vk):
+            dk = evals.get(name)
             if dk is None:
                 continue
             F_, M_, _ = curve(dk, vmax)
@@ -2060,8 +2114,7 @@ def fig_banddown(evals, out):
             Fa = np.mean(Fa, axis=0)
             Ma = np.mean(Ma, axis=0)
             ax.plot(Fa, Ma, "-", color=col, lw=1.5, clip_on=False, zorder=3)
-            Ta = np.array([spec["data"][str(vmax)]["f=%g" % f]["triv"]
-                           for f in C.F_TEST])
+            Ta = triv_curve(vmax, Fa)
             ax.plot(Fa, Ta, "--", color=col, lw=1.0, alpha=0.65, zorder=2)
             ends.append((float(Ma[-1]), r"$v_{\max}=%.2f$" % vmax, col))
     ax.set_xscale("log")
@@ -2099,8 +2152,9 @@ def fig_banddown(evals, out):
 def fig_plateau_coupling(evals, out):
     """Out-of-band plateau against the same-arm trivial baseline, vs coupling.
 
-    The plateau is the seed-mean error over f >= 6; the baseline comes from
-    spectrum.json; the coupling is v_max/(2 gamma).  One log-log panel shows
+    The plateau is the seed-mean error over f >= 6; the baseline is the
+    same-arm, same-media trivial baseline (triv_curve); the coupling is
+    v_max/(2 gamma).  One log-log panel shows
     the model tracking the baseline across the 20x coupling range, with the
     excess (model over baseline) growing slowly with coupling.
     """
@@ -2109,16 +2163,14 @@ def fig_plateau_coupling(evals, out):
     # points, the printed values and the y=1 rule all print larger.
     Z = 1.25
     set_style(Z)
-    spec = json.load(open(os.path.join(C.RES, "spectrum.json"),
-                          encoding="utf-8"))
     fig, (ax, axr) = plt.subplots(1, 2, figsize=(FULL_W * 0.92, FULL_W * 0.46),
                                   layout="constrained",
                                   gridspec_kw=dict(width_ratios=[1.35, 1.0]))
     coups, plats, trivs, sds = [], [], [], []
     for vk, vmax in zip(("a005", "a010", "a025", "a050", "a100"), C.VMAX_LIST):
         plateau = []
-        for s in range(3):
-            dk = evals.get("main_fno_%s_s%d" % (vk, s))
+        for name in seeds_available(evals, vk):
+            dk = evals.get(name)
             if dk is None:
                 continue
             F, M, _ = curve(dk, vmax)
@@ -2135,8 +2187,7 @@ def fig_plateau_coupling(evals, out):
         plats.append(float(per_seed.mean()))
         sds.append(float(per_seed.std(ddof=1)) if len(per_seed) > 1 else 0.0)
         trivs.append(float(np.mean(
-            [spec["data"][str(vmax)]["f=%g" % f]["triv"]
-             for f in C.F_TEST if f >= 6])))
+            triv_curve(vmax, [f for f in C.F_TEST if f >= 6]))))
         coups.append(vmax / (2 * C.GAMMA))
     coups, plats, trivs = np.array(coups), np.array(plats), np.array(trivs)
     sds = np.array(sds)
@@ -2149,7 +2200,7 @@ def fig_plateau_coupling(evals, out):
                 textcoords="offset points", ha="right", va="bottom",
                 fontsize=7.0 * Z, color="#333333")
     ax.errorbar(coups, plats, yerr=sds, fmt="-o", color=BLUE, lw=1.5, ms=4.6,
-                capsize=2.6, capthick=0.9, elinewidth=0.9, barsabove=True,
+                capsize=6.6, capthick=0.9, elinewidth=0.9, barsabove=True,
                 clip_on=False, zorder=3)
     ax.plot(coups, trivs, "--s", color=VERMILION, lw=1.4, ms=4.0,
             clip_on=False, zorder=3)
@@ -2165,7 +2216,7 @@ def fig_plateau_coupling(evals, out):
     ax.set_xlabel(r"coupling $v_{\max}/(2\gamma)$")
     ax.set_ylabel(r"plateau error, mean over $f\geq6$")
     despine(ax)
-    # Only the trained level is printed in (a): the two curves sit within 14%
+    # Only the trained level is printed in (a): the two curves sit within 17%
     # of each other, so a value above and a value below each node interleaved
     # at the right-hand end.  The trivial level is read from the dashed curve,
     # and the difference between the two is the whole of panel (b).
@@ -2179,7 +2230,7 @@ def fig_plateau_coupling(evals, out):
 
     # (b) the excess as its own quantity.  In (a) the two curves nearly
     # coincide at every node, and the former badge summarised the difference
-    # in words -- "excess over baseline: 1.00x -> 1.14x" -- without saying
+    # in words -- "excess over baseline: 1.00x -> 1.16x" -- without saying
     # which of the two was the numerator.  Divided explicitly, the quantity
     # has an axis of its own and a label that names both terms.
     # The ratio carries the plateau's spread: the baseline is a deterministic
@@ -2187,7 +2238,7 @@ def fig_plateau_coupling(evals, out):
     # caption's "bars, +/-1 SD over three seeds" was true only of panel (a) and
     # a reader looking for the ratio's uncertainty found none.
     axr.errorbar(coups, ratio, yerr=sds / trivs, fmt="-o", color=BLUE, lw=1.5,
-                 ms=4.4, capsize=2.6, capthick=0.9, elinewidth=0.9,
+                 ms=4.4, capsize=6.4, capthick=0.9, elinewidth=0.9,
                  barsabove=True, clip_on=False, zorder=3)
     # To the right of each node, not above it: the first node sits on y=1.00
     # and a centred label above it printed through the marker.

@@ -1,14 +1,16 @@
-# Cross-Frequency Generalization of Neural Operators for a Periodic Lippmann-Schwinger Benchmark
+# Cross-Frequency Generalization of Neural Operators for the Lippmann–Schwinger Equation
 
-An empirical characterisation of how neural operators generalise across the
-excitation frequency when solving the periodic Lippmann–Schwinger integral
-equation. On a strictly delimited numerical benchmark (one equation family,
-fixed-loss-tangent propagator, contrasts up to \(v_{\max}=1\)), the paper
-measures the cross-frequency error curve under a paired protocol, locates its
-band-edge boundary, reads the plateau against the trivial incident-field
-baseline, and tests which interventions do and do not move that boundary. The
-boundary is separated from the sampling density it is usually confounded with
-by evaluating one multi-grid model over the product of frequency and mesh.
+How a neural operator fails once it is evaluated above the frequency band it was
+trained on, and what buys that accuracy back. On a paired numerical benchmark for
+the periodic Lippmann–Schwinger integral equation (one equation family,
+fixed-loss-tangent propagator, contrasts up to \(v_{\max}=1\)), the error
+multiplies by a factor of seven to eight over the first hertz past the training
+edge and saturates at the trivial incident-field baseline. A 2.6-fold wider
+network, an eight-fold training set, a larger retained-mode budget and a change of
+architecture all leave that boundary in place; only a wider training band, or the
+analytic Born head the paper supplies, moves it. The boundary is separated from
+the sampling density it is usually confounded with by evaluating one multi-grid
+model over the product of frequency and mesh.
 
 ## What this repository contains
 

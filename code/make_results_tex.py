@@ -3704,6 +3704,7 @@ def plateau_macros(ev):
     # tags are words, keyed by the arm suffix they came from.
     _PLAT_TAG = {"005": "Weak", "010": "Soft", "025": "Mid",
                  "050": "Strong", "100": "Max"}
+    ratios = []
     for vk, vmax in zip(("a005", "a010", "a025", "a050", "a100"), C.VMAX_LIST):
         r = arm_curves(ev, vmax)
         tr = triv_row(vmax)
@@ -3715,8 +3716,16 @@ def plateau_macros(ev):
             out.append("\\newcommand{\\PlatTriv%s}{--}" % _PLAT_TAG.get(vk[1:], vk[1:]))
             continue
         plateau = r[1]
+        ratios.append(plateau / triv)
         out.append("\\newcommand{\\PlatTriv%s}{%.3f}"
                    % (_PLAT_TAG.get(vk[1:], vk[1:]), plateau / triv))
+    # The largest excess the sentence "tracks the baseline to within X%"
+    # asserts.  It is a macro rather than a typed 14 because it moves whenever
+    # the denominator moves: with the paired baseline it is 16.4%, and the
+    # figure that used to carry the 600-media one printed 1.14 -- i.e. the
+    # typed number and the panel disagreed by exactly the denominator.
+    out.append("\\newcommand{\\PlatTrivExcess}{%s}"
+               % (fmt(100.0 * (max(ratios) - 1.0), 1) if ratios else "--"))
     # How far the paired denominator sits from the 600-media one it replaced.
     # Quoted in Section~\ref{sec:cliff} so that the change of denominator is
     # visible as a number rather than left to the reader to notice.

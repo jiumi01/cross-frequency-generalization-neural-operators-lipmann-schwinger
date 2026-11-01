@@ -317,6 +317,7 @@ NO_LOCATOR_OK = {
     "millet2024acoustic": "APS DFD meeting abstract, no DOI or preprint",
     "mlamoureuxMarmousi": "GitHub data set, URL is the locator",
     "shenyaojinMarmousi": "GitHub data set, URL is the locator",
+    "ray2026extrapolate": "MathAI 2026 oral (OpenReview), no DOI or preprint",
 }
 
 

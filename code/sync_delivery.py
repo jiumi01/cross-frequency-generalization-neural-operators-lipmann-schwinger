@@ -14,6 +14,11 @@ Direction, stated once because it is not symmetric:
   body       submission/paper_<lang>/main.tex  ->  paper/<lang>/main.tex
              The submission copy is the manuscript of record.  Edit there.
 
+  bibliography  submission/paper_<lang>/refs.bib  ->  paper/<lang>/refs.bib
+             Same direction and same reason: make_bib_tex.py reads the paper/
+             copy, so a stale one produces a bibliography that omits entries
+             the body already cites.
+
   generated  paper/<lang>/gen_*.tex, figs/*    ->  submission/paper_<lang>/
              make_results_tex.py and figures.py write into paper/, so those
              artefacts travel the other way.  Hand-editing them is forbidden
@@ -34,6 +39,13 @@ def md5(path):
         for b in iter(lambda: f.read(1 << 20), b""):
             h.update(b)
     return h.hexdigest()
+
+
+def count_entries(path):
+    """Number of @type{...} records, used only to make the failure message say
+    what diverged rather than just that the hashes differ."""
+    with open(path, encoding="utf-8") as fh:
+        return sum(1 for line in fh if line.lstrip().startswith("@"))
 
 
 def pairs(lang):
@@ -86,6 +98,23 @@ def check():
             else:
                 print("[ok]   %s: the audited SI is the delivered SI (%s)"
                       % (lang, md5(si_a)[:8]))
+        # refs.bib drifts by the same mechanism and was the last file outside
+        # the sync set: on 2026-11-01 a new entry was added to submission/
+        # only, and make_bib_tex.py then raised KeyError on the cite because
+        # paper/<lang>/refs.bib was the older copy.  A bibliography is part of
+        # the manuscript of record, so it travels with the body and is checked
+        # with it.
+        bib_a = os.path.join(sub, "refs.bib")
+        bib_b = os.path.join(pap, "refs.bib")
+        if os.path.exists(bib_a) and os.path.exists(bib_b):
+            if md5(bib_a) != md5(bib_b):
+                print("[FAIL] %s: paper/%s/refs.bib is not the delivered "
+                      "bibliography (%d vs %d entries)"
+                      % (lang, lang, count_entries(bib_b), count_entries(bib_a)))
+                bad += 1
+            else:
+                print("[ok]   %s: the audited bibliography is the delivered one (%s)"
+                      % (lang, md5(bib_a)[:8]))
     return bad
 
 
@@ -100,6 +129,10 @@ def sync():
         if os.path.exists(si_src):
             shutil.copy2(si_src, os.path.join(pap, "SI_main.tex"))
             print("body      %s -> %s" % (si_src, os.path.join(pap, "SI_main.tex")))
+        bib_src = os.path.join(sub, "refs.bib")
+        if os.path.exists(bib_src):
+            shutil.copy2(bib_src, os.path.join(pap, "refs.bib"))
+            print("source    %s -> %s" % (bib_src, os.path.join(pap, "refs.bib")))
         for name in generated_names(pap):
             s = os.path.join(pap, name)
             d = os.path.join(sub, name)
