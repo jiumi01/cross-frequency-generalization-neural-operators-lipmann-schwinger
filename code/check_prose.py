@@ -62,7 +62,15 @@ MATH_ENVS = ("equation", "align", "gather", "multline", "split", "cases",
 ARG_CMDS = ("label", "cite", "citep", "citet", "input", "includegraphics",
             "url", "href", "bibitem", "bibliography", "usepackage",
             "documentclass", "newcommand", "renewcommand", "def", "setlength",
-            "hspace", "vspace")
+            "hspace", "vspace",
+            # Verbatim identifiers, not words: a commit hash, a path or a
+            # package name is reproduced exactly, so no prose rule has
+            # anything to say about its contents.  Leaving them in made the
+            # sci-notation rule read the tree hash `49e4520` as 4.9e4520 and
+            # report a "C-style exponent" in a sentence that is correct.
+            # The masking self-test keeps `\texttt` out of the same trap the
+            # other argument commands are already tested for.
+            "texttt")
 
 
 def _blank(m):
