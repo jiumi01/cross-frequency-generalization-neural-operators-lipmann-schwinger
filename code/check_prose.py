@@ -62,15 +62,7 @@ MATH_ENVS = ("equation", "align", "gather", "multline", "split", "cases",
 ARG_CMDS = ("label", "cite", "citep", "citet", "input", "includegraphics",
             "url", "href", "bibitem", "bibliography", "usepackage",
             "documentclass", "newcommand", "renewcommand", "def", "setlength",
-            "hspace", "vspace",
-            # Verbatim identifiers, not words: a commit hash, a path or a
-            # package name is reproduced exactly, so no prose rule has
-            # anything to say about its contents.  Leaving them in made the
-            # sci-notation rule read the tree hash `49e4520` as 4.9e4520 and
-            # report a "C-style exponent" in a sentence that is correct.
-            # The masking self-test keeps `\texttt` out of the same trap the
-            # other argument commands are already tested for.
-            "texttt")
+            "hspace", "vspace")
 
 
 def _blank(m):
@@ -90,6 +82,16 @@ def _math(m):
     Spaces here would be read as prose spacing: `(X and Y)` with both symbols
     masked becomes "( and )", which the spacing rule reports as a typo the
     author cannot see.  The placeholder keeps the span opaque instead.
+    """
+    return re.sub(r"[^\n]", "\u00a7", m.group(0))
+
+
+def _opaque(m):
+    """Same contract as `_math`, for a verbatim identity in running text.
+
+    The span collapses to one placeholder per character so line numbers
+    survive, and it is neither a letter nor a digit, so no rule reads it as a
+    word or as a number.
     """
     return re.sub(r"[^\n]", "\u00a7", m.group(0))
 
@@ -123,6 +125,14 @@ def prose(text):
     # "Section \ref" indistinguishable from "Fig." with nothing after it --
     # the self-test caught both rules silently passing.
     t = re.sub(r"\\(?:ref|eqref|siTab|siFig)\*?\{[^{}]*\}", "REF", t)
+    # Verbatim identities are not prose: a commit hash, a path or a package
+    # name is reproduced exactly, so no rule has anything to say about its
+    # contents.  `\texttt` goes through `_opaque` rather than `_blank`: blanking
+    # leaves a run of spaces, and the spacing rule then reports " ," after a
+    # span that ended in a brace.  The placeholder is opaque to every rule
+    # (no letters, no digits), and the sci-notation rule in particular no
+    # longer reads the tree hash `49e4520` as 4.9e4520.
+    t = re.sub(r"\\texttt\*?(\[[^\]]*\])?(\{[^{}]*\})*", _opaque, t)
     for cmd in ARG_CMDS:
         t = re.sub(r"\\%s\*?(\[[^\]]*\])?(\{[^{}]*\})*" % cmd, _blank, t)
     t = re.sub(r"\\begin\{[^{}]*\}(\[[^\]]*\])?", _blank, t)
