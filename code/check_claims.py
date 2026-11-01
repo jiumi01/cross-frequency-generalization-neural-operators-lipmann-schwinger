@@ -532,6 +532,50 @@ def macro_space_guard(root=None):
            % (len(names), len(UNIT_SUFFIX_OK)))
 
 
+def flip_unit_guard(root=None):
+    """A sign-flip test is identified by the unit whose signs it flips.
+
+    Two tests of that name appear in this paper and they are not the same
+    instrument: the supplementary paired table flips the sign of each
+    *medium* (200 units), while the comparison between the calibrated arm and
+    the trained operator flips the sign of each *seed* (six units, so 0.031 is
+    the smallest two-sided value it can return).  An earlier revision called
+    both "the sign-flip test", and a reader then has a p of 0.031 next to a p
+    of 0.0001 with no way to see that the counts differ.  The class is closed
+    here: in the body of either manuscript, every occurrence must sit within
+    one sentence-pair of a word that names its unit.  The abstract is excluded
+    because it is word-budgeted and states the verdict only.
+    """
+    root = root or ROOT
+    spec = {"en": (r"sign-flip",
+                   ("media-level", "seed-level", "six-seed", "six seeds",
+                    "six pairs", "media", "seeds")),
+            "cn": (r"符号翻转",
+                   ("介质级", "种子级", "六个种子", "六个配对", "介质", "种子"))}
+    for lang, folder in (("en", "paper_en"), ("cn", "paper_cn")):
+        p = os.path.join(root, "submission", folder, "main.tex")
+        if not os.path.exists(p):
+            continue
+        t = open(p, encoding="utf-8").read()
+        t = re.sub(r"\\begin\{abstract\}.*?\\end\{abstract\}", " ", t,
+                   flags=re.S)
+        # the English front matter writes the abstract as \abstract{...} and
+        # not as an environment, so both spellings have to be removed
+        t = re.sub(r"\\abstract\{.*?(?=\\keyword)", " ", t, flags=re.S)
+        word, quals = spec[lang]
+        miss = [t[:m.start()].count("\n") + 1
+                for m in re.finditer(re.escape(word), t)
+                if not any(q in t[max(0, m.start() - 220):m.start() + 220]
+                           for q in quals)]
+        if miss:
+            bad("%s: the sign-flip test is named without its unit at lines %s "
+                "-- a media-level and a seed-level sign-flip test disagree "
+                "because they count different things, not because one is "
+                "wrong" % (lang, miss))
+        else:
+            ok("%s: every sign-flip test in the body names its unit" % lang)
+
+
 def arch_label_guard(root=None):
     """Fig. 4's legend and Table III's rows must name the same four models.
 
@@ -2651,6 +2695,9 @@ def main():
     print("\n=== macro spacing ===")
     macro_name_guard()
     macro_space_guard()
+
+    print("\n=== statistical units ===")
+    flip_unit_guard()
 
     print("\n=== text residue in the delivered files ===")
     import guards_text as T

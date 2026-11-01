@@ -69,14 +69,16 @@ CAP = { "en": dict(
   paired=("Paired tests on the per-sample errors. $n$: entries averaged; "
           "$\\Delta=\\bar e_{A}-\\bar e_{B}$: mean paired difference, negative "
           "when $A$ is the more accurate, 95\\% interval resampling media; $p$: "
-          "sign-flip; $d_z$: standardised paired effect size, $\\bar\\Delta/"
+          "media-level sign-flip, one sign drawn per medium; $d_z$: standardised "
+          "paired effect size, $\\bar\\Delta/"
           "\\mathrm{sd}(\\Delta)$; $*$: interval excluding zero."),
   si_paired=("Paired tests on the per-sample errors. $n$: entries averaged; "
              "$\\Delta=\\bar e_{A}-\\bar e_{B}$: mean paired difference, "
              "negative when $A$ is the more accurate, 95\\% interval "
-             "resampling media; $p$: sign-flip; $d_z$: standardised paired "
-             "effect size, $\\bar\\Delta/\\mathrm{sd}(\\Delta)$; $*$: interval "
-             "excluding zero."),
+             "resampling media; $p$: media-level sign-flip, one sign drawn per "
+             "medium; $d_z$: standardised paired effect size, "
+             "$\\bar\\Delta/\\mathrm{sd}(\\Delta)$; $*$: interval excluding "
+             "zero."),
   arms=("Complete inventory of the trained arms behind the seeding protocol. "
         "$\\varepsilon(f)$: seed-mean relative $L_2$; the last column averages "
         "$f\\ge6$. For the widened-band arms these lie inside their own "
@@ -185,9 +187,10 @@ CAP = { "en": dict(
            "$\\varepsilon_{\\mathrm{in}}$、$\\varepsilon_{\\infty}$ 与 $r$；"
            "两组均为同一批 \\RealWinN{} 个窗口上的均值，而非逐频率全表的 "
            "\\MainNMedia{} 个配对介质，且两组只差几何。"),
-  paired=("配对检验。$A$、$B$ 为首列两配置；$n$ 为条目数（介质 $\\times$ 种子 "
-          "$\\times$ 频点）；$\\Delta$ 为平均配对差值，95\\% 区间对\\emph{介质}重抽样；"
-          "$p$ 为双侧符号翻转置换检验（保留一位有效数字）；星号表示区间不含 0。"),
+  paired=("配对检验。$A$、$B$ 为首列两配置；$n$ 为条目数（介质 $\\times$ 频点，"
+          "种子先取平均）；$\\Delta$ 为平均配对差值，95\\% 区间对\\emph{介质}重抽样；"
+          "$p$ 为双侧介质级符号翻转置换检验（每个介质抽一次符号；保留一位有效数字）；"
+          "星号表示区间不含 0。"),
   arms=("支撑种子协议的全部训练臂清单。$\\varepsilon(f)$：测试频率 $f$ 处的"
         "种子均值相对 $L_2$；末列对 $f\\ge6$ 取平均。对加宽带臂，这些频率位于"
         "其自身训练带内——那正是这些臂的目的；对 $[1,2]$ 臂则远在带外。"),
