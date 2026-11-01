@@ -44,6 +44,18 @@ def math_spans(t):
     spans = []
     i, n = 0, len(t)
     while i < n:
+        # ``\\[2pt]`` is a row break with optional spacing, not display math.
+        # Reading the second backslash as a \mathopen\[ made the scan hunt for
+        # a \] that tables never have, and the ``break`` below then returned
+        # only the spans found so far: every mathy macro after the first
+        # multi-line table cell was reported "used outside math" while the
+        # prose around it was correct.  Measured 2026-11-01 on Table 1.
+        if t[i] == "\\" and t[i + 1:i + 2] == "\\":
+            i += 2
+            if t[i:i + 1] == "[":
+                j = t.find("]", i)
+                i = j + 1 if j > 0 else i
+            continue
         if t[i] == "\\" and t[i + 1:i + 2] == "[":
             j = t.find("\\]", i)
             if j < 0:
