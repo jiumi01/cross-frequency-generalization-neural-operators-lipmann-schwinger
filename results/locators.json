@@ -1,0 +1,351 @@
+{
+ "contrast": "0.25",
+ "mult": 6.0,
+ "ladders": {
+  "mode": {
+   "rows": [
+    {
+     "prefix": "mode_m01",
+     "edge": 4.0,
+     "fstar": null,
+     "onset": 4.25,
+     "step": [
+      4.0,
+      4.25
+     ],
+     "plateau": 1.1682970841957745,
+     "inband": 0.369456604798205,
+     "params": 38186,
+     "modes": 1,
+     "train": "train_a025",
+     "label": "1"
+    },
+    {
+     "prefix": "mode_m02",
+     "edge": 4.0,
+     "fstar": null,
+     "onset": 4.0,
+     "step": [
+      4.0,
+      4.25
+     ],
+     "plateau": 0.8826224342003869,
+     "inband": 0.18775614583281053,
+     "params": 114986,
+     "modes": 2,
+     "train": "train_a025",
+     "label": "2"
+    },
+    {
+     "prefix": "mode_m03",
+     "edge": 4.0,
+     "fstar": null,
+     "onset": 4.25,
+     "step": [
+      4.0,
+      4.25
+     ],
+     "plateau": 0.8375472453853282,
+     "inband": 0.0965119628216085,
+     "params": 242986,
+     "modes": 3,
+     "train": "train_a025",
+     "label": "3"
+    },
+    {
+     "prefix": "mode_m04",
+     "edge": 4.0,
+     "fstar": null,
+     "onset": 4.25,
+     "step": [
+      4.0,
+      4.25
+     ],
+     "plateau": 0.9971246762084698,
+     "inband": 0.05770387959004453,
+     "params": 422186,
+     "modes": 4,
+     "train": "train_a025",
+     "label": "4"
+    },
+    {
+     "prefix": "mode_m08",
+     "edge": 4.0,
+     "fstar": 4.5,
+     "onset": 4.25,
+     "step": [
+      4.0,
+      4.25
+     ],
+     "plateau": 0.9524802747251526,
+     "inband": 0.0644348701537069,
+     "params": 1650986,
+     "modes": 8,
+     "train": "train_a025",
+     "label": "8"
+    },
+    {
+     "prefix": "mode_m12",
+     "edge": 4.0,
+     "fstar": 4.5,
+     "onset": 4.25,
+     "step": [
+      4.0,
+      4.25
+     ],
+     "plateau": 0.9609202979461821,
+     "inband": 0.07354018388195123,
+     "params": 3698986,
+     "modes": 12,
+     "train": "train_a025",
+     "label": "12"
+    },
+    {
+     "prefix": "mode_m24",
+     "edge": 4.0,
+     "fstar": 4.5,
+     "onset": 4.25,
+     "step": [
+      4.0,
+      4.25
+     ],
+     "plateau": 0.9641945581505542,
+     "inband": 0.07445741867098456,
+     "params": 14758186,
+     "modes": 24,
+     "train": "train_a025",
+     "label": "24"
+    },
+    {
+     "prefix": "mode_m32",
+     "edge": 4.0,
+     "fstar": 4.5,
+     "onset": 4.25,
+     "step": [
+      4.0,
+      4.25
+     ],
+     "plateau": 0.9706888975616577,
+     "inband": 0.0747208722144114,
+     "params": 26226986,
+     "modes": 32,
+     "train": "train_a025",
+     "label": "32"
+    }
+   ],
+   "spread": {
+    "fstar": 0.0,
+    "onset": 0.25,
+    "step_lo": 4.0,
+    "step_hi": 4.25,
+    "n": 8
+   }
+  },
+  "cap": {
+   "rows": [
+    {
+     "prefix": "main_fno_a025",
+     "edge": 4.0,
+     "fstar": 4.5,
+     "onset": 4.25,
+     "step": [
+      4.0,
+      4.25
+     ],
+     "plateau": 0.9631189418469975,
+     "inband": 0.07157462707155832,
+     "params": 10252586,
+     "modes": 20,
+     "train": "train_a025",
+     "label": "w32 (ref)"
+    },
+    {
+     "prefix": "cap_w64_a025",
+     "edge": 4.0,
+     "fstar": 4.5,
+     "onset": 4.25,
+     "step": [
+      4.0,
+      4.25
+     ],
+     "plateau": 0.9782628775880658,
+     "inband": 0.06840392801337658,
+     "params": 26240450,
+     "modes": 20,
+     "train": "train_a025",
+     "label": "w64"
+    }
+   ],
+   "spread": {
+    "fstar": 0.0,
+    "onset": 0.0,
+    "step_lo": 4.0,
+    "step_hi": 4.25,
+    "n": 2
+   }
+  },
+  "ndata": {
+   "rows": [
+    {
+     "prefix": "ndata_n01536",
+     "edge": 4.0,
+     "fstar": null,
+     "onset": 4.25,
+     "step": [
+      4.0,
+      4.25
+     ],
+     "plateau": 1.009165757070567,
+     "inband": 0.2288443810170582,
+     "params": 10252586,
+     "modes": 20,
+     "train": "train_a025",
+     "label": "1536"
+    },
+    {
+     "prefix": "ndata_n03072",
+     "edge": 4.0,
+     "fstar": null,
+     "onset": 4.25,
+     "step": [
+      4.0,
+      4.25
+     ],
+     "plateau": 0.99007084721577,
+     "inband": 0.15846433363219867,
+     "params": 10252586,
+     "modes": 20,
+     "train": "train_a025",
+     "label": "3072"
+    },
+    {
+     "prefix": "ndata_n06144",
+     "edge": 4.0,
+     "fstar": null,
+     "onset": 4.25,
+     "step": [
+      4.0,
+      4.25
+     ],
+     "plateau": 0.9720736043111452,
+     "inband": 0.10606569408454088,
+     "params": 10252586,
+     "modes": 20,
+     "train": "train_a025",
+     "label": "6144"
+    },
+    {
+     "prefix": "main_fno_a025",
+     "edge": 4.0,
+     "fstar": 4.5,
+     "onset": 4.25,
+     "step": [
+      4.0,
+      4.25
+     ],
+     "plateau": 0.9631189418469975,
+     "inband": 0.07157462707155832,
+     "params": 10252586,
+     "modes": 20,
+     "train": "train_a025",
+     "label": "12288 (ref)"
+    }
+   ],
+   "spread": {
+    "fstar": 0.0,
+    "onset": 0.0,
+    "step_lo": 4.0,
+    "step_hi": 4.25,
+    "n": 4
+   }
+  },
+  "band": {
+   "rows": [
+    {
+     "prefix": "band_b2",
+     "edge": 2.0,
+     "fstar": 2.5,
+     "onset": 2.5,
+     "step": [
+      1.5,
+      2.5
+     ],
+     "plateau": 0.8955830078699653,
+     "inband": 0.020491131563220952,
+     "params": 10252586,
+     "modes": 20,
+     "train": "train_b025_2",
+     "label": "[1,2]"
+    },
+    {
+     "prefix": "band_b3",
+     "edge": 3.0,
+     "fstar": 3.5,
+     "onset": 3.5,
+     "step": [
+      2.5,
+      3.5
+     ],
+     "plateau": 0.9255848618609693,
+     "inband": 0.03863724064361556,
+     "params": 10252586,
+     "modes": 20,
+     "train": "train_b025_3",
+     "label": "[1,3]"
+    },
+    {
+     "prefix": "main_fno_a025",
+     "edge": 4.0,
+     "fstar": 4.5,
+     "onset": 4.25,
+     "step": [
+      4.0,
+      4.25
+     ],
+     "plateau": 0.9631189418469975,
+     "inband": 0.07157462707155832,
+     "params": 10252586,
+     "modes": 20,
+     "train": "train_a025",
+     "label": "[1,4] (ref)"
+    },
+    {
+     "prefix": "band_b6",
+     "edge": 6.0,
+     "fstar": 7.0,
+     "onset": 7.0,
+     "step": [
+      6.0,
+      7.0
+     ],
+     "plateau": 1.0103096838484662,
+     "inband": 0.11937861082897547,
+     "params": 10252586,
+     "modes": 20,
+     "train": "train_b025_6",
+     "label": "[1,6]"
+    },
+    {
+     "prefix": "band_b12",
+     "edge": 12.0,
+     "fstar": null,
+     "onset": null,
+     "step": null,
+     "plateau": null,
+     "inband": 0.17846089339961954,
+     "params": 10252586,
+     "modes": 20,
+     "train": "train_b025_12",
+     "label": "[1,12]"
+    }
+   ],
+   "spread": {
+    "fstar": 4.5,
+    "onset": 4.5,
+    "step_lo": 1.5,
+    "step_hi": 7.0,
+    "n": 5
+   }
+  }
+ }
+}

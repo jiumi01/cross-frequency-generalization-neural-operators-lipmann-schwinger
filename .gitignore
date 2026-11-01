@@ -1,0 +1,58 @@
+# Public-tree policy: this repository carries reproduction code and computed
+# records only.  Manuscript sources, rendered deliverables, figures and every
+# internal administrative document stay on the working disk.
+paper/
+submission/
+versions/
+release/
+release_docs/
+figures/
+figures_v2/
+期刊选型/
+
+# Internal administrative material.  The glob is deliberately broad so that a
+# new document of this class cannot reach the public tree by being forgotten.
+reviews/
+REVIEW_*.md
+REVIEW_*.html
+
+# Large training / generated corpora: not redistributed (regenerate, see README)
+data/
+runs/
+
+# Tooling, caches, scratch
+.tmp/
+.workbuddy/
+__pycache__/
+*.pyc
+.DS_Store
+*.log
+code/_*.png
+
+# Working drafts and downloaded reference material (not reproduction code)
+code/draft_aefcb947_folder/
+code/doc-fetch-resources/
+
+# Scratch markers and debug renders inside results/.  Note that
+# results/_archive_truncated_semantics/ is NOT scratch: it is the bit-for-bit
+# baseline the a025 invariance gate compares against, so the blanket rule
+# below must not swallow it.
+results/_fig_deep_check.png
+results/_bax_read.json.bak*
+results/_gen_macros*.bak*
+results/_w1*.log
+results/_w2_seeds_status.json
+
+# Driver transcripts and build stamps.  These are machine-local records of
+# which stage ran when on this disk, not evidence for any claim, and
+# make_release.py already refuses to ship them.  Four of them were nevertheless
+# tracked, so the same archive had two different file sets depending on whether
+# a reader took the release tree or the repository -- and the build stamp inside
+# a content-addressed evidence directory made the DAS tree hash move on every
+# rebuild, which is a fixed point the statement can never satisfy.  They stay on
+# disk (the .sh drivers read them) but out of the tracked tree.
+results/.pipeline_done
+results/.finish_state
+results/.lastmile_state
+results/.residual_state
+results/.residual2_state

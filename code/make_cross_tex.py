@@ -1,0 +1,315 @@
+# Author: Longgang Wang
+"""Emit the frequency x grid cross as LaTeX macros, a main-text table and the
+supplement's matched-q table.
+
+Everything either manuscript says about the cross comes from here, so no number
+is typed twice: results/cross_analysis.json -> gen_cross.tex (macros, both
+languages) + gen_tab_cross.tex (main table, English and Chinese captions) +
+gen_tab_cross_q.tex (supplement).
+
+Refuses to write if the analysis file is missing or carries no verdict, so a
+manuscript that quotes the cross cannot be built from a stale or partial run.
+
+Usage
+-----
+    python code/make_cross_tex.py
+"""
+import os
+import sys
+import json
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import common as C
+
+LAB = {64: "A", 96: "B", 128: "C"}
+CAP_EN = (r"""One multi-resolution-trained model evaluated on three spatial
+resolutions; every mesh is seen in training, each taking a third of the steps.
+Frequencies {%s}; %d media drawn at $384^{2}$ and restricted spectrally, so each
+row is the same medium. Mean $\pm$ SD over the shared %d seeds."""
+           )
+CAP_CN = (r"""同一多分辨率训练模型评估三种空间分辨率，三网格均参与训练、
+各占三分之一优化步。频率集合 {%s}；%d 个介质在 $384^{2}$ 生成后经谱限制，
+每行同一连续介质；值为共用 %d 个种子的均值 $\pm$ 标准差。""")
+# Table note, kept out of the caption because the caption has a word budget and
+# the two ratios have to be defined where the reader meets them.
+NOTE_EN = (r"\footnotesize $r_{\mathrm{edge}}=\varepsilon(4.25)/\varepsilon(4)$"
+           r" (first out-of-band node against the edge); "
+           r"$r_{\mathrm{1Hz}}=\varepsilon(5)/\varepsilon(4)$ (first hertz beyond it); "
+           r"$\varepsilon_{\mathrm{in}}$, mean over $f<4$; "
+           r"$\varepsilon_{\infty}$, mean over $f\geq6$.")
+NOTE_CN = (r"\footnotesize $r_{\mathrm{edge}}=\varepsilon(4.25)/\varepsilon(4)$"
+           r"（首个带外节点相对带缘）；"
+           r"$r_{\mathrm{1Hz}}=\varepsilon(5)/\varepsilon(4)$（带缘后 1\,Hz）；"
+           r"$\varepsilon_{\mathrm{in}}$ 为 $f<4$ 的均值；"
+           r"$\varepsilon_{\infty}$ 为 $f\geq6$ 的均值。")
+
+
+def note_for(lang, d):
+    """Table note: the two ratio definitions plus the per-seed locators.
+
+    The locators (f*, largest step) are node-valued, so a mean+-SD would be
+    unreadable: either the three seeds agree and the SD is 0, or they do not and
+    no average is a node.  The sentence is therefore built from the records, not
+    asserted: if a later rerun puts a seed on a different node the note says so
+    instead of claiming agreement.
+    """
+    base = NOTE_EN if lang == "en" else NOTE_CN
+    locs = d["loc"]
+    fst = {tuple(v["seed_fstar"]) for v in locs.values()}
+    stp = {tuple(tuple(x) for x in v["seed_step"]) for v in locs.values()}
+    one_f = len(fst) == 1 and len(next(iter(fst))) == len(d["seeds"])
+    one_s = len(stp) == 1 and len(next(iter(stp))) == len(d["seeds"])
+    if one_f and one_s:
+        f = list(fst)[0][0]
+        s = list(stp)[0][0]
+        if lang == "en":
+            return base + (r" All three seeds return the same locators at every"
+                           r" mesh ($f^{\star}=%s$, largest step $%.2f\to%.2f$),"
+                           r" so the $\pm$ applies to the ratios and errors only."
+                           % (("%g" % f), s[0], s[1]))
+        return base + (r" 三种子在每个网格上给出相同定位（$f^{\star}=%s$，"
+                       r"最大单步 $%.2f\to%.2f$），$\pm$ 只作用于比值与误差。"
+                       % (("%g" % f), s[0], s[1]))
+    if lang == "en":
+        return base + (r" Seed locators are not all equal; the table prints the"
+                       r" arm value and each seed's own locator is in the archive.")
+    return base + r" 各种子定位不全相同；表中为整臂值，逐种子值见归档。"
+
+
+def fmt(x, n=2):
+    return ("%%.%df" % n) % x
+
+
+def sci(x):
+    """1.8e-05 -> 1.8\\times10^{-5}.  A partial R^2 of 2e-5 printed as 0.000
+    would read as exactly zero, which is not what the test returned."""
+    if x == 0:
+        return "0"
+    s = "%.1e" % x
+    mant, exp = s.split("e")
+    return "%s\\times10^{%d}" % (mant, int(exp))
+
+
+def main():
+    p = os.path.join(C.RES, "cross_analysis.json")
+    if not os.path.exists(p):
+        raise SystemExit("results/cross_analysis.json missing -- run cross_analyze.py")
+    d = json.load(open(p, encoding="utf-8"))
+    if "verdict" not in d:
+        raise SystemExit("cross_analysis.json has no verdict")
+    loc = {int(k): v for k, v in d["loc"].items()}
+    f, N = d["f"], d["N"]
+    # Written into paper/<lang> (the tree the build compiles from, and the one
+    # every other generator owns) *and* into submission/paper_<lang> (the tree
+    # gen_si_labels.py inlines from when it numbers the SI floats).  The two
+    # copies are byte-identical, so sync_delivery.py copies them without a diff.
+    dirs = []
+    for lg in ("en", "cn"):
+        for base in (os.path.join(C.ROOT, "paper", lg),
+                     os.path.join(C.ROOT, "submission", "paper_%s" % lg)):
+            if os.path.isdir(base):
+                dirs.append((lg, base))
+
+    out = ["% auto-generated by code/make_cross_tex.py -- do not edit"]
+
+    def mac(name, val):
+        out.append("\\newcommand{\\%s}{%s}" % (name, val))
+
+    for n in N:
+        L, s = loc[n], LAB[n]
+        mac("CrossFstar" + s, fmt(L["fstar"], 2))
+        mac("CrossOnset" + s, fmt(L["onset"], 2))
+        mac("CrossStep" + s, ("%.2f--%.2f" % tuple(L["step"])) if L["step"] else "n/a")
+        mac("CrossJump" + s, fmt(L["jump"], 2))
+        mac("CrossJumpSD" + s, fmt(L.get("sd_jump", 0.0), 2))
+        mac("CrossRoneHz" + s, fmt(L["r1hz"], 2))
+        mac("CrossRoneHzSD" + s, fmt(L.get("sd_r1hz", 0.0), 2))
+        mac("CrossIn" + s, fmt(L["inband"], 4))
+        mac("CrossInSD" + s, fmt(L.get("sd_inband", 0.0), 4))
+        mac("CrossPlat" + s, fmt(L["plateau"], 4))
+        mac("CrossPlatSD" + s, fmt(L.get("sd_plateau", 0.0), 4))
+    # Paired mesh effect, same seed evaluated on the finest and the coarsest
+    # mesh: the unpaired reading of the ladder ("0.6% across N") is smaller than
+    # the seed-to-seed spread of the same ratio, so only the paired version says
+    # whether the mesh moves it at all.
+    _pm = d.get("paired_mesh") or {}
+    mac("CrossPairedEdge", "%+.2f" % _pm.get("d_edge", 0.0))
+    mac("CrossPairedEdgeLo", "%+.2f" % _pm.get("d_edge_lo", 0.0))
+    mac("CrossPairedEdgeHi", "%+.2f" % _pm.get("d_edge_hi", 0.0))
+    mac("CrossPairedNlo", "%d" % (_pm.get("mesh_pair", [64, 128])[0]))
+    mac("CrossPairedNhi", "%d" % (_pm.get("mesh_pair", [64, 128])[1]))
+    mac("CrossRtwoF", fmt(d["r2"]["f"], 3))
+    mac("CrossRtwoQ", fmt(d["r2"]["q"], 3))
+    mac("CrossRtwoFN", fmt(d["r2"]["fN"], 3))
+    mac("CrossNLevels", "%d" % len(N))
+    mac("CrossNMedia", "%d" % d["n"])
+    mac("CrossNSeeds", "%d" % len(d["seeds"]))
+    mac("CrossNFreq", "%d" % len(f))
+    mac("CrossJumpSpreadPct", fmt(100 * (max(loc[n]["jump"] for n in N) /
+                                         min(loc[n]["jump"] for n in N) - 1), 1))
+    mac("CrossPairRatioMax", fmt(max(p[5] / p[4] for p in d["pairs"]), 1))
+    mac("CrossVerdict", d["verdict"])
+
+    # ---------------------------------------------------------- conditional
+    # The R^2 comparison is descriptive: 14 means against one slope is not a
+    # nested test.  These macros carry the test the design does support.
+    pc = os.path.join(C.RES, "cross_cond.json")
+    if not os.path.exists(pc):
+        raise SystemExit("results/cross_cond.json missing -- run cross_cond.py")
+    c = json.load(open(pc, encoding="utf-8"))
+    mac("CondBeta", "%.4f" % c["beta_logq"])
+    mac("CondBetaCILo", "%.4f" % c["beta_ci"][0])
+    mac("CondBetaCIHi", "%.4f" % c["beta_ci"][1])
+    # The same interval from a second, independent instrument: media-cluster
+    # bootstrap instead of the analytic CR0 sandwich.  Quoted because the 25 200
+    # records are 200 media x 14 f x 3 N x 3 seeds and a reader is right to ask
+    # that the interval not treat them as independent.
+    if "beta_ci_boot" in c:
+        mac("CondBetaBootLo", "%.4f" % c["beta_ci_boot"][0])
+        mac("CondBetaBootHi", "%.4f" % c["beta_ci_boot"][1])
+        mac("CondBetaBootN", "%d" % c["beta_boot_n"])
+    mac("CondPartialRtwo", sci(c["partial_r2_logq"]))
+    mac("CondRtwoFonly", "%.3f" % c["r2_freq"])
+    mac("CondRtwoFQ", "%.3f" % c["r2_freq_plus_logq"])
+    mac("CondIntF", "%.2f" % c["interaction_F"])
+    mac("CondIntP", "%.2f" % c["interaction_p"])
+    mac("CondNObs", "%d" % c["n_obs"])
+    lt = c["locator_thresholds"]
+    ref = lt.get("main_fno_a025", {})
+    mac("LocRefThree", "%s" % ref.get("3", "n/a"))
+    mac("LocRefFour", "%s" % ref.get("4", "n/a"))
+    mac("LocRefSix", "%s" % ref.get("6", "n/a"))
+    mac("LocCrossSix", "%s" % lt.get("cross_N128", {}).get("6", "n/a"))
+    body = "\n".join(out) + "\n"
+
+    # ------------------------------------------------- full 42-cell table
+    cell = {}
+    for s in d["seeds"]:
+        e = json.load(open(os.path.join(C.RES, "cross_eval_s%d.json" % s),
+                           encoding="utf-8"))
+        for r in e["rows"]:
+            cell.setdefault((float(r["f"]), int(r["N"])), []).append(r["mean"])
+    cell = {k: sum(v) / len(v) for k, v in cell.items()}
+    frows = "\n".join("%g & %s \\\\" % (
+        ff, " & ".join("%.3f" % cell[(ff, n)] for n in sorted(set(N))))
+        for ff in f) if cell else ""
+
+    qs = [n / 4.25 for n in N]
+    pm = d["paired_mesh"]
+
+    def pmv(m, s):
+        return "$%s\\pm%s$" % (fmt(m, 2), fmt(s, 2))
+
+    def pmv3(m, s):
+        return "$%s\\pm%s$" % (fmt(m, 3), fmt(s, 3))
+
+    rows = "\n".join("%d & %s & %s & %s & %s & %s & %s \\\\"
+                     % (n,
+                        "%.2f/%.2f" % (loc[n]["fstar"], loc[n]["onset"]),
+                        "%.2f--%.2f" % tuple(loc[n]["step"]),
+                        pmv(loc[n]["jump"], loc[n].get("sd_jump", 0.0)),
+                        pmv(loc[n]["r1hz"], loc[n].get("sd_r1hz", 0.0)),
+                        pmv3(loc[n]["inband"], loc[n].get("sd_inband", 0.0)),
+                        pmv3(loc[n]["plateau"], loc[n].get("sd_plateau", 0.0)))
+                     for n in N)
+
+    for lg, dr in dirs:
+        open(os.path.join(dr, "gen_cross.tex"), "w", encoding="utf-8").write(body)
+        # The two captions carry different numbers of slots on purpose: the
+        # frequency set is listed in full, because the main sweep uses a
+        # different one and a reader is entitled to see which nodes this table
+        # was evaluated at.
+        fset = ", ".join(("%g" % v) for v in f)
+        nseed = len(d["seeds"])
+        cap = ((CAP_EN % (fset, d["n"], nseed)) if lg == "en"
+               else (CAP_CN % (fset, d["n"], nseed)))
+        # The caption is checked against the manuscript's own reading budget
+        # here, at generation, not only by lint_style.py afterwards: a caption
+        # that grows past the budget with the data would otherwise be caught
+        # by a gate whose message names the .tex file rather than this one.
+        import lint_style as LINT
+        cjk, latin, _units = LINT.reading_load(LINT._strip_tex(cap))
+        if (cjk > 4 and _units > LINT.CAPTION_CJK_CHAR_BUDGET) or \
+           (cjk <= 4 and latin > LINT.CAPTION_WORD_BUDGET):
+            raise SystemExit("gen_tab_cross[%s]: caption is %d cjk units / %d "
+                             "words, over the style budget" % (lg, _units, latin))
+        tab = r"""%% auto-generated by code/make_cross_tex.py
+\begin{table}[t]
+\centering
+\caption{%s}
+\label{tab:cross}
+\footnotesize
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{ccccccc}
+\toprule
+$N$ & $f^{\star}$/onset & largest step & $r_{\mathrm{edge}}$
+& $r_{\mathrm{1Hz}}$ & $\varepsilon_{\mathrm{in}}$ & $\varepsilon_{\infty}$ \\
+\midrule
+%s
+\bottomrule
+\end{tabular}
+
+\vspace{2pt}
+%s
+\end{table}
+""" % (" ".join(cap.split()), rows, note_for(lg, d))
+        open(os.path.join(dr, "gen_tab_cross.tex"), "w", encoding="utf-8").write(tab)
+
+    prows = []
+    for pr in d["pairs"]:
+        f1, n1, f2, n2, e1, e2 = pr
+        prows.append("%.2f & %d & %.3f & %.2f & %d & %.3f & %.2f \\\\"
+                     % (f1, n1, e1, f2, n2, e2, e2 / e1))
+    tabq = r"""%% auto-generated by code/make_cross_tex.py
+\begin{table}[t]
+\centering
+\caption{Cells matched in points per wavelength, $q=N/f$. If $q$ set the error
+the members of a pair would agree; the pair inside the band nearly does, and the
+pairs that straddle the band edge differ by an order of magnitude.}
+\label{tab:si_cross_q}
+\small
+\begin{tabular}{ccccccc}
+\toprule
+$f$ & $N$ & $\varepsilon$ & $f'$ & $N'$ & $\varepsilon'$ & ratio \\
+\midrule
+%s
+\bottomrule
+\end{tabular}
+\end{table}
+""" % "\n".join(prows)
+    # The supplement exists only in English, so its table goes to the English
+    # copies alone; a cn/ copy would be an unreferenced duplicate.
+    for lg, dr in dirs:
+        if lg == "en":
+            open(os.path.join(dr, "gen_tab_cross_q.tex"), "w", encoding="utf-8").write(tabq)
+            tabf = r"""%% auto-generated by code/make_cross_tex.py
+\begin{table}[t]
+\centering
+\caption{Every cell of the cross: seed-mean relative $L_2$ error at each of the
+%d frequencies and each mesh. The complete records behind the main text's cross
+table, named rather than referenced because the supplement is a separate
+document.}
+\label{tab:si_cross_full}
+\small
+\begin{tabular}{c%s}
+\toprule
+$f$ & %s \\
+\midrule
+%s
+\bottomrule
+\end{tabular}
+\end{table}
+""" % (len(f), "c" * len(sorted(set(N))),
+       " & ".join("$\\varepsilon_{%d}$" % n for n in sorted(set(N))), frows)
+            open(os.path.join(dr, "gen_tab_cross_full.tex"), "w",
+                 encoding="utf-8").write(tabf)
+    print("wrote gen_cross/gen_tab_cross (en, cn) and gen_tab_cross_q (en)")
+    print("wrote gen_tab_cross_full (en); beta=%.4f partial R2=%.2e"
+          % (c["beta_logq"], c["partial_r2_logq"]))
+    print("verdict=%s  R2(f)=%.3f  R2(q)=%.3f  jump %.2f/%.2f/%.2f"
+          % (d["verdict"], d["r2"]["f"], d["r2"]["q"],
+             loc[64]["jump"], loc[96]["jump"], loc[128]["jump"]))
+
+
+if __name__ == "__main__":
+    main()
