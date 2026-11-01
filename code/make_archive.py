@@ -5,11 +5,12 @@
 
 A snapshot is copy-only: it never writes into the working tree.  What it copies
 is the set of artefacts a reader needs to reproduce the delivered PDFs --
-code/, paper/, results/ -- plus the disposition document, a CHANGELOG and an
-md5 manifest.  Earlier snapshots are left untouched so revisions can be diffed
-and rolled back.
+code/, paper/, results/ -- plus a CHANGELOG and an md5 manifest.  Internal
+administrative documents are not part of that set; pass --with-admin to add
+them to a local rollback copy.  Earlier snapshots are left untouched so
+revisions can be diffed and rolled back.
 
-Usage:  python code/make_archive.py v03_2026-10-12_mdpi_single_column
+Usage:  python code/make_archive.py [--with-admin] v03_2026-10-12_mdpi_single_column
 """
 import glob
 import os
@@ -58,9 +59,10 @@ def copy_tree(src, dst, base, rows):
 
 
 def main():
-    if len(sys.argv) < 2:
-        print("usage: make_archive.py <version-label>"); return 1
-    label = sys.argv[1]
+    args = [a for a in sys.argv[1:] if not a.startswith("--")]
+    if not args:
+        print("usage: make_archive.py [--with-admin] <version-label>"); return 1
+    label = args[0]
     dest = os.path.join(ROOT, "versions", label)
     if os.path.exists(dest):
         # A directory that already carries the copied trees is a finished
@@ -85,22 +87,22 @@ def main():
         src = os.path.join(ROOT, sub)
         if os.path.isdir(src):
             copy_tree(src, os.path.join(dest, sub), ROOT, rows)
-    # Every administrative document of this class, not just the one file this
-    # used to hard-code: the main document cites a companion table, and shipping
-    # one without the other leaves a pointer into a document the reader does not
-    # have.  A glob also means the next round's companion cannot be forgotten by
-    # omission.
-    docs = sorted(glob.glob(os.path.join(ROOT, "REVIEW_*.md")))
-    if os.path.exists(os.path.join(ROOT, "REVIEW_RESPONSE.md")):
-        docs.insert(0, os.path.join(ROOT, "REVIEW_RESPONSE.md"))
-    seen = set()
-    for src in docs:
-        doc = os.path.basename(src)
-        if doc in seen:
-            continue
-        seen.add(doc)
-        shutil.copy2(src, os.path.join(dest, doc))
-        rows.append((md5(src), os.path.getsize(src), doc))
+    # Administrative documents of this class are internal.  The snapshot named
+    # in the Data Availability statement is handed to a reader, so it carries
+    # the reproduction artefacts and nothing else; --with-admin is for a local
+    # rollback copy that also wants the disposition trail.
+    if "--with-admin" in sys.argv:
+        docs = sorted(glob.glob(os.path.join(ROOT, "REVIEW_*.md")))
+        if os.path.exists(os.path.join(ROOT, "REVIEW_RESPONSE.md")):
+            docs.insert(0, os.path.join(ROOT, "REVIEW_RESPONSE.md"))
+        seen = set()
+        for src in docs:
+            doc = os.path.basename(src)
+            if doc in seen:
+                continue
+            seen.add(doc)
+            shutil.copy2(src, os.path.join(dest, doc))
+            rows.append((md5(src), os.path.getsize(src), doc))
     # The four delivered PDFs come from submission/, not from paper/.
     # paper/<lang>/main.pdf is a build intermediate and it is the file a desktop
     # viewer holds open; when it is locked make_paper falls back to main_new.pdf
