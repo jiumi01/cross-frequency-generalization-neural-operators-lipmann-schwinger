@@ -66,16 +66,16 @@ CAP = { "en": dict(
            "same \\RealWinN{} windows rather than the \\MainNMedia{} paired "
            "media of the main-text per-frequency table, and differ only in "
            "geometry."),
-  paired=("Paired tests on the per-sample errors. $n$: entries averaged; "
+  paired=("Paired tests on per-sample errors. $n$: entries averaged; "
           "$\\Delta=\\bar e_{A}-\\bar e_{B}$: mean paired difference, negative "
           "when $A$ is the more accurate, 95\\% interval resampling media; $p$: "
-          "media-level sign-flip, one sign drawn per medium; $d_z$: standardised "
+          "media-level sign-flip, one sign per medium; $d_z$: standardised "
           "paired effect size, $\\bar\\Delta/"
           "\\mathrm{sd}(\\Delta)$; $*$: interval excluding zero."),
-  si_paired=("Paired tests on the per-sample errors. $n$: entries averaged; "
+  si_paired=("Paired tests on per-sample errors. $n$: entries averaged; "
              "$\\Delta=\\bar e_{A}-\\bar e_{B}$: mean paired difference, "
              "negative when $A$ is the more accurate, 95\\% interval "
-             "resampling media; $p$: media-level sign-flip, one sign drawn per "
+             "resampling media; $p$: media-level sign-flip, one sign per "
              "medium; $d_z$: standardised paired effect size, "
              "$\\bar\\Delta/\\mathrm{sd}(\\Delta)$; $*$: interval excluding "
              "zero."),
@@ -188,9 +188,9 @@ CAP = { "en": dict(
            "两组均为同一批 \\RealWinN{} 个窗口上的均值，而非逐频率全表的 "
            "\\MainNMedia{} 个配对介质，且两组只差几何。"),
   paired=("配对检验。$A$、$B$ 为首列两配置；$n$ 为条目数（介质 $\\times$ 频点，"
-          "种子先取平均）；$\\Delta$ 为平均配对差值，95\\% 区间对\\emph{介质}重抽样；"
-          "$p$ 为双侧介质级符号翻转置换检验（每个介质抽一次符号；保留一位有效数字）；"
-          "星号表示区间不含 0。"),
+          "种子取平均）；$\\Delta$ 为平均配对差值，95\\% 区间重抽样介质；"
+          "$p$ 为双侧介质级符号翻转（每介质一次符号；一位有效数字）；"
+          "星号：区间不含 0。"),
   arms=("支撑种子协议的全部训练臂清单。$\\varepsilon(f)$：测试频率 $f$ 处的"
         "种子均值相对 $L_2$；末列对 $f\\ge6$ 取平均。对加宽带臂，这些频率位于"
         "其自身训练带内——那正是这些臂的目的；对 $[1,2]$ 臂则远在带外。"),
