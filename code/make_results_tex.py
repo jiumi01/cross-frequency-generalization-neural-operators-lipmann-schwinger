@@ -558,7 +558,7 @@ def table_summary(ev, arms, cap):
     # [!ht]: this is the table the surrounding prose reads its numbers from, and
     # a plain [t] let it drift two pages past its first citation once another
     # float was queued ahead of it.  "h" first, then the top of the next page.
-    t = ("\\begin{table}[!ht]\n\\centering\n\\caption{%s}\n\\label{tab:summary}\n"
+    t = ("\\begin{table}\n\\centering\n\\caption{%s}\n\\label{tab:summary}\n"
          "\\small\n\\setlength{\\tabcolsep}{4.2pt}\n"
          "\\begin{tabular}{lcccccc}\n\\toprule\n"
          " & \\multicolumn{2}{c}{$\\varepsilon_{\\mathrm{in}}$} & "
@@ -591,7 +591,7 @@ def table_realgeo(arms, cap):
     s = d.get("summary")
     if not s:
         return ""
-    t = ("\\begin{table}[t]\n\\centering\n\\caption{%s}\n\\label{tab:realgeo}\n"
+    t = ("\\begin{table}\n\\centering\n\\caption{%s}\n\\label{tab:realgeo}\n"
          "\\small\n\\setlength{\\tabcolsep}{4.2pt}\n"
          "\\begin{tabular}{lcccccc}\n\\toprule\n"
          " & \\multicolumn{3}{c}{%s} & \\multicolumn{3}{c}{%s} \\\\\n"
@@ -620,7 +620,7 @@ def table_arch(ev, arms, cap):
     # band-edge behaviour exactly where the text claimed all three families
     # behaved alike, so a reader had to take the claim on trust.
     groups = [(p + "_", lab) for p, lab in C.ARCH_GROUPS]
-    t = ("\\begin{table}[t]\n\\centering\n\\caption{%s}\n\\label{tab:arch}\n"
+    t = ("\\begin{table}\n\\centering\n\\caption{%s}\n\\label{tab:arch}\n"
          "\\small\n\\setlength{\\tabcolsep}{3.2pt}\n"
          "\\begin{tabular}{clcccccc}\n\\toprule\n"
          "$v_{\\max}$ & %s & %s & $\\varepsilon_{\\mathrm{in}}$ & "
@@ -661,7 +661,7 @@ def table_band(ev, arms, cap):
             ("band_b12_", "FNO", "[1,12]"),
             ("base_unet_a025_", "U-Net", "[1,4]"),
             ("uband_b6_", "U-Net", "[1,6]")]
-    t = ("\\begin{table}[t]\n\\centering\n\\caption{%s}\n\\label{tab:band}\n"
+    t = ("\\begin{table}\n\\centering\n\\caption{%s}\n\\label{tab:band}\n"
          "\\small\n\\setlength{\\tabcolsep}{3.6pt}\n"
          "\\begin{tabular}{llccccc}\n\\toprule\n"
          "%s & %s & $\\varepsilon_{\\mathrm{in}}$ & $\\varepsilon_{5}$ & "
@@ -697,7 +697,7 @@ def f_star(F, M_, e4=None, thr=6.0):
 
 
 def table_mode(ev, cap):
-    t = ("\\begin{table}[t]\n\\centering\n\\caption{%s}\n\\label{tab:mode}\n"
+    t = ("\\begin{table}\n\\centering\n\\caption{%s}\n\\label{tab:mode}\n"
          "\\small\n\\setlength{\\tabcolsep}{4pt}\n"
          "\\begin{tabular}{cccccc}\n\\toprule\n"
          "$M$ & $\\varepsilon_{\\mathrm{in}}$ & $\\varepsilon_{5}$ & "
@@ -823,7 +823,7 @@ def table_cost(cap):
                      m["per_sample_ms"], lo["per_sample_ms"] / m["per_sample_ms"],
                      hi["per_sample_ms"] / m["per_sample_ms"]))
     h = lab["h"]
-    t = ("\\begin{table}[t]\n\\centering\n\\caption{%s}\n\\label{tab:cost}\n"
+    t = ("\\begin{table}\n\\centering\n\\caption{%s}\n\\label{tab:cost}\n"
          "\\small\n\\setlength{\\tabcolsep}{3.2pt}\n"
          "\\begin{tabular}{lccccc}\n\\toprule\n"
          "%s & %s & %s & %s & $S_{1.5}$ & $S_{12}$ \\\\\n\\midrule\n"
@@ -859,7 +859,7 @@ def table_data(ev, cap):
     if not rungs:
         return ""
     lab = cap["data_lab"]
-    t = ("\\begin{table}[t]\n\\centering\n\\caption{%s}\n\\label{tab:data}\n"
+    t = ("\\begin{table}\n\\centering\n\\caption{%s}\n\\label{tab:data}\n"
          "\\small\n\\setlength{\\tabcolsep}{3.6pt}\n"
          "\\begin{tabular}{rccccc}\n\\toprule\n%s \\\\\n\\midrule\n"
          % (cap["data"], " & ".join(lab["h"])))
@@ -889,7 +889,7 @@ def table_propnorm(cap):
     at = dict(zip([round(float(f), 4) for f in d["f"]],
                   [float(v) for v in d["norm"]]))
     show = [1.5, 2.5, 3.5, 4.0, 4.25, 4.5, 4.75]
-    t = ("\\begin{table}[t]\n\\centering\n\\caption{%s}\n"
+    t = ("\\begin{table}\n\\centering\n\\caption{%s}\n"
          "\\label{tab:propnorm}\n\\small\n\\setlength{\\tabcolsep}{3.4pt}\n"
          "\\begin{tabular}{lcccccccc}\n\\toprule\n"
          "$f$ & " % cap["propnorm"])
@@ -925,7 +925,7 @@ def table_paired(cap):
         return ""
     d = json.load(open(p, encoding="utf-8"))
     lab = cap["paired_lab"]
-    t = ("\\begin{table}[t]\n\\centering\n\\caption{%s}\n\\label{tab:paired}\n"
+    t = ("\\begin{table}\n\\centering\n\\caption{%s}\n\\label{tab:paired}\n"
          "\\small\n\\setlength{\\tabcolsep}{3.6pt}\n"
          "\\begin{tabular}{lrrrrrr}\n\\toprule\n"
          " & $n$ & $\\bar e_{A}$ & $\\bar e_{B}$ & $\\Delta$ (95\\%% CI) & $p$ "
@@ -955,7 +955,7 @@ def table_si_paired(cap):
         return ""
     d = json.load(open(p, encoding="utf-8"))
     lab = cap["paired_lab"]
-    t = ("\\begin{table}[t]\n\\centering\n\\caption{%s}\n\\label{tab:paired}\n"
+    t = ("\\begin{table}\n\\centering\n\\caption{%s}\n\\label{tab:paired}\n"
          "\\small\n\\setlength{\\tabcolsep}{3.6pt}\n"
          "\\begin{tabular}{lrrrrrr}\n\\toprule\n"
          " & $n$ & $\\bar e_{A}$ & $\\bar e_{B}$ & $\\Delta$ (95\\%% CI) & $p$ "
@@ -978,7 +978,7 @@ def table_born(ev, arms, cap):
         if n:
             ref = n[0]
             break
-    t = ("\\begin{table}[t]\n\\centering\n\\caption{%s}\n\\label{tab:born}\n"
+    t = ("\\begin{table}\n\\centering\n\\caption{%s}\n\\label{tab:born}\n"
          "\\small\n\\setlength{\\tabcolsep}{4pt}\n"
          "\\begin{tabular}{ccccc}\n\\toprule\n"
          "$v_{\\max}$ & %s & $\\varepsilon(1.5)$ & $\\varepsilon(4)$ & "
@@ -3227,7 +3227,7 @@ def table_anchor(cap, lang="en"):
     if d is None:
         return ""
     ev = load(RES_DIR)
-    t = ("\\begin{table}[!ht]\n\\centering\n\\caption{%s}\n\\label{tab:anchor}\n"
+    t = ("\\begin{table}\n\\centering\n\\caption{%s}\n\\label{tab:anchor}\n"
          "\\footnotesize\n\\setlength{\\tabcolsep}{4pt}\n"
          "\\begin{tabular}{llrrrrr}\n\\toprule\n"
          "$v_{\\max}$ & predictor & $\\varepsilon_{\\mathrm{in}}$ & "
@@ -3599,7 +3599,7 @@ def table_banddown(ev, cap):
         return "%% banddown.json missing or on an unexpected grid -- table omitted.\n"
     d, fL = ld
     i1, i075, i05, i025 = (fL.index(x) for x in (1.0, 0.75, 0.5, 0.25))
-    t = ("\\begin{table}[t]\n\\centering\n"
+    t = ("\\begin{table}\n\\centering\n"
          "\\caption{" + cap["banddown"] + "}\n"
          "\\label{tab:banddown}\n\\small\n\\setlength{\\tabcolsep}{4pt}\n"
          "\\begin{tabular}{lccccccc}\n\\toprule\n"
@@ -3873,7 +3873,7 @@ def table_gridthree(cap):
     g = _gridthree_load()
     if g is None:
         return ""
-    t = ("\\begin{table}[t]\n\\centering\n\\caption{%s}\n"
+    t = ("\\begin{table}\n\\centering\n\\caption{%s}\n"
          "\\label{tab:gridthree}\n\\small\n"
          "\\setlength{\\tabcolsep}{4.6pt}\n"
          "\\begin{tabular}{lrrrrrr}\n\\toprule\n"
@@ -4029,7 +4029,7 @@ def table_locators(cap):
     # page, so on the page where it is first cited the top block is already
     # taken and a plain [t] pushes it two pages out.  "!" lets LaTeX relax the
     # class's \topfraction rather than wait for a page whose top is free.
-    t = ("\\begin{table}[!ht]\n\\centering\n\\caption{%s}\n\\label{tab:locators}\n"
+    t = ("\\begin{table}\n\\centering\n\\caption{%s}\n\\label{tab:locators}\n"
          "\\footnotesize\n\\setlength{\\tabcolsep}{3.6pt}\n"
          "\\begin{tabular}{llcccc}\n\\toprule\n"
          "ladder & rung & $f^{\\star}$ & onset & largest step & "
@@ -4076,7 +4076,7 @@ def table_ci(cap):
     # shrinking the font keeps every digit at full precision instead of
     # rounding the intervals away.  The sparse tables (5-8 plain columns) are
     # \footnotesize; this one earns the smaller size by its column count.
-    t = ("\\begin{table}[t]\n\\centering\n\\caption{%s}\n\\label{tab:ci}\n"
+    t = ("\\begin{table}\n\\centering\n\\caption{%s}\n\\label{tab:ci}\n"
          "\\scriptsize\n\\setlength{\\tabcolsep}{3.0pt}\n"
          "\\begin{tabular}{llccccc}\n\\toprule\n"
          "predictor & $v_{\\max}$ & $\\varepsilon_{\\mathrm{in}}$ & "
@@ -4424,7 +4424,7 @@ def table_res(cap):
     d = _res_load()
     if d is None:
         return ""
-    t = ("\\begin{table}[t]\n\\centering\n\\caption{%s}\n\\label{tab:res}\n"
+    t = ("\\begin{table}\n\\centering\n\\caption{%s}\n\\label{tab:res}\n"
          "\\footnotesize\n\\setlength{\\tabcolsep}{4pt}\n"
          "\\begin{tabular}{lcccccc}\n\\toprule\n"
          "grid & $f^{\\star}$ & onset & largest step & jump & "
