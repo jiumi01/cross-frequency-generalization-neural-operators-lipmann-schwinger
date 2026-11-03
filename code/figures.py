@@ -454,9 +454,221 @@ def end_labels(ax, entries, fs=7.4, dx=3.5, min_sep=9.5, bold=True,
 
 def badge(ax, x, y, text, fs=7.0, ha="left", va="top", color="#333333"):
     """Small note that stays legible over both ends of a colour map."""
-    ax.text(x, y, text, transform=ax.transAxes, fontsize=fs, ha=ha, va=va,
-            color=color, bbox=dict(facecolor="white", alpha=0.78,
-                                   edgecolor="none", pad=1.4))
+    return ax.text(x, y, text, transform=ax.transAxes, fontsize=fs, ha=ha,
+                   va=va, color=color,
+                   bbox=dict(facecolor="white", alpha=0.78,
+                             edgecolor="none", pad=1.4))
+
+
+# ---------------------------------------------------------------------------
+# direct labels: one text per curve, placed in measured empty space
+# ---------------------------------------------------------------------------
+def _poly_px(ax, F, M, step=0.6):
+    """A curve as a polyline in display pixels, densified to ~step px.
+
+    Placement is a geometric question ("is this strip of paper empty?"), so it
+    has to be asked in the same units the text is measured in.  Comparing data
+    coordinates instead would make the answer depend on the log scale, which is
+    exactly how a previous version of panel 8(b) put four labels on top of
+    three lines while every clearance computed in decades looked fine.
+    """
+    F = np.asarray(F, float)
+    M = np.asarray(M, float)
+    P = ax.transData.transform(np.column_stack([F, M]))
+    out = [P[:1]]
+    for a, b in zip(P[:-1], P[1:]):
+        n = max(2, int(np.hypot(*(b - a)) / step) + 1)
+        t = np.linspace(0.0, 1.0, n)[1:, None]
+        out.append(a + t * (b - a))
+    return np.vstack(out)
+
+
+def _ebar_px(ax, F, M, S, cap_pt=5.2):
+    """The error bars as a point cloud, so they count as obstacles too.
+
+    The horizontal caps matter as much as the vertical strokes: a label that
+    clears the stem of an error bar can still land on its cap, which is what
+    happened to the trained-FNO label at 7.8 pt.  Both are emitted here.
+    """
+    fig = ax.figure
+    cap = cap_pt * fig.dpi / 72.0
+    pts = []
+    for xx, mm, ss in zip(np.asarray(F, float), np.asarray(M, float),
+                          np.asarray(S, float)):
+        if not np.isfinite(ss) or ss <= 0:
+            continue
+        for yy in (mm - ss, mm + ss):
+            p = ax.transData.transform((xx, yy))
+            n = max(2, int(2.0 * cap / 0.8) + 1)
+            t = np.linspace(-1.0, 1.0, n)[:, None] * np.array([[cap, 0.0]])
+            pts.append(p[None, :] + t)
+        p0 = ax.transData.transform((xx, mm - ss))
+        p1 = ax.transData.transform((xx, mm + ss))
+        n = max(2, int(np.hypot(*(p1 - p0)) / 0.8) + 1)
+        t = np.linspace(0.0, 1.0, n)[:, None]
+        pts.append(p0 + t * (p1 - p0))
+    return np.vstack(pts) if pts else np.empty((0, 2))
+
+
+def _rect_dist(rect, pts):
+    """Shortest distance in pixels from an axis-aligned box to a point cloud."""
+    if pts is None or len(pts) == 0:
+        return np.inf
+    x0, y0, x1, y1 = rect
+    dx = np.maximum(np.maximum(x0 - pts[:, 0], pts[:, 0] - x1), 0.0)
+    dy = np.maximum(np.maximum(y0 - pts[:, 1], pts[:, 1] - y1), 0.0)
+    return float(np.hypot(dx, dy).min())
+
+
+def curve_labels(ax, entries, fs=6.6, gap_pt=2.0, cap_pt=8.0, max_dec=0.35,
+                 avoid=(), verbose=True):
+    """Label each curve directly, in blank space above it (below when thin).
+
+    entries: [(F, M, S or None, text, colour), ...]
+
+    The old approach -- a legend box parked in whatever pocket was free -- is
+    what a crowded panel forces, but it makes the reader travel from a box on
+    one side of the figure to a curve on the other.  Direct labels are better
+    *if* they are actually placed in empty space; the failure mode is text
+    sitting on a line, which is invisible to a check written in data
+    coordinates because the log axis stretches a 0.1-decade gap into a few
+    pixels.
+
+    So each candidate position is tested against the drawn geometry: the text
+    is measured with the renderer, every curve is densified into a pixel
+    polyline, and a position is accepted only if the text box keeps `gap_pt`
+    from every curve, every error bar, the band edge, the axes frame and the
+    labels already placed.  Among the accepted positions the one taken is the
+    one that maximises the clearance to the *other* curves while hugging its
+    own -- i.e. the middle of the widest blank strip that belongs to this
+    curve.  `above` is preferred; `below` is tried at the same time, so a curve
+    with no room overhead still gets a label.
+
+    Returns [(text, side, clearance_px, own_gap_px), ...], one row per label,
+    and prints the same table: the claim "the labels do not touch the curves"
+    is then a measurement in the build log, not an intention.
+    """
+    fig = ax.figure
+    fig.canvas.draw()
+    rend = fig.canvas.get_renderer()
+    gap = gap_pt * fig.dpi / 72.0
+    cap = cap_pt * fig.dpi / 72.0
+    # A label may not sit on the frame.  1 px was enough to pass the overlap
+    # test and not enough to look separated: at 7.8 pt the trained-FNO label
+    # was placed with its first letter on the y axis.  Three pixels plus the
+    # text gap is the smallest offset that reads as "inside the panel".
+    margin = gap + 1.0
+
+    own, obs = [], []
+    for F, M, S, _lab, _col in entries:
+        p = _poly_px(ax, F, M)
+        own.append(p)
+        obs.append(p)
+        if S is not None:
+            e = _ebar_px(ax, F, M, S)
+            if len(e):
+                obs.append(e)
+    # the band edge rule: text across it reads as if it belonged to the wrong
+    # side of the training band
+    xb = ax.transData.transform((4.0, ax.get_ylim()[0]))[0]
+    obs.append(np.array([[xb, ax.bbox.y0], [xb, ax.bbox.y1]]))
+    obs = np.vstack(obs)
+
+    placed = []
+    for a in avoid:
+        if a is None:
+            continue
+        bb = a.get_window_extent(renderer=rend)
+        placed.append((bb.x0 - 1.0, bb.y0 - 1.0, bb.x1 + 1.0, bb.y1 + 1.0))
+
+    axb = ax.bbox
+    xlo, xhi = ax.get_xlim()
+    rows = []
+    for k, (F, M, _S, lab, col) in enumerate(entries):
+        t = ax.text(0.0, 0.0, lab, fontsize=fs, fontweight="bold")
+        bb = t.get_window_extent(renderer=rend)
+        tw, th = float(bb.width), float(bb.height)
+        t.remove()
+
+        best = None
+        for side in ("above", "below"):
+            for frac in np.linspace(0.012, 0.94, 44):
+                xi = xlo + frac * (xhi - xlo)
+                if not (F[0] <= xi <= F[-1]):
+                    continue
+                yc = float(np.interp(xi, F, M))
+                px = ax.transData.transform((xi, yc))[0]
+                for ha in ("left", "right"):
+                    bx0 = px if ha == "left" else px - tw
+                    bx1 = bx0 + tw
+                    if bx0 < axb.x0 + margin or bx1 > axb.x1 - margin:
+                        continue
+                    for d in np.linspace(0.02, max_dec, 18):
+                        yd = yc * (10.0 ** (d if side == "above" else -d))
+                        py = ax.transData.transform((xi, yd))[1]
+                        by0 = py if side == "above" else py - th
+                        by1 = by0 + th
+                        if by0 < axb.y0 + margin or by1 > axb.y1 - margin:
+                            continue
+                        r = (bx0, by0, bx1, by1)
+                        clr = _rect_dist(r, obs)
+                        if clr < gap:
+                            continue
+                        d_own = _rect_dist(r, own[k])
+                        d_oth = min(_rect_dist(r, own[j])
+                                    for j in range(len(own)) if j != k)
+                        # a label must belong to its own curve: floating it
+                        # into another curve's empty side is how a direct label
+                        # starts pointing at the wrong line
+                        if d_own > d_oth:
+                            continue
+                        blocked = False
+                        for q in placed:
+                            if (bx0 < q[2] + gap and bx1 > q[0] - gap
+                                    and by0 < q[3] + gap and by1 > q[1] - gap):
+                                blocked = True
+                                break
+                        if blocked:
+                            continue
+                        # Best = centre of the widest blank strip that still
+                        # belongs to this curve.  Clearance is capped: past
+                        # `cap` the label is already visibly detached, and
+                        # beyond that the tie-break pulls it back toward its
+                        # own line instead of letting it drift to the top of
+                        # an empty half-panel.  `above` carries a bonus large
+                        # enough to outrank a merely roomier strip below: the
+                        # request is above-first, and below is the fallback for
+                        # curves with no room overhead, not a preference for
+                        # whichever gap happens to be taller.
+                        score = (min(clr, cap) - 0.05 * d_own
+                                 + (0.45 * cap if side == "above" else 0.0))
+                        if best is None or score > best[0]:
+                            best = (score, xi, yd, side, ha, clr, d_own)
+        if best is None:
+            raise RuntimeError("curve_labels: no free strip for %r" % lab)
+        _sc, xi, yd, side, ha, clr, d_own = best
+        ax.text(xi, yd, lab, fontsize=fs, color=col, fontweight="bold",
+                ha=ha, va=("bottom" if side == "above" else "top"),
+                zorder=8, clip_on=False)
+        if verbose:
+            print("[labels] %-15s %-5s f=%5.2f  clearance %4.1f px  "
+                  "own gap %4.1f px" % (lab, side, xi, clr, d_own))
+        rows.append((lab, side, xi, clr, d_own))
+
+    # Re-measure what was actually drawn (the layout may have moved since the
+    # candidate boxes were computed) and refuse to ship text on a line.
+    fig.canvas.draw()
+    worst = np.inf
+    texts = [a for a in ax.texts if a.get_text() in
+             [e[3] for e in entries] and a.get_fontweight() == "bold"]
+    for a in texts:
+        bb = a.get_window_extent(renderer=rend)
+        worst = min(worst, _rect_dist((bb.x0, bb.y0, bb.x1, bb.y1), obs))
+    if verbose:
+        print("[labels] worst clearance after draw: %.1f px" % worst)
+    assert worst >= 0.8, ("direct labels touch a curve (%.1f px): "
+                          "the placement search is unsound" % worst)
+    return rows
 
 
 def ratio_arrow(ax, x, y0, y1, text, fs=7.6, color="#333333", side="right",
@@ -490,8 +702,15 @@ def fig_main(evals, out):
     bars interleave; 3 + 2 leaves 5.2 cm and keeps one shared y axis, so the
     comparison the strip exists for -- one cliff, five plateau heights -- is
     still made at a single scale.
+
+    Z: the figure is emitted on the 16.6 cm canvas and placed at 0.835 of it
+    (the MDPI text block measures 13.86 cm), so nominal type prints at 83.5%.
+    At Z = 1 the 8.5 pt ticks land at 7.1 pt, below the 8 pt legibility floor a
+    reviewer applies; Z = 1.18 restores 8.4 pt.  The 3 + 2 layout has slack in
+    each panel, so the larger type does not force the axes together.
     """
-    set_style()
+    Z = 1.18
+    set_style(Z)
     arms = C.VMAX_LIST
     fig = plt.figure(figsize=(FULL_W, FULL_W * 0.62))
     gs = fig.add_gridspec(2, 6, hspace=0.66, wspace=0.20)
@@ -643,7 +862,7 @@ def fig_arch(evals, out):
     axn.axhline(1.0, color="#666666", lw=0.8, ls=(0, (1.1, 1.5)), zorder=1)
     # Upper left: at the right edge of (c) the four curves converge on the
     # rule, so a label placed there printed on top of them.
-    axn.annotate("own plateau $=1$", xy=(2.05, 1.62), fontsize=7.0,
+    axn.annotate("own $\\varepsilon_{\\infty}$", xy=(1.60, 1.64), fontsize=7.0,
                  color="#333333", va="top", ha="left")
     band(axn)
     axn.set_ylim(0.0, 1.75)
@@ -743,7 +962,10 @@ def fig_band(evals, out):
 # Figure -- heat map over (retained modes M, frequency f)
 # ---------------------------------------------------------------------------
 def fig_mode_phase(evals, out, band_tag, train_edge, fname):
-    set_style()
+    # Z = 1.18 for the same reason as fig_main: the canvas is placed at 0.835,
+    # so nominal 8.5 pt ticks would print at 7.1 pt without it.
+    Z = 1.18
+    set_style(Z)
     # M = 32 is deliberately excluded: on the 64x64 grid it spans every
     # representable mode, so its band-limitation bound is vacuous.
     modes = [2, 4, 8, 12, 20, 24]
@@ -773,7 +995,10 @@ def fig_mode_phase(evals, out, band_tag, train_edge, fname):
     # Full text width: 15 frequency columns of a four-character value need
     # ~31 pt per cell; at the previous 10.4 cm the cells were 19 pt wide and
     # neighbouring values printed into each other ("0.860.83").
-    fig, ax = plt.subplots(figsize=(FULL_W, FULL_W * 0.56),
+    # Taller than the old 0.56 canvas: at the printed width the cells were the
+    # size of the numbers inside them, so the error values were legible only
+    # under magnification.  Height costs nothing in a single-column figure.
+    fig, ax = plt.subplots(figsize=(FULL_W, FULL_W * 0.64),
                            layout="constrained")
     vmax_c = np.nanmax(Mat)
     im = ax.imshow(Mat, cmap="viridis", aspect="auto", origin="lower",
@@ -1270,6 +1495,11 @@ def fig_training(out):
 # ---------------------------------------------------------------------------
 # Figure -- cross-contrast evaluation: the cliff is read arm-matched
 # ---------------------------------------------------------------------------
+# Marker shapes for the five evaluation contrasts.  Used wherever a single
+# panel carries all five, so that hue is a convenience and not the only cue.
+ARM_MK = ["o", "s", "^", "v", "D"]
+
+
 def fig_crosscontrast(evals, out):
     """Why a cliff ratio must be read arm-matched.
 
@@ -1295,7 +1525,12 @@ def fig_crosscontrast(evals, out):
         for i, vmax in enumerate(C.VMAX_LIST):
             F, M, S = curve(d, vmax)
             own_curve = abs(vmax - own) < 1e-9
-            ax.errorbar(F, M, color=ARMS5[i], marker="o", ms=3.0,
+            # One marker shape per contrast: five solid curves distinguished
+            # by hue alone are five identical curves in a greyscale print, and
+            # the ordered sweep only rescues the reader who already knows the
+            # ordering.  The ring stays circular so that it still reads as a
+            # highlight rather than as a sixth arm.
+            ax.errorbar(F, M, color=ARMS5[i], marker=ARM_MK[i], ms=3.0,
                         lw=2.4 if own_curve else 1.2,
                         zorder=4 if own_curve else 3, clip_on=False,
                         label=r"eval $v_{\max}=%.2f$" % vmax)
@@ -1323,7 +1558,7 @@ def fig_crosscontrast(evals, out):
     # inside the data region.  Short labels on purpose -- the long form made
     # the strip wider than the text block, which forced a down-scale on
     # inclusion and put the type below print size.
-    h = [Line2D([], [], color=ARMS5[i], marker="o", ls="-", lw=1.2, ms=3.0)
+    h = [Line2D([], [], color=ARMS5[i], marker=ARM_MK[i], ls="-", lw=1.2, ms=3.0)
          for i in range(len(C.VMAX_LIST))]
     l = [r"$v_{\max}=%.2f$" % v for v in C.VMAX_LIST]
     # The two convention handles are drawn in TWO colours each, not in grey.
@@ -1335,7 +1570,7 @@ def fig_crosscontrast(evals, out):
     # the ring) is the cue" without adding a legend row or widening the strip.
     h.append((Line2D([], [], color=ARMS5[0], lw=2.6, ls="-"),
               Line2D([], [], color=ARMS5[-1], lw=2.6, ls="-")))
-    l.append("train-matched")
+    l.append("thick: train-matched")
     h.append((Line2D([], [], color="none", marker="o", ms=7.0, mfc="none",
                      mec=ARMS5[0], mew=1.3),
               Line2D([], [], color="none", marker="o", ms=7.0, mfc="none",
@@ -1468,7 +1703,8 @@ def fig_anchor(out):
     Read from results/anchor_baseline.json and the evaluation records, so the
     figure and the anchor table cannot drift apart.  No GPU.
     """
-    set_style()
+    Z = 1.18
+    set_style(Z)
     p = os.path.join(C.RES, "anchor_baseline.json")
     if not os.path.exists(p):
         print("no anchor_baseline.json -- run code/anchor_baseline.py"); return
@@ -1509,11 +1745,14 @@ def fig_anchor(out):
     decades(ax, numticks=3)
     sweep_axis(ax)
     ax.set_ylabel(r"relative $L_2$ error")
+    # The trivial baseline is not labelled here.  Out of band it coincides with
+    # the trained curve, so a fourth label at the right edge printed grey type
+    # under the blue line, and the line went through the glyphs.  The caption
+    # names it as the dotted curve instead.
     end_labels(ax, [(float(M[-1]), "trained FNO", BLUE),
                     (float(anch[-1]), "anchor", VERMILION),
-                    (float(np.asarray(a["born1"])[-1]), "Born, order 1", INK),
-                    (float(np.asarray(a["trivial"])[-1]), "trivial", FAINT)],
-                fs=7.2)
+                    (float(np.asarray(a["born1"])[-1]), "Born, order 1", INK)],
+                fs=7.2 * Z)
     # The decisive reading of the panel: the anchor's plateau sits below the
     # trained operator's by a constant factor, so the two never cross.
     pl_a = float(np.mean(anch[F >= 6.0]))
@@ -1576,7 +1815,7 @@ def fig_anchor(out):
     despine(ax)
     end_labels(ax, [(float(fno[-1]), "trained FNO", BLUE),
                     (float(anchp[-1]), "anchor", VERMILION),
-                    (float(trivp[-1]), "trivial", FAINT)], fs=7.2)
+                    (float(trivp[-1]), "trivial", FAINT)], fs=7.2 * Z)
     panel_label(ax, "b", r"out-of-band plateau")
     require_inside(ax)
     save(fig, os.path.join(out, "fig_anchor"))
@@ -1601,9 +1840,12 @@ def fig_deep(out):
           and the deep head with one.  This is the panel that carries the
           method claim, and it is drawn from the same evaluation records as
           the tables so the figure cannot drift from the numbers.
+    Z = 1.18, for the same reason as fig_main: the canvas is placed at 0.835 of
+    its natural width, so nominal 8.5 pt ticks would print at 7.1 pt.
     No GPU.
     """
-    set_style()
+    Z = 1.18
+    set_style(Z)
     ph = os.path.join(C.RES, "anchor_higher_order.json")
     ps = os.path.join(C.RES, "anchor_order_selection.json")
     if not (os.path.exists(ph) and os.path.exists(ps)):
@@ -1672,8 +1914,8 @@ def fig_deep(out):
         Fm, M, S = mean_curve(ev, ns, 0.25)
         ax.errorbar(Fm, M, yerr=S, color=BLUE, marker="o", ms=3.2, lw=1.3,
                     capsize=5.2, capthick=0.9, elinewidth=0.9, barsabove=True,
-                    clip_on=False, zorder=3, label="Trained FNO")
-        ends_b.append((float(M[-1]), "trained FNO", BLUE))
+                    clip_on=False, zorder=3, label="trained FNO")
+        ends_b.append((Fm, M, S, "trained FNO", BLUE))
         vals_b.append(np.ravel(M))
     # the head curve comes from the order scan, which is the instrument that
     # records a sweep per (contrast, order); the order-selection record only
@@ -1684,13 +1926,13 @@ def fig_deep(out):
         Fh = np.array([r["f"] for r in sweep])
         hv = np.array([r["mean"] for r in sweep])
         ax.plot(Fh, hv, color=VERMILION, marker="D", ms=3.2, lw=1.3,
-                clip_on=False, zorder=3, label="Analytic head")
-        ends_b.append((float(hv[-1]), "Analytic head", VERMILION))
+                clip_on=False, zorder=3, label="analytic head")
+        ends_b.append((Fh, hv, None, "analytic head", VERMILION))
         vals_b.append(np.ravel(hv))
     for pref, col, mk, lab in (("ba_fno_a025_m8_s", GREEN, "P",
-                                "Residual on deep head, $M=8$"),
+                                "deep head $+$ res., $M=8$"),
                                ("ba_fno_a025_s", ORANGE, "X",
-                                "Residual on shallow head, $M=2$")):
+                                "shallow head $+$ res., $M=2$")):
         ns = [n for n in sorted(ev) if n.startswith(pref)]
         if not ns:
             continue
@@ -1698,9 +1940,9 @@ def fig_deep(out):
         ax.errorbar(Fm, M, yerr=S, color=col, marker=mk, ms=3.2, lw=1.3,
                     capsize=5.2, capthick=0.9, elinewidth=0.9, barsabove=True,
                     clip_on=False, zorder=3, label=lab)
-        ends_b.append((float(M[-1]),
-                       "deep head $+$ res." if "deep" in lab
-                       else "shallow head $+$ res.", col))
+        ends_b.append((Fm, M, S,
+                       "deep $+$ res." if "deep" in lab
+                       else "shallow $+$ res.", col))
         vals_b.append(np.ravel(M))
         if "deep" in lab:
             # The residual does not remove the step, and the panel says so with
@@ -1723,6 +1965,7 @@ def fig_deep(out):
     # instead of shipping a figure and a caption that disagree.
     deep = [n for n in sorted(ev) if n.startswith("ba_fno_a025_m8_s")
             and list(ev[n].get("f_test") or []) == list(C.F_TEST)]
+    bd = None
     if deep:
         Fd, Md, _ = mean_curve(ev, deep, 0.25)
         if np.isclose(Fd, 4.0).any() and np.isclose(Fd, 5.0).any():
@@ -1739,8 +1982,12 @@ def fig_deep(out):
                         % (r1, _m.group(1)))
             except IOError:
                 pass
-            badge(ax, 0.30, 0.07, r"$r_{1}=%.2f$ at the ring" % r1,
-                  fs=7.8, ha="left", va="bottom")
+            # Corner note, not a data label: the top-left strip is offered to
+            # the trained-FNO label, and the whole band above the plateau
+            # (y > 1.2) is empty, so the note goes there instead of sitting on
+            # the cliff at f = 4 the way it used to.
+            bd = badge(ax, 0.985, 0.985, r"$r_{1}=%.2f$ past the ring" % r1,
+                       fs=8.6, ha="right", va="top")
     ax.set_yscale("log")
     # The four objects span three decades here (the head alone is an order of
     # magnitude below the trained operator inside the band), so the limit is
@@ -1754,7 +2001,21 @@ def fig_deep(out):
     decades(ax, numticks=3)
     sweep_axis(ax)
     ax.set_ylabel(r"relative $L_2$ error")
-    end_labels(ax, ends_b, fs=7.0)
+    # One label per curve, placed by measurement rather than by hand.
+    # A single-x column cannot work here: the four in-band curves cross (the
+    # analytic head enters at 0.026 and falls, the shallow head enters at 0.012
+    # and climbs through it at f ~ 2.6), and the two lower curves are 0.13
+    # decades apart once f > 5.  So the strip that is free differs from curve
+    # to curve, and the placement has to be solved against the drawn geometry:
+    # curve_labels measures each string with the renderer and scans both the
+    # blank strip above and the one below, keeping the widest strip that still
+    # belongs to that curve.  It prints the clearance it achieved and asserts
+    # on it, so "no text on a line" is checked at build time.
+    # 7.8 pt nominal prints at 6.5 pt here (0.835 inclusion): the largest size
+    # the strip between the shallow-head plateau and the trained plateau takes
+    # without the placement search losing its clearance.  A larger value makes
+    # curve_labels refuse the panel rather than print text on a line.
+    curve_labels(ax, ends_b, fs=7.8, avoid=[bd] if bd is not None else [])
     panel_label(ax, "b", r"$v_{\max}=0.25$")
     save(fig, os.path.join(out, "fig_deep"))
 
@@ -2243,13 +2504,14 @@ def fig_plateau_coupling(evals, out):
     # To the right of each node, not above it: the first node sits on y=1.00
     # and a centred label above it printed through the marker.
     for i, (x, y) in enumerate(zip(coups, ratio)):
-        # The first node sits exactly on the reference rule: a centred label
-        # printed through the dashes, and a label above the marker printed
-        # through the segment rising to the next node.  It goes below the
-        # rule, which is why the axis keeps a margin under 1.00.
+        # The first node sits just above the reference rule, so the label has
+        # to clear the rule as well as the marker: at -7 pt its baseline cut
+        # the dashes and "1.02" read as if printed on the line.  -14 pt puts
+        # the whole glyph box under 1.00, which is why the axis keeps a margin
+        # below the rule.
         below = i == 0
         axr.annotate("%.2f" % y, xy=(x, y),
-                     xytext=(3.0, -7.0 * Z) if below else (5.5 * Z, 0),
+                     xytext=(3.0, -14.0 * Z) if below else (5.5 * Z, 0),
                      textcoords="offset points",
                      ha="left",
                      va="top" if below else "center",
