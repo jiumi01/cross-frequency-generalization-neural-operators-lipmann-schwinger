@@ -88,10 +88,10 @@ CAP = { "en": dict(
       "fixes $\\gamma=0.05$, whose attained norm spans $\\PropSpread\\times$ "
       "over the test grid; the compensated arm holds it constant. 3-seed "
       "means."),
-  disc=("Discriminator arms: all rows share the baseline's media, protocol "
-        "and seeds; each changes one ingredient only (input encoding of $f$, "
-        "loss, or initialisation). Onset is the interval in which the error "
-        "first leaves $3\\times$ its own in-band level. 3-seed means."),
+  disc=("Discriminator arms: shared media, protocol and seeds; one ingredient "
+        "changes per row. 3-seed means. No onset column: that rule is scaled "
+        "by each arm's own in-band error, so it is not comparable across rows; "
+        "the boundary is read in Table~\\ref{tab:locators}."),
   anchor=("Two-term Born anchor on each arm's protocol: 200 paired media, "
           "seeds shared with the trained rows. $a,b$: least squares on 512 "
           "in-band samples, no out-of-band frequency. Columns average over "
@@ -3031,15 +3031,14 @@ def table_disc(cap):
     ]
     t = ("\\begin{table}[ht]\n\\centering\n\\caption{%s}\n\\label{tab:disc}\n"
          "\\footnotesize\n\\setlength{\\tabcolsep}{3.6pt}\n"
-         "\\begin{tabular}{lrrrrrr}\n\\toprule\n"
+         "\\begin{tabular}{lrrrrr}\n\\toprule\n"
          "arm & $\\varepsilon_{\\mathrm{in}}$ & $\\varepsilon(4)$ & "
-         "$\\varepsilon(5)$ & $r$ & $\\varepsilon_{\\infty}$ & onset \\\\\n"
+         "$\\varepsilon(5)$ & $r$ & $\\varepsilon_{\\infty}$ \\\\\n"
          "\\midrule\n" % cap["disc"])
     for label, arm in rows:
-        t += ("%s & $%s$ & $%s$ & $%s$ & $%s$ & $%s$ & $[%s,%s]$ \\\\\n"
+        t += ("%s & $%s$ & $%s$ & $%s$ & $%s$ & $%s$ \\\\\n"
               % (label, fmt(arm["in_band"]), fmt(arm["e4"]), fmt(arm["e5"]),
-                 fmt(arm["ratio"], 2), fmt(arm["plateau"]),
-                 freq_label(arm["onset"][0]), freq_label(arm["onset"][1])))
+                 fmt(arm["ratio"], 2), fmt(arm["plateau"])))
     return t + "\\bottomrule\n\\end{tabular}\n\\end{table}\n"
 
 
