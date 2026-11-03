@@ -116,8 +116,8 @@ def enumerate_floats(src):
     return walk("table"), walk("figure")
 
 
-def build(root):
-    si_dir = os.path.join(root, "submission", "paper_en")
+def build(root, lang="en"):
+    si_dir = os.path.join(root, "submission", "paper_%s" % lang)
     src = inline_inputs(strip_comments(read(os.path.join(si_dir, "SI_main.tex"))),
                         si_dir)
     tables, figures = enumerate_floats(src)
@@ -136,12 +136,16 @@ def main():
     ap.add_argument("--root", default=ROOT)
     a = ap.parse_args()
     root = os.path.abspath(a.root)
-    text, tables, figures = build(root)
-    unlabeled = [n for n, l in tables + figures if not l]
-    # Both languages cite the supplement through the same macros: the Chinese
-    # manuscript points at the same PDF, so a hand-written "Supplementary
-    # Table 9" there would drift exactly as the English one did.
+    # One map per supplement, not one map for both.  While the two editions were
+    # the same document, a single map was correct and kept them from drifting.
+    # They are no longer the same document: the English supplement was reordered
+    # by citation order and lost three tables that duplicated main-text figures,
+    # while the Chinese edition is frozen.  Sharing the English numbers would
+    # make every "Supplementary Table~N" in the Chinese manuscript name the wrong
+    # float, so each language is numbered from its own file.
     for lang in ("en", "cn"):
+        text, tables, figures = build(root, lang)
+        unlabeled = [n for n, l in tables + figures if not l]
         out = os.path.join(root, "paper", lang, "gen_si_refs.tex")
         if not os.path.isdir(os.path.dirname(out)):
             continue
