@@ -1,5 +1,5 @@
 {
-  "checked": "2026-11-10",
+  "checked": "2026-11-12",
   "entries": [
     {
       "key": "li2021fno",
@@ -7,7 +7,7 @@
       "doi": "",
       "arxiv": "2010.08895",
       "url": "",
-      "checked": "2026-11-10",
+      "checked": "2026-11-12",
       "verdict": "ok",
       "detail": "preprint only, arXiv:2010.08895"
     },
@@ -17,7 +17,7 @@
       "doi": "10.1038/s42256-021-00302-5",
       "arxiv": "",
       "url": "",
-      "checked": "2026-11-10",
+      "checked": "2026-11-12",
       "verdict": "ok",
       "detail": "Nature Machine Intelligence 3:218-229 (2021)",
       "doi_record": {
@@ -36,7 +36,7 @@
       "doi": "",
       "arxiv": "",
       "url": "",
-      "checked": "2026-11-10",
+      "checked": "2026-11-12",
       "verdict": "ok",
       "detail": "no DOI (journal issues none); Journal of Machine Learning Re 24:1--97"
     },
@@ -46,7 +46,7 @@
       "doi": "10.1109/72.392253",
       "arxiv": "",
       "url": "",
-      "checked": "2026-11-10",
+      "checked": "2026-11-12",
       "verdict": "ok",
       "detail": "IEEE Transactions on Neural Networ 6:911-917 (1995)",
       "doi_record": {
@@ -65,7 +65,7 @@
       "doi": "10.1016/j.jcp.2025.114530",
       "arxiv": "",
       "url": "",
-      "checked": "2026-11-10",
+      "checked": "2026-11-12",
       "verdict": "ok",
       "detail": "Journal of Computational Physics 547:114530 (2026)",
       "doi_record": {
@@ -84,7 +84,7 @@
       "doi": "10.1093/gji/ggaf113",
       "arxiv": "",
       "url": "",
-      "checked": "2026-11-10",
+      "checked": "2026-11-12",
       "verdict": "ok",
       "detail": "Geophysical Journal International 241:1467-1478 (2025)",
       "doi_record": {
@@ -103,7 +103,7 @@
       "doi": "10.3390/app16125997",
       "arxiv": "",
       "url": "",
-      "checked": "2026-11-10",
+      "checked": "2026-11-12",
       "verdict": "ok",
       "detail": "Applied Sciences 16:5997 (2026)",
       "doi_record": {
@@ -122,7 +122,7 @@
       "doi": "",
       "arxiv": "2605.12997",
       "url": "",
-      "checked": "2026-11-10",
+      "checked": "2026-11-12",
       "verdict": "ok",
       "detail": "preprint only, arXiv:2605.12997"
     },
@@ -132,7 +132,7 @@
       "doi": "",
       "arxiv": "2507.18813",
       "url": "",
-      "checked": "2026-11-10",
+      "checked": "2026-11-12",
       "verdict": "ok",
       "detail": "preprint only, arXiv:2507.18813"
     },
@@ -142,7 +142,7 @@
       "doi": "10.1007/s11424-024-3294-x",
       "arxiv": "",
       "url": "",
-      "checked": "2026-11-10",
+      "checked": "2026-11-12",
       "verdict": "ok",
       "detail": "Journal of Systems Science and Com 37:413-440 (2024)",
       "doi_record": {
@@ -161,7 +161,7 @@
       "doi": "10.1016/j.jcp.2016.06.034",
       "arxiv": "",
       "url": "",
-      "checked": "2026-11-10",
+      "checked": "2026-11-12",
       "verdict": "ok",
       "detail": "Journal of Computational Physics 322:113-124 (2016)",
       "doi_record": {
@@ -180,7 +180,7 @@
       "doi": "10.1007/978-1-4614-4942-3",
       "arxiv": "",
       "url": "",
-      "checked": "2026-11-10",
+      "checked": "2026-11-12",
       "verdict": "ok",
       "detail": "Applied Mathematical Sciences : (2013)",
       "doi_record": {
@@ -199,7 +199,7 @@
       "doi": "10.1137/0913035",
       "arxiv": "",
       "url": "",
-      "checked": "2026-11-10",
+      "checked": "2026-11-12",
       "verdict": "ok",
       "detail": "SIAM Journal on Scientific and Sta 13:631-644 (1992)",
       "doi_record": {
@@ -218,7 +218,7 @@
       "doi": "10.1137/0907058",
       "arxiv": "",
       "url": "",
-      "checked": "2026-11-10",
+      "checked": "2026-11-12",
       "verdict": "ok",
       "detail": "SIAM Journal on Scientific and Sta 7:856-869 (1986)",
       "doi_record": {
@@ -237,7 +237,7 @@
       "doi": "10.1007/s11831-007-9013-7",
       "arxiv": "",
       "url": "",
-      "checked": "2026-11-10",
+      "checked": "2026-11-12",
       "verdict": "ok",
       "detail": "Archives of Computational Methods  15:37-66 (2007)",
       "doi_record": {
@@ -256,7 +256,7 @@
       "doi": "10.1007/s00211-015-0700-2",
       "arxiv": "",
       "url": "",
-      "checked": "2026-11-10",
+      "checked": "2026-11-12",
       "verdict": "ok",
       "detail": "Numerische Mathematik 131:567-614 (2015)",
       "doi_record": {
@@ -275,7 +275,7 @@
       "doi": "",
       "arxiv": "1806.08734",
       "url": "",
-      "checked": "2026-11-10",
+      "checked": "2026-11-12",
       "verdict": "ok",
       "detail": "preprint only, arXiv:1806.08734"
     },
@@ -285,7 +285,7 @@
       "doi": "10.4208/cicp.oa-2020-0085",
       "arxiv": "",
       "url": "",
-      "checked": "2026-11-10",
+      "checked": "2026-11-12",
       "verdict": "ok",
       "detail": "Communications in Computational Ph 28:1746-1767 (2020)",
       "doi_record": {
@@ -304,7 +304,7 @@
       "doi": "",
       "arxiv": "2006.10739",
       "url": "",
-      "checked": "2026-11-10",
+      "checked": "2026-11-12",
       "verdict": "ok",
       "detail": "preprint only, arXiv:2006.10739"
     },
@@ -314,7 +314,7 @@
       "doi": "10.1016/j.jcp.2021.110768",
       "arxiv": "",
       "url": "",
-      "checked": "2026-11-10",
+      "checked": "2026-11-12",
       "verdict": "ok",
       "detail": "Journal of Computational Physics 449:110768 (2022)",
       "doi_record": {
@@ -333,7 +333,7 @@
       "doi": "10.1016/j.jcp.2018.10.045",
       "arxiv": "",
       "url": "",
-      "checked": "2026-11-10",
+      "checked": "2026-11-12",
       "verdict": "ok",
       "detail": "Journal of Computational Physics 378:686-707 (2019)",
       "doi_record": {
@@ -352,7 +352,7 @@
       "doi": "10.1038/s42254-021-00314-5",
       "arxiv": "",
       "url": "",
-      "checked": "2026-11-10",
+      "checked": "2026-11-12",
       "verdict": "ok",
       "detail": "Nature Reviews Physics 3:422-440 (2021)",
       "doi_record": {
@@ -371,7 +371,7 @@
       "doi": "10.1145/3648506",
       "arxiv": "",
       "url": "",
-      "checked": "2026-11-10",
+      "checked": "2026-11-12",
       "verdict": "ok",
       "detail": "ACM / IMS Journal of Data Science 1:1-27 (2024)",
       "doi_record": {
@@ -390,7 +390,7 @@
       "doi": "10.1016/j.cma.2022.114778",
       "arxiv": "",
       "url": "",
-      "checked": "2026-11-10",
+      "checked": "2026-11-12",
       "verdict": "ok",
       "detail": "Computer Methods in Applied Mechan 393:114778 (2022)",
       "doi_record": {
@@ -409,7 +409,7 @@
       "doi": "10.52202/068431-0117",
       "arxiv": "",
       "url": "",
-      "checked": "2026-11-10",
+      "checked": "2026-11-12",
       "verdict": "ok",
       "detail": "Advances in Neural Information Pro :1596-1611 (2022)",
       "doi_record": {
@@ -428,7 +428,7 @@
       "doi": "",
       "arxiv": "2403.03542",
       "url": "",
-      "checked": "2026-11-10",
+      "checked": "2026-11-12",
       "verdict": "ok",
       "detail": "preprint only, arXiv:2403.03542"
     },
@@ -438,7 +438,7 @@
       "doi": "",
       "arxiv": "2202.03376",
       "url": "",
-      "checked": "2026-11-10",
+      "checked": "2026-11-12",
       "verdict": "ok",
       "detail": "preprint only, arXiv:2202.03376"
     },
@@ -448,7 +448,7 @@
       "doi": "10.1016/S0045-7825(97)00218-1",
       "arxiv": "",
       "url": "",
-      "checked": "2026-11-10",
+      "checked": "2026-11-12",
       "verdict": "ok",
       "detail": "Computer Methods in Applied Mechan 157:69-94 (1998)",
       "doi_record": {
@@ -467,7 +467,7 @@
       "doi": "10.1121/10.0017937",
       "arxiv": "",
       "url": "",
-      "checked": "2026-11-10",
+      "checked": "2026-11-12",
       "verdict": "ok",
       "detail": "JASA Express Letters 3:052401 (2023)",
       "doi_record": {
@@ -486,7 +486,7 @@
       "doi": "10.1038/s41598-021-00773-x",
       "arxiv": "",
       "url": "",
-      "checked": "2026-11-10",
+      "checked": "2026-11-12",
       "verdict": "ok",
       "detail": "Scientific Reports 11:21614 (2021)",
       "doi_record": {
@@ -505,7 +505,7 @@
       "doi": "",
       "arxiv": "2606.08448",
       "url": "",
-      "checked": "2026-11-10",
+      "checked": "2026-11-12",
       "verdict": "ok",
       "detail": "preprint only, arXiv:2606.08448"
     },
@@ -515,7 +515,7 @@
       "doi": "10.1016/j.jcp.2024.113168",
       "arxiv": "",
       "url": "",
-      "checked": "2026-11-10",
+      "checked": "2026-11-12",
       "verdict": "ok",
       "detail": "Journal of Computational Physics 513:113168 (2024)",
       "doi_record": {
@@ -534,7 +534,7 @@
       "doi": "10.1109/TGRS.2024.3440199",
       "arxiv": "",
       "url": "",
-      "checked": "2026-11-10",
+      "checked": "2026-11-12",
       "verdict": "ok",
       "detail": "IEEE Transactions on Geoscience an 62:1-11 (2024)",
       "doi_record": {
@@ -553,7 +553,7 @@
       "doi": "10.1109/TAP.2018.2885437",
       "arxiv": "",
       "url": "",
-      "checked": "2026-11-10",
+      "checked": "2026-11-12",
       "verdict": "ok",
       "detail": "IEEE Transactions on Antennas and  67:1819-1825 (2019)",
       "doi_record": {
@@ -572,7 +572,7 @@
       "doi": "10.1109/LAWP.2019.2927543",
       "arxiv": "",
       "url": "",
-      "checked": "2026-11-10",
+      "checked": "2026-11-12",
       "verdict": "ok",
       "detail": "IEEE Antennas and Wireless Propaga 18:2259-2263 (2019)",
       "doi_record": {
@@ -591,7 +591,7 @@
       "doi": "10.1109/LGRS.2017.2688461",
       "arxiv": "",
       "url": "",
-      "checked": "2026-11-10",
+      "checked": "2026-11-12",
       "verdict": "ok",
       "detail": "IEEE Geoscience and Remote Sensing 14:941-945 (2017)",
       "doi_record": {
@@ -610,7 +610,7 @@
       "doi": "10.13443/j.cjors.2017092602",
       "arxiv": "",
       "url": "",
-      "checked": "2026-11-10",
+      "checked": "2026-11-12",
       "verdict": "ok",
       "detail": "registered outside Crossref: www.chndoi.org",
       "doi_record": {
@@ -624,7 +624,7 @@
       "doi": "10.1190/1.1437051",
       "arxiv": "",
       "url": "",
-      "checked": "2026-11-10",
+      "checked": "2026-11-12",
       "verdict": "ok",
       "detail": "The Leading Edge 13:927-936 (1994)",
       "doi_record": {
@@ -643,7 +643,7 @@
       "doi": "10.3997/2214-4609.201411190",
       "arxiv": "",
       "url": "",
-      "checked": "2026-11-10",
+      "checked": "2026-11-12",
       "verdict": "ok",
       "detail": "EAEG Workshop - Practical Aspects  : (1990)",
       "doi_record": {
@@ -662,7 +662,7 @@
       "doi": "",
       "arxiv": "",
       "url": "https://github.com/mlamoureux/Marmousi",
-      "checked": "2026-11-10",
+      "checked": "2026-11-12",
       "verdict": "ok",
       "detail": "https://github.com/mlamoureux/Marmousi"
     },
@@ -672,7 +672,7 @@
       "doi": "",
       "arxiv": "",
       "url": "https://github.com/shenyaojin/reverse_time_migration",
-      "checked": "2026-11-10",
+      "checked": "2026-11-12",
       "verdict": "ok",
       "detail": "https://github.com/shenyaojin/reverse_time_migration"
     },
@@ -682,7 +682,7 @@
       "doi": "",
       "arxiv": "",
       "url": "https://github.com/devitocodes/data",
-      "checked": "2026-11-10",
+      "checked": "2026-11-12",
       "verdict": "ok",
       "detail": "https://github.com/devitocodes/data"
     },
@@ -692,7 +692,7 @@
       "doi": "10.1093/jge/gxac016",
       "arxiv": "",
       "url": "",
-      "checked": "2026-11-10",
+      "checked": "2026-11-12",
       "verdict": "ok",
       "detail": "Journal of Geophysics and Engineer 19:269-282 (2022)",
       "doi_record": {
@@ -711,7 +711,7 @@
       "doi": "10.1109/TGRS.2023.3333663",
       "arxiv": "",
       "url": "",
-      "checked": "2026-11-10",
+      "checked": "2026-11-12",
       "verdict": "ok",
       "detail": "IEEE Transactions on Geoscience an 61:1-18 (2023)",
       "doi_record": {
@@ -730,7 +730,7 @@
       "doi": "10.1016/j.jmps.2025.106219",
       "arxiv": "",
       "url": "",
-      "checked": "2026-11-10",
+      "checked": "2026-11-12",
       "verdict": "ok",
       "detail": "Journal of the Mechanics and Physi 203:106219 (2025)",
       "doi_record": {
@@ -749,7 +749,7 @@
       "doi": "",
       "arxiv": "2605.26732",
       "url": "",
-      "checked": "2026-11-10",
+      "checked": "2026-11-12",
       "verdict": "ok",
       "detail": "preprint only, arXiv:2605.26732"
     },
@@ -759,7 +759,7 @@
       "doi": "",
       "arxiv": "2602.11197",
       "url": "",
-      "checked": "2026-11-10",
+      "checked": "2026-11-12",
       "verdict": "ok",
       "detail": "preprint only, arXiv:2602.11197"
     },
@@ -769,7 +769,7 @@
       "doi": "",
       "arxiv": "2610.31071",
       "url": "",
-      "checked": "2026-11-10",
+      "checked": "2026-11-12",
       "verdict": "ok",
       "detail": "preprint only, arXiv:2610.31071"
     },
@@ -779,7 +779,7 @@
       "doi": "",
       "arxiv": "2603.18527",
       "url": "",
-      "checked": "2026-11-10",
+      "checked": "2026-11-12",
       "verdict": "ok",
       "detail": "preprint only, arXiv:2603.18527"
     },
@@ -789,7 +789,7 @@
       "doi": "10.1007/978-3-319-24574-4_28",
       "arxiv": "",
       "url": "",
-      "checked": "2026-11-10",
+      "checked": "2026-11-12",
       "verdict": "ok",
       "detail": "Lecture Notes in Computer Science :234-241 (2015)",
       "doi_record": {
@@ -808,7 +808,7 @@
       "doi": "10.1016/j.jcp.2022.111902",
       "arxiv": "",
       "url": "",
-      "checked": "2026-11-10",
+      "checked": "2026-11-12",
       "verdict": "ok",
       "detail": "Journal of Computational Physics 477:111902 (2023)",
       "doi_record": {

@@ -181,17 +181,20 @@ def main():
     rows, flagged = [], []
     for e in bib:
         key, kind = e["key"], kind_of(e)
-        row = dict(key=key, kind=kind, doi=e.get("doi", ""),
+        # The .bib stores LaTeX-escaped surface forms (the IEEEtran build needs
+        # \_ for _ in a typeset DOI); resolving needs the semantic string.
+        doi = e.get("doi", "").replace("\\_", "_")
+        row = dict(key=key, kind=kind, doi=doi,
                    arxiv="", url=e.get("url", ""), checked=today,
                    verdict="ok", detail="")
 
-        if e.get("doi"):
-            rec = crossref_doi(e["doi"])
+        if doi:
+            rec = crossref_doi(doi)
             row["doi_record"] = rec
             if not rec["resolved"]:
                 # Not in Crossref is not the same as not registered: fall back
                 # to the handle system before calling the DOI broken.
-                landing = doi_handle(e["doi"])
+                landing = doi_handle(doi)
                 if landing is None:
                     row["verdict"] = "doi-unresolved"
                     row["detail"] = rec.get("error", "")[:70]
