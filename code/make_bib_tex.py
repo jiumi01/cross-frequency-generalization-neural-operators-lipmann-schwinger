@@ -55,8 +55,12 @@ JABBR = {
     "ieee geoscience and remote sensing letters":
         "IEEE Geosci. Remote Sens. Lett.",
     "nature reviews physics": "Nat. Rev. Phys.",
+    "journal of systems science and complexity": "J. Syst. Sci. Complex.",
     "the leading edge": "Lead. Edge",
     "电波科学学报": "Chin. J. Radio Sci.",
+    # The .bib romanises the name (pdflatex/IEEEtran cannot set CJK); the
+    # renderer keeps the MDPI abbreviation so regenerated gen_bib is unchanged.
+    "chinese journal of radio science": "Chin. J. Radio Sci.",
 }
 
 # Proper nouns and acronyms that must survive sentence-casing of a title.
@@ -202,7 +206,11 @@ def render(e):
     ti = sentence(e.get("title", "")).rstrip(".")
     y = e.get("year", "")
     doi = e.get("doi")
-    doi_s = " https://doi.org/%s" % doi if doi else ""
+    # A DOI can contain an underscore (Springer chapter DOIs end in `_28`), and
+    # a bare `_` is a math subscript in text mode: the U-Net chapter DOI reached
+    # a real build as "! Missing $ inserted".  The .bib keeps the DOI verbatim
+    # and the renderer escapes it, the same division of labour as `url()`.
+    doi_s = " https://doi.org/%s" % url(doi) if doi else ""
     t = e["type"]
 
     if t == "article":
@@ -237,6 +245,15 @@ def render(e):
         if pages:
             s += ", pp. %s" % pages
         s += "; %s." % y
+        # A venue name alone does not say whether the item was ever published.
+        # The MathAI entry is an oral with no proceedings volume; printing only
+        # "In <conference>; 2026." made an unpublished talk indistinguishable
+        # from a proceedings paper, and the .bib note that said so was dropped
+        # here.  Any note on an inproceedings entry is now rendered verbatim,
+        # so the disclosure cannot be lost again.
+        note = e.get("note", "")
+        if note:
+            s += " %s." % note
         # The same loss the misc branch documents below: ICLR/ICML/NeurIPS
         # proceedings carry no DOI, so the arXiv number is the entry's only
         # persistent locator, and this branch rendered volume and pages but
@@ -259,16 +276,18 @@ def render(e):
         s = "%s %s." % (au, ti)
         if hp:
             s += " %s," % hp
-        s += " %s." % y
-        # An eprint on a misc entry used to be dropped here: the entry carried
-        # archivePrefix+eprint, the article branch rendered them, and this
-        # branch ignored both, so a citation whose only locator is an arXiv
-        # number printed with no locator at all (measured 2026-10-24 on the
-        # APEX entry, whose rendered line ended at the bare year).  Render it
-        # the same way the article branch does.
+        # An eprint on a misc entry is a preprint, and MDPI sets the word
+        # "Preprint" before the year for those.  This branch used to print the
+        # bare year followed by the arXiv number, so the APEX entry was the one
+        # arXiv-only reference in the list that a reader could not tell apart
+        # from a published report -- the other nine all carried the label.
+        # Same shape as the article branch, so the class is uniform.
         ep = e.get("eprint")
         if ep:
-            s += " %s:%s." % (e.get("archivePrefix") or "arXiv", ep)
+            s += " \\emph{Preprint} \\textbf{%s}, %s:%s." % (
+                y, e.get("archivePrefix") or "arXiv", ep)
+        else:
+            s += " %s." % y
         link = e.get("url", "")
         note = e.get("note", "")
         if link:

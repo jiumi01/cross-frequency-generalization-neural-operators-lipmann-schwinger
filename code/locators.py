@@ -58,12 +58,25 @@ MULT = 6.0              # stated threshold of the f* rule
 
 
 # ---------------------------------------------------------------- loading
-def load_curve(prefix, seeds=(0, 1, 2), res=RES):
-    """Seed-mean error curve for one arm, from its per-seed eval_*.json.
+def load_curve(prefix, seeds=None, res=RES):
+    """Seed-mean error curve for one arm, over every seed it carries.
 
     Returns (f, e, meta) or None.  `e` is the mean over seeds of the per-media
     mean error, i.e. the same aggregation the tables use.
+
+    The seed set used to be pinned at (0, 1, 2).  The arms the headline claims
+    rest on carry six, so the reference rung of every ladder came out at 0.9631
+    and 0.0910 here while the table built from the same records printed 0.9656
+    and 0.0918 -- a one-percent gap that reads as a stale number rather than as
+    a different seed set.  An arm now uses whatever per-seed files exist, and the
+    reference rung therefore matches the tables it is compared with.
     """
+    if seeds is None:
+        seeds = [s for s in range(6)
+                 if os.path.exists(os.path.join(
+                     res, "eval_%s_s%d.json" % (prefix, s)))]
+        if not seeds:
+            return None
     curves, meta = [], None
     for s in seeds:
         p = os.path.join(res, "eval_%s_s%d.json" % (prefix, s))
@@ -148,7 +161,14 @@ def locators(prefix, edge=F_BAND, res=RES):
                 onset=loc_onset(f, e, edge),
                 step=st,
                 plateau=float(e[f > edge + 1.0].mean()) if (f > edge + 1).sum() else None,
-                inband=float(e[f < edge].mean()) if (f < edge).sum() else None,
+                # In-band level over the in-band NODES, the edge node included.
+                # `f < edge` excluded it and gave 0.369 where the per-node table
+                # gives 0.412 for the same rung, so this table and the
+                # interval/ladder tables printed two different in-band floors for
+                # the same arm.  The edge node is in the training band by the
+                # manuscript's own definition, so it belongs in the mean.
+                inband=(float(e[f <= edge + 1e-9].mean())
+                        if (f <= edge + 1e-9).sum() else None),
                 params=meta["params"], modes=meta["modes"],
                 train=meta["train_data"])
 

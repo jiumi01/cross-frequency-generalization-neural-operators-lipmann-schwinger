@@ -23,6 +23,15 @@ import common as C
 # "read and absent", which is what makes the `--` fallbacks honest.
 _SPECTRUM = "unset"
 
+# Float environment per language pass: the English main text is
+# typeset in the IEEE Access two-column format, where any float
+# wider than one column must be starred; the Chinese companion and
+# the supplement keep the single-column form, where the unstarred
+# float is correct.  The loop in main() sets this once per language
+# pass before building that language's tables.
+FLOAT_STAR = ""
+
+
 # The five arms of Table~\ref{tab:main}; their seed count is what that table's
 # caption must quote (see seed_macros).
 MAIN_ARMS = ("main_fno_a005", "main_fno_a010", "main_fno_a025",
@@ -36,7 +45,7 @@ CAP = { "en": dict(
         "$u_\\theta\\equiv0$."),
   summary=("Generalization cliff per contrast arm: mean relative $L_2$ error over "
            "\\NumSeedsMain\\ seeds with its seed standard deviation. "
-           "$\\varepsilon_{\\mathrm{in}}$: mean over $f<4$; "
+           "$\\varepsilon_{\\mathrm{in}}$: mean over the in-band nodes $f\\le4$; "
            "$\\varepsilon_{\\infty}$: mean over $f\\ge6$; "
            "$r_{1}=\\varepsilon(5)/\\varepsilon(4)$: ratio over one unit of $f$ "
            "past the training edge."),
@@ -49,17 +58,19 @@ CAP = { "en": dict(
   arch=("Architecture comparison at matched budget: families swapped into the "
         "$v_{\\max}=0.25$ and $1.00$ arms, FNO rows of other contrasts kept for "
         "one scale. $\\varepsilon_{\\mathrm{in}}$: in-band mean over $[1,4]$; "
-        "$\\varepsilon_{f}$: mean relative $L_{2}$ at test frequency $f$; "
-        "params (M): million parameters."),
-  band=("Training-band-width ablation at $v_{\\max}=0.25$, read across two "
-        "families. The FNO steps at the band edge while the U-Net rises "
-        "smoothly through the same node, but in both the gain sits just beyond "
-        "the new edge and the in-band floor is unmoved."),
+        "$\\varepsilon_{f}$: mean relative $L_{2}$ at $f$; "
+        "params (M): million parameters. Seed means, shared seeds."),
+  band=("Training-band-width ablation at $v_{\\max}=0.25$. The FNO steps at "
+        "the band edge, the U-Net rises smoothly; in both the gain sits past the "
+        "new edge and the in-band floor is unmoved. Seed means over the same "
+        "paired media as the main-text frequency table."),
   mode=("Retained-mode budget $M$ at $v_{\\max}=0.25$, with training band "
         "$[1,4]$; $M=20$ is the reference arm. $f^{\\star}$ is the first test "
-        "frequency whose mean error exceeds $6\\varepsilon(4)$."),
+        "frequency whose mean error exceeds $6\\varepsilon(4)$. Each row is a seed "
+        "mean over the shared media draw."),
   born=("Truncated Born (Neumann) series on the same paired media. Entries above "
-        "unity mean the series is worse than predicting zero."),
+        "unity mean the series is worse than predicting zero. Each entry is a seed "
+        "mean on those media."),
   realgeo=("Third level: the Marmousi windows against the synthetic control. "
            "Columns are $\\varepsilon_{\\mathrm{in}}$, $\\varepsilon_{\\infty}$ "
            "and $r$ of the main-text summary table; both groups are means over the "
@@ -79,10 +90,11 @@ CAP = { "en": dict(
              "medium; $d_z$: standardised paired effect size, "
              "$\\bar\\Delta/\\mathrm{sd}(\\Delta)$; $*$: interval excluding "
              "zero."),
-  arms=("Complete inventory of the trained arms behind the seeding protocol. "
+  arms=("Headline numbers of the %d arms of the contrast, architecture, "
+        "capacity, loss-tangent, mixed-contrast, mode and band-width ladders. "
         "$\\varepsilon(f)$: seed-mean relative $L_2$; the last column averages "
-        "$f\\ge6$. For the widened-band arms these lie inside their own "
-        "training band; for the $[1,2]$ arm, far outside."),
+        "$f\\ge6$. For the widened-band arms these frequencies lie inside their "
+        "own training band; for the $[1,2]$ arm, far outside."),
   c1=("Discriminating experiment for the conditioning confound: arms share "
       "medium and protocol, differing only in regularisation. The baseline "
       "fixes $\\gamma=0.05$, whose attained norm spans $\\PropSpread\\times$ "
@@ -103,14 +115,16 @@ CAP = { "en": dict(
         "column is the trained plateau over the head's."),
   gridthree=("(a) Reference convergence: one medium drawn at $256^2$ and "
              "downsampled to the two coarser grids. (b) The trained FNO, on its "
-             "native $64^2$ input, scored against three targets."),
+             "native $64^2$ input, scored against three targets. $\\varepsilon$ values "
+             "are seed means; (a) uses a single medium."),
   ci=("Headline scalars with $95\\%$ intervals from \\CIBoot\\ bootstrap "
-      "replicates resampling media; onset: first node reaching half the "
-      "plateau."),
+      "replicates resampling media, one index shared by numerator and "
+      "denominator. Six seeds for the contrast and residual arms, three for "
+      "the U-Net arms; onset: first node reaching half the plateau."),
   locators=("All three boundary locators, recomputed on every rung of the four "
-            "control ladders. \\emph{n/a}: the locator declines to answer, as "
-            "on the widest band, where every test node lies inside the trained "
-            "band."),
+            "control ladders. \\emph{n/a}: the locator declines to answer where "
+            "every test node lies inside the trained band; recomputed from the "
+            "seed-mean curves of the modal-budget table."),
   res=("Resolution check: three locators and two scalars at $64^{2}$ and "
        "$128^{2}$. (a) native protocol; (b) one media draw discretised on both "
        "grids; (c) Marmousi windows; (d) their control. Rows of (c), (d) give "
@@ -146,10 +160,10 @@ CAP = { "en": dict(
   ),
   realgeo_h=("Marmousi model", "synthetic control"),
   h_lab=("train band", "model", "order", "params (M)"),
-  cost=("Per-sample cost on the $64\\times64$ problem, one GPU, batch 32. The "
-        "solver row carries its own timings. Speed-up is quoted at both ends of "
-        "the test range, against an unpreconditioned Bi-CGSTAB solve, and is "
-        "therefore an upper bound rather than a constant."),
+  cost=("Per-sample cost on the $64\\times64$ problem, one GPU, batch 32; the "
+        "solver row carries its timings. Speed-up is quoted at both ends of the "
+        "test range against an unpreconditioned Bi-CGSTAB solve, hence an upper "
+        "bound, not a constant. Single runs, not repeated."),
   cost_lab=dict(
     solver="Bi-CGSTAB (reference)",
     fno="$\\mathrm{FNO}$ $w=40$, $M=20$",
@@ -172,17 +186,18 @@ CAP = { "en": dict(
             "$\\PropLo$（$f=\\PropLoF$）与 $\\PropHighest$ 之间，"
             "故前向算子测试网格的条件数并不一致；网格最大值出现在 $f=4.25$。"),
   arch=("相同训练预算下的架构对比：三族模型替换进 $v_{\\max}=0.25$ 与 $1.00$ 两臂。"
-        "$\\varepsilon_{\\mathrm{in}}$ 为 $[1,4]$ 带内均值；$\\varepsilon_{f}$ 为测试频率 "
-        "$f$ 处平均相对 $L_2$ 误差；params (M) 为百万计参数量。"),
-  band=("$v_{\\max}=0.25$ 的训练带宽消融，跨两个架构族读取。FNO 在带缘呈台阶，"
-        "而 U-Net 无台阶；但两者的收益都集中在新的带缘之外，"
-        "带内下界也都不随带宽移动。"),
+        "$\\varepsilon_{\\mathrm{in}}$ 为 $[1,4]$ 带内均值；$\\varepsilon_{f}$ 为 "
+        "$f$ 处平均相对 $L_2$ 误差；params (M) 为百万计参数量。"
+        "种子均值，种子共用。"),
+  band=("$v_{\\max}=0.25$ 的训练带宽消融。FNO 在带缘呈台阶，U-Net 无台阶；"
+        "两者的收益都在新的带缘之外，带内下界不随带宽移动。"
+        "每行与主文逐频率表使用同一批配对介质，数值为种子均值。"),
   mode=("$v_{\\max}=0.25$ 时保留模态预算 $M$ 的影响（训练频带 $[1,4]$，$M=20$ 为"
         "基准）。模态预算构成第二条独立的泛化边界；$f^{\\star}$ 为平均误差首次"
-        "超过 $6\\varepsilon(4)$ 的测试频率。"),
+        "超过 $6\\varepsilon(4)$ 的测试频率。每行为共享介质抽取上的种子均值。"),
   born=("同一批配对介质上的截断 Born（Neumann）级数。该级数在弱对比度区间是强基线，"
         "当耦合量 $v_{\\max}/(2\\gamma)$ 超过 1 后发散；大于 1 的数值意味着它比"
-        "直接预测零更差。"),
+        "直接预测零更差。条目为种子均值。"),
   realgeo=("第三级：Marmousi 窗口与合成对照。列为表 \\ref{tab:summary} 的 "
            "$\\varepsilon_{\\mathrm{in}}$、$\\varepsilon_{\\infty}$ 与 $r$；"
            "两组均为同一批 \\RealWinN{} 个窗口上的均值，而非逐频率全表的 "
@@ -191,9 +206,9 @@ CAP = { "en": dict(
           "种子取平均）；$\\Delta$ 为平均配对差值，95\\% 区间重抽样介质；"
           "$p$ 为双侧介质级符号翻转（每介质一次符号；一位有效数字）；"
           "星号：区间不含 0。"),
-  arms=("支撑种子协议的全部训练臂清单。$\\varepsilon(f)$：测试频率 $f$ 处的"
-        "种子均值相对 $L_2$；末列对 $f\\ge6$ 取平均。对加宽带臂，这些频率位于"
-        "其自身训练带内——那正是这些臂的目的；对 $[1,2]$ 臂则远在带外。"),
+  arms=("对比度、架构、容量、损耗角正切、混合对比度、模态与频带各阶梯中 "
+        "%d 个 arm 的头条数字。$\\varepsilon(f)$ 为种子均值；末列对 $f\\ge6$ "
+        "取平均，加宽带臂在带内、$[1,2]$ 臂在带外。"),
   c1=("条件数混杂的判别实验：两臂介质与协议相同、仅正则化不同。"
       "基线固定 $\\gamma=0.05$，取到范数在测试网格上跨 $\\PropSpread$ 倍；"
       "补偿臂令其恒定。3 种子均值。"),
@@ -206,12 +221,13 @@ CAP = { "en": dict(
   deep=("解析头深度：$n=200$，配对介质与种子。每行由同一带内前缀拟合；"
         "$M$ 为 Born 项数。末列为训练算子平台与本头平台之比。"),
   gridthree=("(a) 参考解收敛性：同一介质在 $256^2$ 上生成并降采样。(b) FNO "
-             "固定 $64^2$ 输入，对三个目标分辨率评分。"),
+             "固定 $64^2$ 输入，对三个目标分辨率评分。$\\varepsilon$ 为种子均值；"
+             "(a) 只用单个介质。"),
   ci=("主标量及其 $95\\%$ 区间（\\CIBoot\\ 次按介质重采样）；"
       "onset 为曲线首次达到平台一半的频点。"),
-  locators=("三个边界定位器在四条控制实验梯子每一级上的取值。"
+  locators=("三个边界定位器在四条控制梯子各级的取值。"
             "\\emph{n/a} 表示该定位器拒绝作答；最宽频带上它无定义，"
-            "因为全部测试节点都在训练频带内。"),
+            "因全部测试节点都在训练频带内。由同一批种子均值曲线重算。"),
   res=("分辨率检查：三个定位器与两个标量在 $64^{2}$/$128^{2}$ 上重算。"
        "(a) 原生协议；(b) 同一批介质离散于两种网格；(c) Marmousi 窗口；"
        "(d) 合成对照。(c)(d) 行只给 $f^{\\star}$、跃变与误差。"),
@@ -246,8 +262,9 @@ CAP = { "en": dict(
   realgeo_h=("Marmousi 模型", "合成对照"),
   h_lab=("训练频带", "模型", "阶数", "参数量 (M)"),
   cost=("$64\\times64$ 问题上的单样本开销（同一 GPU，批大小 32）。"
-        "求解器行给出其自身的耗时，训练列为每轮秒数；加速比在测试频段两端"
-        "分别给出，且相对无预条件的 Bi-CGSTAB 求解，故为优势上界。"),
+        "求解器行给出自身耗时，训练列为每轮秒数；加速比在测试频段两端"
+        "分别给出，且相对无预条件的 Bi-CGSTAB 求解，故为优势上界。"
+        "计时为单次测量。"),
   cost_lab=dict(
     solver="Bi-CGSTAB（参考）",
     fno="$\\mathrm{FNO}$ $w=40$，$M=20$",
@@ -316,12 +333,43 @@ def mean_over_seeds(ev, names, vmax):
             (A.std(0, ddof=0) if A.shape[0] > 1 else np.zeros(A.shape[1])))
 
 
+def train_edge(rec):
+    """Upper limit of the band the arm was trained on, from its cache name.
+
+    `in_band` in an evaluation record is a mean over media and in-band nodes at
+    once, and the mask behind it was fixed when the record was written.  Reading
+    the in-band level off the stored curve instead needs the arm's own band, and
+    the cache name is the only field that carries it: `train_b025_2` is contrast
+    0.25 trained on [1,2], `train_a025` is contrast 0.25 on the default band.
+    """
+    base = os.path.basename(str(rec.get("train_data", "")).replace("\\", "/"))
+    m = re.search(r"_b\d+_(\d+(?:\.\d+)?)$", base)
+    return float(m.group(1)) if m else float(C.F_TRAIN[1])
+
+
 def inband(ev, names, vmax):
+    """Seed mean and seed SD of the in-band error over the in-band nodes.
+
+    Definition: for each seed, the mean of that seed's curve at every test node
+    at or below the arm's training edge; then mean and SD across seeds.  Earlier
+    versions averaged the per-sample `in_band` field, which pools media and nodes
+    into one number.  The two differ by several percent on the reference arm
+    (0.086 against 0.092), and only this definition can be recomputed from the
+    per-node table the manuscript prints, which is what the captions promise.
+    """
+    key = "%.2f" % vmax
     vals = []
     for n in names:
-        for r in ev[n]["in_band"]:
-            if abs(r["vmax"] - vmax) < 1e-6:
-                vals.append(r["mean"])
+        rows = ev[n]["sweep"].get(key)
+        if not rows:
+            continue
+        F = np.array([r["f"] for r in rows], float)
+        E = np.array([r["mean"] for r in rows], float)
+        m = F <= train_edge(ev[n]) + 1e-9
+        if m.any():
+            vals.append(float(E[m].mean()))
+    if not vals:
+        return float("nan"), float("nan")
     return float(np.mean(vals)), (float(np.std(vals)) if len(vals) > 1 else 0.0)
 
 
@@ -344,6 +392,43 @@ def fmt(x, n=3):
     # `}{--}` pattern -- i.e. an unresolved number could reach the manuscript
     # silently.  Keep every fallback in exactly one form.
     return ("%%.%df" % n) % x if np.isfinite(x) else "--"
+
+
+def qr(a, b, nd=3):
+    """Quotient of two values *as they are printed*.
+
+    Every factor of the form `N x` in the manuscript has to be recomputable from
+    the table cell it relates.  Computed from unrounded floats, 0.966/0.0218 =
+    44.3 sat next to the cells 0.966 and 0.022, whose quotient is 43.9; both are
+    true, but only one can be checked by a reader, and a referee who checks it
+    reads the difference as a stale number.  The quotient is therefore taken on
+    the printed values, so the printed table reproduces the printed factor.
+    """
+    a = float(a)
+    b = float(b)
+    if not (np.isfinite(a) and np.isfinite(b)) or b == 0.0:
+        return float("nan")
+    return round(a, nd) / round(b, nd)
+
+
+def qrp(a, b):
+    """Quotient of two *already printed* cells, with no second rounding.
+
+    `qr` rounds both operands to one decimal count, which is wrong when the
+    operands are printed at different precisions: the depth-selected head's
+    in-band error is printed as 0.025 and the composite's as 0.0075, and
+    re-rounding 0.0075 to 0.008 silently replaced a reproducible 3.3 with 3.1.
+    String cells are passed through unchanged, so the printed table is the only
+    input to the printed factor.
+    """
+    try:
+        a = float(a)
+        b = float(b)
+    except (TypeError, ValueError):
+        return float("nan")
+    if not (np.isfinite(a) and np.isfinite(b)) or b == 0.0:
+        return float("nan")
+    return a / b
 
 
 def fmt_tiny(x, n=3):
@@ -491,6 +576,31 @@ def triv_row(vmax):
     return np.array(out, float)
 
 
+def _triv_or(val, arm):
+    """The paired trivial plateau, or the anchor instrument's copy if absent."""
+    v = float(val) if val is not None else float("nan")
+    if np.isfinite(v):
+        return v
+    return float(arm.get("trivial_plateau", float("nan")))
+
+
+def triv_plateau(vmax):
+    """Out-of-band level of the same-arm trivial baseline, on the paired media.
+
+    One source for every printed trivial plateau.  The anchor table used to take
+    its copy from `anchor_baseline.json`, whose baseline was evaluated on the
+    anchor instrument's own draw, so the same quantity appeared as 0.228 in that
+    table and as 0.218 in the ratio column of the interval table.  The difference
+    is the media resampling, not physics, and the manuscript states the pairing
+    rule that this function implements.
+    """
+    tv = triv_row(vmax)
+    if tv is None:
+        return float("nan")
+    F = np.array(C.F_TEST, float)
+    return float(np.asarray(tv)[F >= 6.0].mean())
+
+
 def table_main(ev, arms, cap):
     F, body = None, []
     for vmax in arms:
@@ -558,7 +668,7 @@ def table_summary(ev, arms, cap):
     # [!ht]: this is the table the surrounding prose reads its numbers from, and
     # a plain [t] let it drift two pages past its first citation once another
     # float was queued ahead of it.  "h" first, then the top of the next page.
-    t = ("\\begin{table}\n\\centering\n\\caption{%s}\n\\label{tab:summary}\n"
+    t = ("\\begin{table" + FLOAT_STAR + "\n\\centering\n\\caption{%s}\n\\label{tab:summary}\n"
          "\\small\n\\setlength{\\tabcolsep}{4.2pt}\n"
          "\\begin{tabular}{lcccccc}\n\\toprule\n"
          " & \\multicolumn{2}{c}{$\\varepsilon_{\\mathrm{in}}$} & "
@@ -591,7 +701,7 @@ def table_realgeo(arms, cap):
     s = d.get("summary")
     if not s:
         return ""
-    t = ("\\begin{table}\n\\centering\n\\caption{%s}\n\\label{tab:realgeo}\n"
+    t = ("\\begin{table" + FLOAT_STAR + "\n\\centering\n\\caption{%s}\n\\label{tab:realgeo}\n"
          "\\small\n\\setlength{\\tabcolsep}{4.2pt}\n"
          "\\begin{tabular}{lcccccc}\n\\toprule\n"
          " & \\multicolumn{3}{c}{%s} & \\multicolumn{3}{c}{%s} \\\\\n"
@@ -620,7 +730,7 @@ def table_arch(ev, arms, cap):
     # band-edge behaviour exactly where the text claimed all three families
     # behaved alike, so a reader had to take the claim on trust.
     groups = [(p + "_", lab) for p, lab in C.ARCH_GROUPS]
-    t = ("\\begin{table}\n\\centering\n\\caption{%s}\n\\label{tab:arch}\n"
+    t = ("\\begin{table" + FLOAT_STAR + "\n\\centering\n\\caption{%s}\n\\label{tab:arch}\n"
          "\\small\n\\setlength{\\tabcolsep}{3.2pt}\n"
          "\\begin{tabular}{clcccccc}\n\\toprule\n"
          "$v_{\\max}$ & %s & %s & $\\varepsilon_{\\mathrm{in}}$ & "
@@ -661,7 +771,7 @@ def table_band(ev, arms, cap):
             ("band_b12_", "FNO", "[1,12]"),
             ("base_unet_a025_", "U-Net", "[1,4]"),
             ("uband_b6_", "U-Net", "[1,6]")]
-    t = ("\\begin{table}\n\\centering\n\\caption{%s}\n\\label{tab:band}\n"
+    t = ("\\begin{table" + FLOAT_STAR + "\n\\centering\n\\caption{%s}\n\\label{tab:band}\n"
          "\\small\n\\setlength{\\tabcolsep}{3.6pt}\n"
          "\\begin{tabular}{llccccc}\n\\toprule\n"
          "%s & %s & $\\varepsilon_{\\mathrm{in}}$ & $\\varepsilon_{5}$ & "
@@ -697,7 +807,7 @@ def f_star(F, M_, e4=None, thr=6.0):
 
 
 def table_mode(ev, cap):
-    t = ("\\begin{table}\n\\centering\n\\caption{%s}\n\\label{tab:mode}\n"
+    t = ("\\begin{table" + FLOAT_STAR + "\n\\centering\n\\caption{%s}\n\\label{tab:mode}\n"
          "\\small\n\\setlength{\\tabcolsep}{4pt}\n"
          "\\begin{tabular}{cccccc}\n\\toprule\n"
          "$M$ & $\\varepsilon_{\\mathrm{in}}$ & $\\varepsilon_{5}$ & "
@@ -823,7 +933,7 @@ def table_cost(cap):
                      m["per_sample_ms"], lo["per_sample_ms"] / m["per_sample_ms"],
                      hi["per_sample_ms"] / m["per_sample_ms"]))
     h = lab["h"]
-    t = ("\\begin{table}\n\\centering\n\\caption{%s}\n\\label{tab:cost}\n"
+    t = ("\\begin{table" + FLOAT_STAR + "\n\\centering\n\\caption{%s}\n\\label{tab:cost}\n"
          "\\small\n\\setlength{\\tabcolsep}{3.2pt}\n"
          "\\begin{tabular}{lccccc}\n\\toprule\n"
          "%s & %s & %s & %s & $S_{1.5}$ & $S_{12}$ \\\\\n\\midrule\n"
@@ -859,7 +969,7 @@ def table_data(ev, cap):
     if not rungs:
         return ""
     lab = cap["data_lab"]
-    t = ("\\begin{table}\n\\centering\n\\caption{%s}\n\\label{tab:data}\n"
+    t = ("\\begin{table" + FLOAT_STAR + "\n\\centering\n\\caption{%s}\n\\label{tab:data}\n"
          "\\small\n\\setlength{\\tabcolsep}{3.6pt}\n"
          "\\begin{tabular}{rccccc}\n\\toprule\n%s \\\\\n\\midrule\n"
          % (cap["data"], " & ".join(lab["h"])))
@@ -889,7 +999,7 @@ def table_propnorm(cap):
     at = dict(zip([round(float(f), 4) for f in d["f"]],
                   [float(v) for v in d["norm"]]))
     show = [1.5, 2.5, 3.5, 4.0, 4.25, 4.5, 4.75]
-    t = ("\\begin{table}\n\\centering\n\\caption{%s}\n"
+    t = ("\\begin{table" + FLOAT_STAR + "\n\\centering\n\\caption{%s}\n"
          "\\label{tab:propnorm}\n\\small\n\\setlength{\\tabcolsep}{3.4pt}\n"
          "\\begin{tabular}{lcccccccc}\n\\toprule\n"
          "$f$ & " % cap["propnorm"])
@@ -925,7 +1035,7 @@ def table_paired(cap):
         return ""
     d = json.load(open(p, encoding="utf-8"))
     lab = cap["paired_lab"]
-    t = ("\\begin{table}\n\\centering\n\\caption{%s}\n\\label{tab:paired}\n"
+    t = ("\\begin{table" + FLOAT_STAR + "\n\\centering\n\\caption{%s}\n\\label{tab:paired}\n"
          "\\small\n\\setlength{\\tabcolsep}{3.6pt}\n"
          "\\begin{tabular}{lrrrrrr}\n\\toprule\n"
          " & $n$ & $\\bar e_{A}$ & $\\bar e_{B}$ & $\\Delta$ (95\\%% CI) & $p$ "
@@ -955,7 +1065,7 @@ def table_si_paired(cap):
         return ""
     d = json.load(open(p, encoding="utf-8"))
     lab = cap["paired_lab"]
-    t = ("\\begin{table}\n\\centering\n\\caption{%s}\n\\label{tab:paired}\n"
+    t = ("\\begin{table" + FLOAT_STAR + "\n\\centering\n\\caption{%s}\n\\label{tab:paired}\n"
          "\\small\n\\setlength{\\tabcolsep}{3.6pt}\n"
          "\\begin{tabular}{lrrrrrr}\n\\toprule\n"
          " & $n$ & $\\bar e_{A}$ & $\\bar e_{B}$ & $\\Delta$ (95\\%% CI) & $p$ "
@@ -978,19 +1088,31 @@ def table_born(ev, arms, cap):
         if n:
             ref = n[0]
             break
-    t = ("\\begin{table}\n\\centering\n\\caption{%s}\n\\label{tab:born}\n"
-         "\\small\n\\setlength{\\tabcolsep}{4pt}\n"
-         "\\begin{tabular}{ccccc}\n\\toprule\n"
-         "$v_{\\max}$ & %s & $\\varepsilon(1.5)$ & $\\varepsilon(4)$ & "
-         "$\\varepsilon(12)$ \\\\\n\\midrule\n" % (cap["born"], cap["h_lab"][2]))
+    # The in-band mean and the out-of-band plateau are columns of their own.
+    # The prose quotes both against the trained operator ("0.018 against 0.025",
+    # "wins by 3.5x, 0.218 against 0.062"), and with only the three nodes printed
+    # a reader could not recover either number from this table: 0.062 falls
+    # between eps(9) and eps(12) and looks like a typo against the printed 0.069.
+    t = ("\\begin{table" + FLOAT_STAR + "\n\\centering\n\\caption{%s}\n\\label{tab:born}\n"
+         "\\small\n\\setlength{\\tabcolsep}{3.6pt}\n"
+         "\\begin{tabular}{ccL{0pt}ccccc}\n\\toprule\n"
+         "$v_{\\max}$ & %s & $\\varepsilon_{\\mathrm{in}}$ & "
+         "$\\varepsilon(1.5)$ & $\\varepsilon(4)$ & "
+         "$\\varepsilon(12)$ & $\\varepsilon_{\\infty}$ \\\\\n\\midrule\n"
+         % (cap["born"], cap["h_lab"][2])).replace("L{0pt}", "c")
     if ref:
         for vmax in arms:
             for o in (1, 5):
                 rows = ev[ref]["born_order%d" % o]["%.2f" % vmax]
                 at = lambda fv: next((r["mean"] for r in rows
                                       if abs(r["f"] - fv) < 1e-9), np.nan)
-                t += ("$%.2f$ & %d & %s & %s & %s \\\\\n"
-                      % (vmax, o, fmt(at(1.5)), fmt(at(4.0)), fmt(at(12.0))))
+                fin = float(np.mean([r["mean"] for r in rows
+                                     if r["f"] <= C.F_TRAIN[1] + 1e-9]))
+                fout = float(np.mean([r["mean"] for r in rows
+                                      if r["f"] >= 6.0]))
+                t += ("$%.2f$ & %d & %s & %s & %s & %s & %s \\\\\n"
+                      % (vmax, o, fmt(fin), fmt(at(1.5)), fmt(at(4.0)),
+                         fmt(at(12.0)), fmt(fout)))
     return t + "\\bottomrule\n\\end{tabular}\n\\end{table}\n"
 
 
@@ -1131,7 +1253,8 @@ def seed_macros(ev):
         return ["\\newcommand{\\%s}{--}" % k for k in ("NumSeeds", "NumSeedsMax",
                                                        "NumSeedsMain",
                                                        "NArmsAtMax",
-                                                       "NumArmsSeeded")]
+                                                       "NumArmsSeeded",
+                                                       "NArmTable")]
     counts = [len(v) for v in fam.values()]
     mx = max(counts)
     main_counts = [len(fam[a]) for a in MAIN_ARMS if a in fam]
@@ -1142,6 +1265,7 @@ def seed_macros(ev):
                                               if main_counts else 0),
         "\\newcommand{\\NArmsAtMax}{%d}" % sum(1 for c in counts if c == mx),
         "\\newcommand{\\NumArmsSeeded}{%d}" % len(fam),
+        "\\newcommand{\\NArmTable}{%d}" % len(tabulated_arms(ev)),
     ]
 
 
@@ -1189,6 +1313,10 @@ def arm_curves(ev, vmax):
     e4 = float(M[np.isclose(F, 4.0)][0]) if np.isclose(F, 4.0).any() else np.nan
     e5 = float(M[np.isclose(F, 5.0)][0]) if np.isclose(F, 5.0).any() else np.nan
     ok = np.isfinite(e4) and e4 > 0 and np.isfinite(e5)
+    # Unrounded: a ratio printed as a table column is a statistic of the data,
+    # not a quotient of two rounded cells.  Captions of the tables that print it
+    # say so; the prose factors of the form N x, which a reader will try to
+    # reproduce from the cell, are built with qr() instead.
     return F, plateau, e4, e5, (e5 / e4 if ok else np.nan), names
 
 
@@ -1232,20 +1360,35 @@ def cost_macros():
     Measured by code/bench_cost.py on the identical 64x64 problem, per sample,
     with an explicit CUDA synchronise.
     """
-    keys = ["CostSolverMs", "CostFnoMs", "CostUnetMatchMs", "CostSpeedup"]
+    keys = ["CostSolverMs", "CostSolverMsLo", "CostFnoMs", "CostUnetMatchMs",
+            "CostSpeedup", "CostSpeedupLo", "CostSolverFlatF"]
     p = os.path.join(C.RES, "cost.json")
     if not os.path.exists(p):
         return ["\\newcommand{\\%s}{--}" % k for k in keys]
     try:
         d = json.load(open(p, encoding="utf-8"))
+        grid = sorted(d["solver"].items(), key=lambda kv: float(kv[0]))
         sol = max(v["per_sample_ms"] for v in d["solver"].values())
+        sol_lo = grid[0][1]["per_sample_ms"]
         fno = d["model"]["FNO w40 M20"]["per_sample_ms"]
         um = d["model"]["U-Net base76"]["per_sample_ms"]
+        # The frequency above which the solve cost stops growing: the first node
+        # within 5% of the top-of-range value.  The prose used to attribute the
+        # growth to a rising iteration count and the table shows the cost flat
+        # from f = 8 on, so the measurement is emitted instead of the story.
+        flat = float(grid[-1][0])
+        for k, v in grid:
+            if v["per_sample_ms"] >= 0.95 * sol:
+                flat = float(k)
+                break
         return [
             "\\newcommand{\\CostSolverMs}{%s}" % fmt(sol, 2),
+            "\\newcommand{\\CostSolverMsLo}{%s}" % fmt(sol_lo, 2),
             "\\newcommand{\\CostFnoMs}{%s}" % fmt(fno, 2),
             "\\newcommand{\\CostUnetMatchMs}{%s}" % fmt(um, 2),
             "\\newcommand{\\CostSpeedup}{%s}" % fmt(sol / fno, 1),
+            "\\newcommand{\\CostSpeedupLo}{%s}" % fmt(sol_lo / fno, 1),
+            "\\newcommand{\\CostSolverFlatF}{%s}" % fmt(flat, 1),
         ]
     except Exception:
         return ["\\newcommand{\\%s}{--}" % k for k in keys]
@@ -2158,7 +2301,7 @@ def macros(ev, arms, res):
             r = arm_curves(ev, vmax)
             pl = r[1] if r else np.nan
             if np.isfinite(pl) and tv_out > 0:
-                ratio.append(pl / tv_out)
+                ratio.append(qr(pl, tv_out))
                 if pl > tv_out:
                     exc.append((vmax, pl, tv_out))
         L.append("\\newcommand{\\TrivInLo}{%s}" % (fmt(min(ti)) if ti else "--"))
@@ -2457,12 +2600,29 @@ def macros(ev, arms, res):
         # of the transition, not its position.
         if sub_in and len(sub_plat) == len(sub_in):
             try:
-                span = float(sub_in[0]) / float(sub_in[-1])
+                span = qr(float(sub_in[0]), float(sub_in[-1]))
                 L.append("\\newcommand{\\SubBandSpan}{%s}" % fmt(span, 1))
             except (ValueError, ZeroDivisionError):
                 L.append("\\newcommand{\\SubBandSpan}{--}")
         else:
             L.append("\\newcommand{\\SubBandSpan}{--}")
+        # The ladder above M = 8 is a different statement and used to borrow the
+        # M = 1 -> 4 factor, which is how "the floor spans 5.4x with the budget"
+        # came to sit next to a sweep whose budgets all lie within 20% of each
+        # other.  Both spans are emitted, so the prose can name the one it means.
+        hi_in = []
+        for m in (8, 12, 24, 32):
+            nm = runs_for(ev, "mode_m%02d_" % m)
+            if nm:
+                hi_in.append(inband(ev, nm, 0.25)[0])
+        if len(hi_in) > 1:
+            L.append("\\newcommand{\\SubBandBudgetLo}{%s}" % fmt(min(hi_in)))
+            L.append("\\newcommand{\\SubBandBudgetHi}{%s}" % fmt(max(hi_in)))
+            L.append("\\newcommand{\\SubBandHiSpan}{%s}"
+                     % fmt(qr(max(hi_in), min(hi_in)), 1))
+        else:
+            for mac in ("SubBandBudgetLo", "SubBandBudgetHi", "SubBandHiSpan"):
+                L.append("\\newcommand{\\%s}{--}" % mac)
         e_ratios, e_contras, fs_ge8 = [], [], []
         for m in (1, 2, 3, 4, 8, 12, 16, 20, 24, 32):
             nm = runs_for(ev, "mode_m%02d_" % m) if m != 20 \
@@ -2550,7 +2710,8 @@ def macros(ev, arms, res):
         L.append("\\newcommand{\\BornWeakInBand}{%s}" % fmt(inb))
         L.append("\\newcommand{\\BornWeakOut}{%s}" % fmt(out))
         L.append("\\newcommand{\\BornWeakGain}{%s}"
-                 % (fmt(plat / out, 1) if out > 0 and np.isfinite(plat) else "--"))
+                 % (fmt(qr(plat, out), 1)
+                    if out > 0 and np.isfinite(plat) else "--"))
     else:
         for mac in ("BornWeakInBand", "BornWeakOut", "BornWeakGain"):
             L.append("\\newcommand{\\%s}{--}" % mac)
@@ -2622,13 +2783,15 @@ def macros(ev, arms, res):
     # which is what the confound disclosure in Sec. "cliff" quantifies.
     top = max(arms)
     if wnames:
-        rows = ev[wnames[0]]["sweep"]["%.2f" % top]
-        Fx = np.array([r["f"] for r in rows])
-        Mx = np.array([r["mean"] for r in rows])
+        # Seed means, not one seed.  Every one of these macros used to be read
+        # off `ev[wnames[0]]`, i.e. seed 0 alone, while the tables beside them are
+        # six-seed means; the strong arm's own ratio came out 7.37 against the
+        # 7.87 in Table 3 for the same arm, and a referee reading both pages can
+        # only conclude that one of them is stale.
+        Fx, Mx, _ = mean_over_seeds(ev, wnames, top)
         e4x = float(Mx[np.isclose(Fx, 4.0)][0])
         e5x = float(Mx[np.isclose(Fx, 5.0)][0])
-        ibx = float(np.mean([r["mean"] for r in ev[wnames[0]]["in_band"]
-                             if abs(r["vmax"] - top) < 1e-6]))
+        ibx = inband(ev, wnames, top)[0]
         L.append("\\newcommand{\\CrossInBand}{%s}" % fmt(ibx))
         platx = float(Mx[Fx >= 6].mean())
         L.append("\\newcommand{\\CrossPlateau}{%s}" % fmt(platx))
@@ -2647,17 +2810,12 @@ def macros(ev, arms, res):
         # manuscript and contradicted in the other.
         snames = runs_for(ev, "main_fno_%s_" % arm_key(top))
         if snames:
-            srow = ev[snames[0]]["sweep"]["%.2f" % weak]
-            Fs = np.array([r["f"] for r in srow])
-            Ms = np.array([r["mean"] for r in srow])
+            Fs, Ms, _ = mean_over_seeds(ev, snames, weak)
             e4s = float(Ms[np.isclose(Fs, 4.0)][0])
             e5s = float(Ms[np.isclose(Fs, 5.0)][0])
-            ibs = float(np.mean([r["mean"] for r in ev[snames[0]]["in_band"]
-                                 if abs(r["vmax"] - weak) < 1e-6]))
+            ibs = inband(ev, snames, weak)[0]
             plats = float(Ms[Fs >= 6].mean())
-            own = ev[snames[0]]["sweep"]["%.2f" % top]
-            F3 = np.array([r["f"] for r in own])
-            M3 = np.array([r["mean"] for r in own])
+            F3, M3, _ = mean_over_seeds(ev, snames, top)
             L.append("\\newcommand{\\CrossStrongMismatch}{%s}"
                      % (fmt(e5s / e4s, 2) if e4s > 0 else "--"))
             L.append("\\newcommand{\\CrossStrongFrac}{%s}"
@@ -2903,6 +3061,18 @@ def _arm_spec():
     return spec
 
 
+def tabulated_arms(ev):
+    """The _arm_spec() prefixes that carry a current evaluation record.
+
+    One definition with two readers -- the table (whose rows these are) and the
+    prose (which quotes how many seeded arms the table covers).  They drifted
+    once: the text said the table listed all 51 seeded arms while it listed 28,
+    because the count in the sentence was written by hand.  The number is now a
+    macro over this list.
+    """
+    return [p for p, _, _ in _arm_spec() if runs_for(ev, p)]
+
+
 def table_arms(ev, cap):
     rows = []
     for prefix, label, vmax in _arm_spec():
@@ -2915,15 +3085,20 @@ def table_arms(ev, cap):
         plat = float(np.mean(M[F >= 6.0])) if (F >= 6.0).any() else np.nan
         params = ev[names[0]].get("params")
         rows.append((prefix, label, params, e4, e5, plat))
-    t = ("\\begin{table}[ht]\n\\centering\n\\caption{%s}\n\\label{tab:arms}\n"
-         "\\footnotesize\n\\setlength{\\tabcolsep}{3.6pt}\n"
-         "\\begin{tabular}{llrrrr}\n\\toprule\n"
-         "arm & configuration & params (M) & $\\varepsilon(4)$ & "
+    # No identifier column.  The first column used to print the run directory
+    # of each arm (main_fno_a025 and so on) -- an artefact name, and one that
+    # repeated what the configuration column already says (architecture,
+    # contrast, variant).  A scientific table carries the configuration; the
+    # mapping from row to stored records is the release manifest's job.
+    t = ("\\begin{table" + FLOAT_STAR + "[ht]\n\\centering\n\\caption{%s}\n\\label{tab:arms}\n"
+         "\\footnotesize\n\\setlength{\\tabcolsep}{4.2pt}\n"
+         "\\begin{tabular}{lrrrr}\n\\toprule\n"
+         "configuration & params (M) & $\\varepsilon(4)$ & "
          "$\\varepsilon(5)$ & $\\varepsilon(f\\ge6)$ \\\\\n\\midrule\n"
-         % cap["arms"])
+         % (cap["arms"] % len(rows)))
     for (prefix, label, params, e4, e5, plat) in rows:
-        t += ("\\texttt{%s} & %s & %s & $%s$ & $%s$ & $%s$ \\\\\n"
-              % (prefix.replace("_", "\\_"), label,
+        t += ("%s & %s & $%s$ & $%s$ & $%s$ \\\\\n"
+              % (label,
                  ("%.1f" % (params / 1e6)) if params else "--",
                  fmt(e4), fmt(e5), fmt(plat)))
     return t + "\\bottomrule\n\\end{tabular}\n\\end{table}\n"
@@ -3029,7 +3204,7 @@ def table_disc(cap):
         ("TL fine-tune, $10^{-4}$ (C4)", d4["arms"]["tl"]),
         ("TL warm start, $10^{-3}$ (C4b)", d4["arms"]["tl_warm"]),
     ]
-    t = ("\\begin{table}[ht]\n\\centering\n\\caption{%s}\n\\label{tab:disc}\n"
+    t = ("\\begin{table" + FLOAT_STAR + "[ht]\n\\centering\n\\caption{%s}\n\\label{tab:disc}\n"
          "\\footnotesize\n\\setlength{\\tabcolsep}{3.6pt}\n"
          "\\begin{tabular}{lrrrrr}\n\\toprule\n"
          "arm & $\\varepsilon_{\\mathrm{in}}$ & $\\varepsilon(4)$ & "
@@ -3111,7 +3286,7 @@ def table_c1(cap):
                              fmt(v["attained_baseline_hi"], 2)), a),
             ("compensated, $\\gamma(f)$",
              "$%s$ (const.)" % fmt(v["attained_compensated"], 2), g)]
-    t = ("\\begin{table}[ht]\n\\centering\n\\caption{%s}\n\\label{tab:c1}\n"
+    t = ("\\begin{table" + FLOAT_STAR + "[ht]\n\\centering\n\\caption{%s}\n\\label{tab:c1}\n"
          "\\footnotesize\n\\setlength{\\tabcolsep}{3.6pt}\n"
          "\\begin{tabular}{llrrrrrr}\n\\toprule\n"
          "arm & attained norm & $\\varepsilon_{\\mathrm{in}}$ & "
@@ -3169,14 +3344,15 @@ def anchor_macros():
         return ["\\newcommand{\\%s}{--}" % k for k in keys]
     ev = load(RES_DIR)
     a = d["arms"]["0.25"]
+    tp = _triv_or(triv_plateau(0.25), a)
     v = dict(
         AnchIn=fmt(a["in_band"]),
         AnchE=fmt(a["e4"]),
         AnchEdge=fmt(a["e5"]),
         AnchPlat=fmt(a["plateau"]),
         AnchRatio=fmt(a["e5"] / a["e4"], 2),
-        AnchTrivPlat=fmt(a["trivial_plateau"]),
-        AnchTrivRatio=fmt(a["trivial_plateau"] / a["plateau"], 1),
+        AnchTrivPlat=fmt(tp),
+        AnchTrivRatio=fmt(qr(tp, a["plateau"]), 1),
         AnchInOut=fmt(a["in_band"] / a["plateau"], 2),
         AnchNFit=str(int(d["n_fit"])),
         AnchA=("$%.3f%+0.3f i$" % (a["a"][0], a["a"][1])),
@@ -3188,8 +3364,8 @@ def anchor_macros():
                  AnchFnoRatio=fmt(r["ratio"], 2),
                  # win factors are stated from the winner's side: the trained
                  # operator wins IN band, the anchor wins OUT of band
-                 AnchWinIn=fmt(a["in_band"] / r["in_band"], 1),
-                 AnchWinOut=fmt(r["plateau"] / a["plateau"], 1))
+                 AnchWinIn=fmt(qr(a["in_band"], r["in_band"]), 1),
+                 AnchWinOut=fmt(qr(r["plateau"], a["plateau"]), 1))
     # across-contrast facts: the anchor's flatness and the trained operator's
     # step, both as ranges so the prose cannot quote a cherry-picked contrast
     rr, fr, plats = [], [], []
@@ -3227,7 +3403,7 @@ def table_anchor(cap, lang="en"):
     if d is None:
         return ""
     ev = load(RES_DIR)
-    t = ("\\begin{table}\n\\centering\n\\caption{%s}\n\\label{tab:anchor}\n"
+    t = ("\\begin{table" + FLOAT_STAR + "\n\\centering\n\\caption{%s}\n\\label{tab:anchor}\n"
          "\\footnotesize\n\\setlength{\\tabcolsep}{4pt}\n"
          "\\begin{tabular}{llrrrrr}\n\\toprule\n"
          "$v_{\\max}$ & predictor & $\\varepsilon_{\\mathrm{in}}$ & "
@@ -3251,7 +3427,7 @@ def table_anchor(cap, lang="en"):
                   % (fmt(ref[0]), fmt(ref[1]), fmt(ref[2]), fmt(ref[3]),
                      fmt(ref[4], 2)))
         t += (" & trivial, $\\hat u\\equiv0$ & n/a & n/a & n/a & $%s$ & n/a \\\\\n"
-              % fmt(a["trivial_plateau"]))
+              % fmt(_triv_or(triv_plateau(vmax), a)))
         if vmax != C.VMAX_LIST[-1]:
             t += "\\midrule\n"
     # The plateau's dispersion, in numbers rather than in pixels.  The bars of
@@ -3274,7 +3450,7 @@ def table_anchor(cap, lang="en"):
     note = ""
     if sem:
         lo, hi = min(sem), max(sem)
-        note = {"en": "$\\varepsilon_{\\mathrm{in}}$: mean over $f<4$; "
+        note = {"en": "$\\varepsilon_{\\mathrm{in}}$: mean over the in-band nodes $f\\le4$; "
                       "$\\varepsilon_{\\infty}$: mean over $f\\ge6$. Rows are "
                       "means over the same 200 paired media, with a standard "
                       "error of $%s$ to $%s$ on $\\varepsilon(4)$, "
@@ -3285,7 +3461,7 @@ def table_anchor(cap, lang="en"):
                       "the comparisons read in the text are Supplementary "
                       "Table~\\siTab{tab:paired}."
                       % (fmt(lo, 3), fmt(hi, 3)),
-                "cn": "$\\varepsilon_{\\mathrm{in}}$ 为 $f<4$ 的均值，"
+                "cn": "$\\varepsilon_{\\mathrm{in}}$ 为频带内节点（$f\\le4$）的均值，"
                       "$\\varepsilon_{\\infty}$ 为 $f\\ge6$ 的均值；各行均为"
                       "同一批 200 个配对介质上的均值，"
                       "$\\varepsilon(4)$、$\\varepsilon(5)$ 与 "
@@ -3404,11 +3580,13 @@ def deep_macros():
         ib, _ = inband(ev, names, v025)
         m["DAFnoPlat"] = fmt(plateau)
         m["DAFnoIn"] = fmt(ib)
-        # out-of-band win: trained plateau over head plateau
-        m["DAWinOut"] = fmt(plateau / max(arm(v025)["plateau_sel"], 1e-9), 1)
+        # out-of-band win: trained plateau over head plateau, taken on the
+        # printed cells.  From the unrounded ratio this read 44.3 while the
+        # cells beside it (0.966 and 0.022) give 43.9, and \DAGainFno quoted
+        # 43.9 for the same comparison -- one factor, two values, two macros.
+        m["DAWinOut"] = fmt(qrp(m.get("DAFnoPlat"), m.get("DAPlatSel")), 1)
         # in-band: whichever object is better, expressed as the winner's factor
-        a_in = arm(v025)["in_band_sel"]
-        m["DAWinIn"] = fmt(max(ib, a_in) / min(ib, a_in), 1)
+        m["DAWinIn"] = fmt(qrp(m.get("DAFnoIn"), m.get("DAInSel")), 1)
     ref100 = arm_curves(ev, v100) if ev else None
     if ref100 is not None:
         F, plateau, e4, e5, ratio, names = ref100
@@ -3421,11 +3599,14 @@ def deep_macros():
             ev, 0.05) else "--"
         # NB: DAFnoPlatStrong is set once, in the Strong/Mid loop below --
         # assigning it here too is a duplicate \newcommand in the preamble.
-    m["DAGainMTwo"] = fmt(arm(v025)["plateau_m2"] /
-                        max(arm(v025)["plateau_sel"], 1e-9), 1)
-    if "DAFnoPlat" in m:
-        m["DAGainFno"] = fmt(float(m["DAFnoPlat"]) /
-                             max(arm(v025)["plateau_sel"], 1e-9), 1)
+    m["DAGainMTwo"] = fmt(qr(arm(v025)["plateau_m2"],
+                             arm(v025)["plateau_sel"]), 1)
+    if "DAWinOut" in m:
+        # \DAGainFno and \DAWinOut are the same comparison (trained plateau over
+        # the depth-selected head's plateau) quoted in two sections.  They were
+        # two independent computations and printed 43.9 and 44.3 side by side;
+        # an alias makes a future divergence impossible rather than detectable.
+        m["DAGainFno"] = m["DAWinOut"]
 
     rho = d["rho"]["arms"]
     m["RhoLevel"] = fmt(rho["0.25"]["rho_level"])
@@ -3467,19 +3648,28 @@ def deep_macros():
             m["BAOneR"] = fmt(b1[4], 2)
         # the floor BA1 is scored against is the M=2 head it was built on
         m["BAOneFloor"] = fmt(arm(v025)["plateau_m2"])
-        m["BAOneWinIn"] = fmt(ib / b1[0], 1)
-        m["BAOneWinOut"] = fmt(float(m["DAFnoPlat"]) / b1[3], 1)
+        m["BAOneWinIn"] = fmt(qr(ib, b1[0]), 1)
+        m["BAOneWinOut"] = fmt(qr(float(m["DAFnoPlat"]), b1[3]), 1)
         b2 = _ba_stats(ev, "ba_fno_a025_m8_s", v025)
         if b2:
-            m["BATwoIn"] = fmt(b2[0])
+            # Four decimals, because this level is ~0.0075: at three it prints
+            # 0.008, one significant digit, and every factor built on it moves.
+            # The interval table prints 0.0075 for the same arm, and two
+            # printed values for one quantity is the defect this file exists to
+            # prevent.  With 0.0075 both the table and the factors below agree.
+            m["BATwoIn"] = fmt(b2[0], 4)
             m["BATwoPlat"] = fmt(b2[3])
             m["BATwoR"] = fmt(b2[4], 2)
             m["BATwoFloor"] = fmt(arm(v025)["plateau_sel"])
-            m["DAGainHeadIn"] = fmt(arm(v025)["in_band_sel"] / b2[0], 1)
+            # Quotients of the PRINTED cells (qrp), not of floats re-rounded to
+            # three decimals: the head's in-band cell is printed as 0.025 while
+            # the composite's is printed as 0.0075, and re-rounding the latter
+            # to 0.008 turns a reproducible 3.3 into an unreproducible 3.1.
+            m["DAGainHeadIn"] = fmt(qrp(m.get("DAInSel"), m["BATwoIn"]), 1)
             if "DAFnoIn" in m:
-                m["BATwoWinIn"] = fmt(float(m["DAFnoIn"]) / b2[0], 1)
+                m["BATwoWinIn"] = fmt(qrp(m["DAFnoIn"], m["BATwoIn"]), 1)
             if "DAFnoPlat" in m:
-                m["BATwoWinOut"] = fmt(float(m["DAFnoPlat"]) / b2[3], 1)
+                m["BATwoWinOut"] = fmt(qrp(m["DAFnoPlat"], m["BATwoPlat"]), 1)
         for vk, tag in (("1.00", "Strong"), ("0.50", "Mid")):
             v = float(vk)
             ref = arm_curves(ev, v) if ev else None
@@ -3525,7 +3715,7 @@ def table_deep(cap):
     if d is None:
         return ""
     ev = load(RES_DIR)
-    t = ("\\begin{table}[ht]\n\\centering\n\\caption{%s}\n\\label{tab:deep}\n"
+    t = ("\\begin{table" + FLOAT_STAR + "[ht]\n\\centering\n\\caption{%s}\n\\label{tab:deep}\n"
          "\\footnotesize\n\\setlength{\\tabcolsep}{4pt}\n"
          "\\begin{tabular}{llrrrr}\n\\toprule\n"
          "$v_{\\max}$ & predictor & $M$ & $\\varepsilon_{\\mathrm{in}}$ & "
@@ -3599,7 +3789,7 @@ def table_banddown(ev, cap):
         return "%% banddown.json missing or on an unexpected grid -- table omitted.\n"
     d, fL = ld
     i1, i075, i05, i025 = (fL.index(x) for x in (1.0, 0.75, 0.5, 0.25))
-    t = ("\\begin{table}\n\\centering\n"
+    t = ("\\begin{table" + FLOAT_STAR + "\n\\centering\n"
          "\\caption{" + cap["banddown"] + "}\n"
          "\\label{tab:banddown}\n\\small\n\\setlength{\\tabcolsep}{4pt}\n"
          "\\begin{tabular}{lccccccc}\n\\toprule\n"
@@ -3873,7 +4063,7 @@ def table_gridthree(cap):
     g = _gridthree_load()
     if g is None:
         return ""
-    t = ("\\begin{table}\n\\centering\n\\caption{%s}\n"
+    t = ("\\begin{table" + FLOAT_STAR + "\n\\centering\n\\caption{%s}\n"
          "\\label{tab:gridthree}\n\\small\n"
          "\\setlength{\\tabcolsep}{4.6pt}\n"
          "\\begin{tabular}{lrrrrrr}\n\\toprule\n"
@@ -4029,7 +4219,7 @@ def table_locators(cap):
     # page, so on the page where it is first cited the top block is already
     # taken and a plain [t] pushes it two pages out.  "!" lets LaTeX relax the
     # class's \topfraction rather than wait for a page whose top is free.
-    t = ("\\begin{table}\n\\centering\n\\caption{%s}\n\\label{tab:locators}\n"
+    t = ("\\begin{table" + FLOAT_STAR + "\n\\centering\n\\caption{%s}\n\\label{tab:locators}\n"
          "\\footnotesize\n\\setlength{\\tabcolsep}{3.6pt}\n"
          "\\begin{tabular}{llcccc}\n\\toprule\n"
          "ladder & rung & $f^{\\star}$ & onset & largest step & "
@@ -4076,11 +4266,12 @@ def table_ci(cap):
     # shrinking the font keeps every digit at full precision instead of
     # rounding the intervals away.  The sparse tables (5-8 plain columns) are
     # \footnotesize; this one earns the smaller size by its column count.
-    t = ("\\begin{table}\n\\centering\n\\caption{%s}\n\\label{tab:ci}\n"
+    t = ("\\begin{table" + FLOAT_STAR + "\n\\centering\n\\caption{%s}\n\\label{tab:ci}\n"
          "\\scriptsize\n\\setlength{\\tabcolsep}{3.0pt}\n"
          "\\begin{tabular}{llccccc}\n\\toprule\n"
          "predictor & $v_{\\max}$ & $\\varepsilon_{\\mathrm{in}}$ & "
-         "$\\varepsilon_{\\infty}$ & $r$ & "
+         "$\\varepsilon_{\\infty}$ & "
+         "\\shortstack{$r_{1}=$\\\\$\\varepsilon(5)/\\varepsilon(4)$} & "
          "\\shortstack{$\\varepsilon_{\\infty}/$\\\\"
          "$\\varepsilon^{\\mathrm{triv}}_{\\infty}$} & "
          "onset\\\\\n\\midrule\n"
@@ -4424,7 +4615,7 @@ def table_res(cap):
     d = _res_load()
     if d is None:
         return ""
-    t = ("\\begin{table}\n\\centering\n\\caption{%s}\n\\label{tab:res}\n"
+    t = ("\\begin{table" + FLOAT_STAR + "\n\\centering\n\\caption{%s}\n\\label{tab:res}\n"
          "\\footnotesize\n\\setlength{\\tabcolsep}{4pt}\n"
          "\\begin{tabular}{lcccccc}\n\\toprule\n"
          "grid & $f^{\\star}$ & onset & largest step & jump & "
@@ -4700,6 +4891,8 @@ def main():
             print("wrote", a.out)
         return
     for lang, folder in [("en", "en"), ("cn", "cn")]:
+        global FLOAT_STAR
+        FLOAT_STAR = "*" if lang == "en" else ""
         mac, tabs = build(lang)
         if tabs is None:
             continue

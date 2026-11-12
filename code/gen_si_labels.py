@@ -51,6 +51,12 @@ HEADER = (
     "% diagnostic, so the file states it here rather than in a commit message.\n"
     "\\newcommand{\\siFig}[1]{\\ifcsname sifig@#1\\endcsname{}S"
     "\\csname sifig@#1\\endcsname\\else\\textbf{??}\\fi}\n"
+    "% Section numbers travel the same way for the same reason.  The supplement\n"
+    "% is ordered by first citation in the main text, so a hand-written\n"
+    "% \"Section~S16\" is a literal that goes stale as soon as a section moves;\n"
+    "% the key is the section's own \\label.\n"
+    "\\newcommand{\\siSec}[1]{\\ifcsname sisec@#1\\endcsname{}S"
+    "\\csname sisec@#1\\endcsname\\else\\textbf{??}\\fi}\n"
 )
 
 
@@ -116,19 +122,37 @@ def enumerate_floats(src):
     return walk("table"), walk("figure")
 
 
+def enumerate_sections(src):
+    """Ordered list of (number, label) for \\sisection{title}{label}.
+
+    The number is the section's position in the supplement as it now stands.
+    The supplement itself prints the same number from a counter, so the two
+    are computed independently and `check_si_refs.py` compares them against
+    what LaTeX wrote into the .aux.
+    """
+    out = []
+    for k, m in enumerate(re.finditer(r"\\sisection\{(?:[^{}]|\{[^{}]*\})*\}"
+                                      r"\s*\{([^}]+)\}", src), 1):
+        out.append((k, m.group(1)))
+    return out
+
+
 def build(root, lang="en"):
     si_dir = os.path.join(root, "submission", "paper_%s" % lang)
     src = inline_inputs(strip_comments(read(os.path.join(si_dir, "SI_main.tex"))),
                         si_dir)
     tables, figures = enumerate_floats(src)
+    sections = enumerate_sections(src)
     lines = [HEADER]
-    for kind, items in (("sitab", tables), ("sifig", figures)):
+    for kind, items in (("sitab", tables), ("sifig", figures),
+                        ("sisec", sections)):
         for num, lab in items:
             if not lab:
                 continue
+            # \siSec renders the S prefix itself, so the stored value is bare.
             lines.append("\\expandafter\\def\\csname %s@%s\\endcsname{%d}\n"
                          % (kind, lab, num))
-    return "".join(lines), tables, figures
+    return "".join(lines), tables, figures, sections
 
 
 def main():
@@ -144,7 +168,7 @@ def main():
     # make every "Supplementary Table~N" in the Chinese manuscript name the wrong
     # float, so each language is numbered from its own file.
     for lang in ("en", "cn"):
-        text, tables, figures = build(root, lang)
+        text, tables, figures, sections = build(root, lang)
         unlabeled = [n for n, l in tables + figures if not l]
         out = os.path.join(root, "paper", lang, "gen_si_refs.tex")
         if not os.path.isdir(os.path.dirname(out)):
@@ -158,7 +182,8 @@ def main():
             fh.write(text)
         if old != text:
             print("[si-refs] wrote paper/%s/gen_si_refs.tex (%d tables, "
-                  "%d figures)" % (lang, len(tables), len(figures)))
+                  "%d figures, %d sections)"
+                  % (lang, len(tables), len(figures), len(sections)))
         else:
             print("[si-refs] paper/%s/gen_si_refs.tex up to date" % lang)
         if unlabeled:

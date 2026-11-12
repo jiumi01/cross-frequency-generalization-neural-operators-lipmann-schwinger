@@ -30,7 +30,9 @@ What it asserts
      tables not;
   6. each citation sits in a sentence that shares vocabulary with the caption
      of the float it names -- a key can exist and still name the wrong float;
-  7. no caption carries a stale self-citation ("as Supplementary Figure~S3").
+  7. no caption carries a stale self-citation ("as Supplementary Figure~S3");
+  8. every SI section is cited at least once from the main text, through
+     \\siSec{...} rather than a literal "Section~S16".
 
 Exit code 0 iff every assertion holds.
 """
@@ -144,8 +146,8 @@ def expected_map(fl):
         "gen_si_labels", os.path.join(ROOT, "code", "gen_si_labels.py"))
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
-    text, tables, figs = mod.build(ROOT)
-    return text, tables, figs
+    text, tables, figs, sections = mod.build(ROOT)
+    return text, tables, figs, sections
 
 
 def aux_numbers():
@@ -257,7 +259,7 @@ def main():
           % (n_tab, n_fig, len(fl)))
 
     # 1. the generated map is current -------------------------------------
-    want, tab_list, fig_list = expected_map(fl)
+    want, tab_list, fig_list, sec_list = expected_map(fl)
     gen_path = os.path.join(PEN, "gen_si_refs.tex")
     if not os.path.exists(gen_path):
         bad("paper/en/gen_si_refs.tex is missing -- run `--steps tex`")
@@ -269,8 +271,9 @@ def main():
                 "(run `--steps tex`)")
     defined_tabs = dict(re.findall(r"sitab@([^\\]+)\\endcsname\{(\d+)\}", have))
     defined_figs = dict(re.findall(r"sifig@([^\\]+)\\endcsname\{(\d+)\}", have))
-    print("map: %d table keys, %d figure keys"
-          % (len(defined_tabs), len(defined_figs)))
+    defined_secs = dict(re.findall(r"sisec@([^\\]+)\\endcsname\{(\d+)\}", have))
+    print("map: %d table keys, %d figure keys, %d section keys"
+          % (len(defined_tabs), len(defined_figs), len(defined_secs)))
 
     # 2. cross-check against LaTeX's own counters --------------------------
     aux = aux_numbers()
@@ -278,7 +281,8 @@ def main():
         print("note: no SI_main.aux -- counter cross-check skipped")
     else:
         checked = 0
-        for lab, val in list(defined_tabs.items()) + list(defined_figs.items()):
+        for lab, val in (list(defined_tabs.items()) + list(defined_figs.items())
+                         + list(defined_secs.items())):
             if lab not in aux:
                 bad("%s is in the map but LaTeX recorded no such label in "
                     "SI_main.aux" % lab)
@@ -303,6 +307,7 @@ def main():
     masked = mask_math(mask_captions(src))
     used_tab = re.findall(r"\\siTab\{([^}]+)\}", src)
     used_fig = re.findall(r"\\siFig\{([^}]+)\}", src)
+    used_sec = re.findall(r"\\siSec\{([^}]+)\}", src)
     if not used_tab:
         bad("no \\siTab{...} in the main text -- did the phrasing change?")
     for key in used_tab:
@@ -311,10 +316,46 @@ def main():
     for key in used_fig:
         if key not in defined_figs:
             bad("\\siFig{%s}: no such SI figure label (typesets ??)" % key)
+    for key in used_sec:
+        if key not in defined_secs:
+            bad("\\siSec{%s}: no such SI section label (typesets ??)" % key)
     print("main-text keys: %d table citations over %d labels, "
-          "%d figure citations over %d labels"
+          "%d figure citations over %d labels, %d section citations over "
+          "%d labels"
           % (len(used_tab), len(set(used_tab)),
-             len(used_fig), len(set(used_fig))))
+             len(used_fig), len(set(used_fig)),
+             len(used_sec), len(set(used_sec))))
+
+    # 4b. every SI section is cited at least once ------------------------------
+    # A supplement section the main text never points at is invisible to the
+    # reader, whatever it contains.  A citation counts when it names the
+    # section (\\siSec) or one of the floats the section carries, because that
+    # is how a reader is sent there; a range ("Sections~S16--S20") counts for
+    # the sections it spans, because that is what it tells the reader.
+    inlined = inline_inputs(strip_comments(si_raw), EN)
+    sec_of = {}
+    cur = None
+    for m in re.finditer(r"\\sisection\{(?:[^{}]|\{[^{}]*\})*\}\s*\{([^}]+)\}"
+                         r"|\\begin\{(?:table|figure)\*?\}", inlined):
+        if m.group(1):
+            cur = m.group(1)
+        elif cur:
+            seg = inlined[m.start():m.start() + 4000]
+            lab = re.search(r"\\label\{([^}]+)\}", seg.split("\\end{")[0])
+            if lab:
+                sec_of[lab.group(1)] = cur
+    cited = set(used_sec)
+    cited |= {sec_of.get(k) for k in (used_tab + used_fig)} - {None}
+    for m in re.finditer(r"\\siSec\{([^}]+)\}\s*--\s*\\siSec\{([^}]+)\}", src):
+        a, b = defined_secs.get(m.group(1)), defined_secs.get(m.group(2))
+        if a and b:
+            cited |= {k for k, v in defined_secs.items()
+                      if int(a) <= int(v) <= int(b)}
+    uncited = sorted((int(v), k) for k, v in defined_secs.items()
+                     if k not in cited)
+    if uncited:
+        bad("SI section(s) never cited from the main text: %s"
+            % ", ".join("%s (S%d)" % (k, n) for n, k in uncited))
 
     # 6. no literals survive ----------------------------------------------
     targets = [main_path] + [os.path.join(PEN, f) for f in

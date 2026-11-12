@@ -1,0 +1,825 @@
+{
+  "checked": "2026-11-10",
+  "entries": [
+    {
+      "key": "li2021fno",
+      "kind": "proceedings",
+      "doi": "",
+      "arxiv": "2010.08895",
+      "url": "",
+      "checked": "2026-11-10",
+      "verdict": "ok",
+      "detail": "preprint only, arXiv:2010.08895"
+    },
+    {
+      "key": "lu2021deeponet",
+      "kind": "journal",
+      "doi": "10.1038/s42256-021-00302-5",
+      "arxiv": "",
+      "url": "",
+      "checked": "2026-11-10",
+      "verdict": "ok",
+      "detail": "Nature Machine Intelligence 3:218-229 (2021)",
+      "doi_record": {
+        "resolved": true,
+        "title": "Learning nonlinear operators via DeepONet based on the universal approximation theorem of operators",
+        "container": "Nature Machine Intelligence",
+        "volume": "3",
+        "page": "218-229",
+        "year": 2021,
+        "type": "journal-article"
+      }
+    },
+    {
+      "key": "kovachki2023neural",
+      "kind": "journal",
+      "doi": "",
+      "arxiv": "",
+      "url": "",
+      "checked": "2026-11-10",
+      "verdict": "ok",
+      "detail": "no DOI (journal issues none); Journal of Machine Learning Re 24:1--97"
+    },
+    {
+      "key": "chen1995universal",
+      "kind": "journal",
+      "doi": "10.1109/72.392253",
+      "arxiv": "",
+      "url": "",
+      "checked": "2026-11-10",
+      "verdict": "ok",
+      "detail": "IEEE Transactions on Neural Networ 6:911-917 (1995)",
+      "doi_record": {
+        "resolved": true,
+        "title": "Universal approximation to nonlinear operators by neural networks with arbitrary activation functions and its application to dynamical systems",
+        "container": "IEEE Transactions on Neural Networks",
+        "volume": "6",
+        "page": "911-917",
+        "year": 1995,
+        "type": "journal-article"
+      }
+    },
+    {
+      "key": "you2026mscalefno",
+      "kind": "journal",
+      "doi": "10.1016/j.jcp.2025.114530",
+      "arxiv": "",
+      "url": "",
+      "checked": "2026-11-10",
+      "verdict": "ok",
+      "detail": "Journal of Computational Physics 547:114530 (2026)",
+      "doi_record": {
+        "resolved": true,
+        "title": "MscaleFNO: Multi-scale Fourier neural operator learning for oscillatory functions and wave scattering problems",
+        "container": "Journal of Computational Physics",
+        "volume": "547",
+        "page": "114530",
+        "year": 2026,
+        "type": "journal-article"
+      }
+    },
+    {
+      "key": "huang2025learned",
+      "kind": "journal",
+      "doi": "10.1093/gji/ggaf113",
+      "arxiv": "",
+      "url": "",
+      "checked": "2026-11-10",
+      "verdict": "ok",
+      "detail": "Geophysical Journal International 241:1467-1478 (2025)",
+      "doi_record": {
+        "resolved": true,
+        "title": "Learned frequency-domain scattered wavefield solutions using neural operators",
+        "container": "Geophysical Journal International",
+        "volume": "241",
+        "page": "1467-1478",
+        "year": 2025,
+        "type": "journal-article"
+      }
+    },
+    {
+      "key": "kim2026fftfree",
+      "kind": "journal",
+      "doi": "10.3390/app16125997",
+      "arxiv": "",
+      "url": "",
+      "checked": "2026-11-10",
+      "verdict": "ok",
+      "detail": "Applied Sciences 16:5997 (2026)",
+      "doi_record": {
+        "resolved": true,
+        "title": "FFT-Free Neural Operators for Helmholtz Scattering via Adaptive Coefficient Modulation",
+        "container": "Applied Sciences",
+        "volume": "16",
+        "page": "5997",
+        "year": 2026,
+        "type": "journal-article"
+      }
+    },
+    {
+      "key": "xie2026frequency",
+      "kind": "preprint",
+      "doi": "",
+      "arxiv": "2605.12997",
+      "url": "",
+      "checked": "2026-11-10",
+      "verdict": "ok",
+      "detail": "preprint only, arXiv:2605.12997"
+    },
+    {
+      "key": "li2025scaleconsistent",
+      "kind": "preprint",
+      "doi": "",
+      "arxiv": "2507.18813",
+      "url": "",
+      "checked": "2026-11-10",
+      "verdict": "ok",
+      "detail": "preprint only, arXiv:2507.18813"
+    },
+    {
+      "key": "chen2024nsno",
+      "kind": "journal",
+      "doi": "10.1007/s11424-024-3294-x",
+      "arxiv": "",
+      "url": "",
+      "checked": "2026-11-10",
+      "verdict": "ok",
+      "detail": "Journal of Systems Science and Com 37:413-440 (2024)",
+      "doi_record": {
+        "resolved": true,
+        "title": "NSNO: Neumann Series Neural Operator for Solving Helmholtz Equations in Inhomogeneous Medium",
+        "container": "Journal of Systems Science and Complexity",
+        "volume": "37",
+        "page": "413-440",
+        "year": 2024,
+        "type": "journal-article"
+      }
+    },
+    {
+      "key": "osnabrugge2016convergent",
+      "kind": "journal",
+      "doi": "10.1016/j.jcp.2016.06.034",
+      "arxiv": "",
+      "url": "",
+      "checked": "2026-11-10",
+      "verdict": "ok",
+      "detail": "Journal of Computational Physics 322:113-124 (2016)",
+      "doi_record": {
+        "resolved": true,
+        "title": "A convergent Born series for solving the inhomogeneous Helmholtz equation in arbitrarily large media",
+        "container": "Journal of Computational Physics",
+        "volume": "322",
+        "page": "113-124",
+        "year": 2016,
+        "type": "journal-article"
+      }
+    },
+    {
+      "key": "colton2013inverse",
+      "kind": "book",
+      "doi": "10.1007/978-1-4614-4942-3",
+      "arxiv": "",
+      "url": "",
+      "checked": "2026-11-10",
+      "verdict": "ok",
+      "detail": "Applied Mathematical Sciences : (2013)",
+      "doi_record": {
+        "resolved": true,
+        "title": "Inverse Acoustic and Electromagnetic Scattering Theory",
+        "container": "Applied Mathematical Sciences",
+        "volume": "",
+        "page": "",
+        "year": 2013,
+        "type": "book"
+      }
+    },
+    {
+      "key": "vorst1992",
+      "kind": "journal",
+      "doi": "10.1137/0913035",
+      "arxiv": "",
+      "url": "",
+      "checked": "2026-11-10",
+      "verdict": "ok",
+      "detail": "SIAM Journal on Scientific and Sta 13:631-644 (1992)",
+      "doi_record": {
+        "resolved": true,
+        "title": "Bi-CGSTAB: A Fast and Smoothly Converging Variant of Bi-CG for the Solution of Nonsymmetric Linear Systems",
+        "container": "SIAM Journal on Scientific and Statistical Computing",
+        "volume": "13",
+        "page": "631-644",
+        "year": 1992,
+        "type": "journal-article"
+      }
+    },
+    {
+      "key": "saad1986gmres",
+      "kind": "journal",
+      "doi": "10.1137/0907058",
+      "arxiv": "",
+      "url": "",
+      "checked": "2026-11-10",
+      "verdict": "ok",
+      "detail": "SIAM Journal on Scientific and Sta 7:856-869 (1986)",
+      "doi_record": {
+        "resolved": true,
+        "title": "GMRES: A Generalized Minimal Residual Algorithm for Solving Nonsymmetric Linear Systems",
+        "container": "SIAM Journal on Scientific and Statistical Computing",
+        "volume": "7",
+        "page": "856-869",
+        "year": 1986,
+        "type": "journal-article"
+      }
+    },
+    {
+      "key": "erlangga2008advances",
+      "kind": "journal",
+      "doi": "10.1007/s11831-007-9013-7",
+      "arxiv": "",
+      "url": "",
+      "checked": "2026-11-10",
+      "verdict": "ok",
+      "detail": "Archives of Computational Methods  15:37-66 (2007)",
+      "doi_record": {
+        "resolved": true,
+        "title": "Advances in Iterative Methods and Preconditioners for the Helmholtz Equation",
+        "container": "Archives of Computational Methods in Engineering",
+        "volume": "15",
+        "page": "37-66",
+        "year": 2007,
+        "type": "journal-article"
+      }
+    },
+    {
+      "key": "gander2015gmres",
+      "kind": "journal",
+      "doi": "10.1007/s00211-015-0700-2",
+      "arxiv": "",
+      "url": "",
+      "checked": "2026-11-10",
+      "verdict": "ok",
+      "detail": "Numerische Mathematik 131:567-614 (2015)",
+      "doi_record": {
+        "resolved": true,
+        "title": "Applying GMRES to the Helmholtz equation with shifted Laplacian preconditioning: what is the largest shift for which wavenumber-independent convergence is guaranteed?",
+        "container": "Numerische Mathematik",
+        "volume": "131",
+        "page": "567-614",
+        "year": 2015,
+        "type": "journal-article"
+      }
+    },
+    {
+      "key": "rahaman2019spectral",
+      "kind": "proceedings",
+      "doi": "",
+      "arxiv": "1806.08734",
+      "url": "",
+      "checked": "2026-11-10",
+      "verdict": "ok",
+      "detail": "preprint only, arXiv:1806.08734"
+    },
+    {
+      "key": "xu2019frequency",
+      "kind": "journal",
+      "doi": "10.4208/cicp.oa-2020-0085",
+      "arxiv": "",
+      "url": "",
+      "checked": "2026-11-10",
+      "verdict": "ok",
+      "detail": "Communications in Computational Ph 28:1746-1767 (2020)",
+      "doi_record": {
+        "resolved": true,
+        "title": "Frequency Principle: Fourier Analysis Sheds Light on Deep Neural Networks",
+        "container": "Communications in Computational Physics",
+        "volume": "28",
+        "page": "1746-1767",
+        "year": 2020,
+        "type": "journal-article"
+      }
+    },
+    {
+      "key": "tancik2020fourier",
+      "kind": "proceedings",
+      "doi": "",
+      "arxiv": "2006.10739",
+      "url": "",
+      "checked": "2026-11-10",
+      "verdict": "ok",
+      "detail": "preprint only, arXiv:2006.10739"
+    },
+    {
+      "key": "wang2022pinns",
+      "kind": "journal",
+      "doi": "10.1016/j.jcp.2021.110768",
+      "arxiv": "",
+      "url": "",
+      "checked": "2026-11-10",
+      "verdict": "ok",
+      "detail": "Journal of Computational Physics 449:110768 (2022)",
+      "doi_record": {
+        "resolved": true,
+        "title": "When and why PINNs fail to train: A neural tangent kernel perspective",
+        "container": "Journal of Computational Physics",
+        "volume": "449",
+        "page": "110768",
+        "year": 2022,
+        "type": "journal-article"
+      }
+    },
+    {
+      "key": "raissi2019pinn",
+      "kind": "journal",
+      "doi": "10.1016/j.jcp.2018.10.045",
+      "arxiv": "",
+      "url": "",
+      "checked": "2026-11-10",
+      "verdict": "ok",
+      "detail": "Journal of Computational Physics 378:686-707 (2019)",
+      "doi_record": {
+        "resolved": true,
+        "title": "Physics-informed neural networks: A deep learning framework for solving forward and inverse problems involving nonlinear partial differential equations",
+        "container": "Journal of Computational Physics",
+        "volume": "378",
+        "page": "686-707",
+        "year": 2019,
+        "type": "journal-article"
+      }
+    },
+    {
+      "key": "karniadakis2021physics",
+      "kind": "journal",
+      "doi": "10.1038/s42254-021-00314-5",
+      "arxiv": "",
+      "url": "",
+      "checked": "2026-11-10",
+      "verdict": "ok",
+      "detail": "Nature Reviews Physics 3:422-440 (2021)",
+      "doi_record": {
+        "resolved": true,
+        "title": "Physics-informed machine learning",
+        "container": "Nature Reviews Physics",
+        "volume": "3",
+        "page": "422-440",
+        "year": 2021,
+        "type": "journal-article"
+      }
+    },
+    {
+      "key": "li2024pino",
+      "kind": "journal",
+      "doi": "10.1145/3648506",
+      "arxiv": "",
+      "url": "",
+      "checked": "2026-11-10",
+      "verdict": "ok",
+      "detail": "ACM / IMS Journal of Data Science 1:1-27 (2024)",
+      "doi_record": {
+        "resolved": true,
+        "title": "Physics-Informed Neural Operator for Learning Partial Differential Equations",
+        "container": "ACM / IMS Journal of Data Science",
+        "volume": "1",
+        "page": "1-27",
+        "year": 2024,
+        "type": "journal-article"
+      }
+    },
+    {
+      "key": "lu2022comprehensive",
+      "kind": "journal",
+      "doi": "10.1016/j.cma.2022.114778",
+      "arxiv": "",
+      "url": "",
+      "checked": "2026-11-10",
+      "verdict": "ok",
+      "detail": "Computer Methods in Applied Mechan 393:114778 (2022)",
+      "doi_record": {
+        "resolved": true,
+        "title": "A comprehensive and fair comparison of two neural operators (with practical extensions) based on FAIR data",
+        "container": "Computer Methods in Applied Mechanics and Engineering",
+        "volume": "393",
+        "page": "114778",
+        "year": 2022,
+        "type": "journal-article"
+      }
+    },
+    {
+      "key": "takamoto2022pdebench",
+      "kind": "proceedings",
+      "doi": "10.52202/068431-0117",
+      "arxiv": "",
+      "url": "",
+      "checked": "2026-11-10",
+      "verdict": "ok",
+      "detail": "Advances in Neural Information Pro :1596-1611 (2022)",
+      "doi_record": {
+        "resolved": true,
+        "title": "PDEBench: An Extensive Benchmark for Scientific Machine Learning",
+        "container": "Advances in Neural Information Processing Systems 35",
+        "volume": "",
+        "page": "1596-1611",
+        "year": 2022,
+        "type": "proceedings-article"
+      }
+    },
+    {
+      "key": "hao2024dpot",
+      "kind": "proceedings",
+      "doi": "",
+      "arxiv": "2403.03542",
+      "url": "",
+      "checked": "2026-11-10",
+      "verdict": "ok",
+      "detail": "preprint only, arXiv:2403.03542"
+    },
+    {
+      "key": "brandstetter2022message",
+      "kind": "proceedings",
+      "doi": "",
+      "arxiv": "2202.03376",
+      "url": "",
+      "checked": "2026-11-10",
+      "verdict": "ok",
+      "detail": "preprint only, arXiv:2202.03376"
+    },
+    {
+      "key": "moulinec1998numerical",
+      "kind": "journal",
+      "doi": "10.1016/S0045-7825(97)00218-1",
+      "arxiv": "",
+      "url": "",
+      "checked": "2026-11-10",
+      "verdict": "ok",
+      "detail": "Computer Methods in Applied Mechan 157:69-94 (1998)",
+      "doi_record": {
+        "resolved": true,
+        "title": "A numerical method for computing the overall response of nonlinear composites with complex microstructure",
+        "container": "Computer Methods in Applied Mechanics and Engineering",
+        "volume": "157",
+        "page": "69-94",
+        "year": 1998,
+        "type": "journal-article"
+      }
+    },
+    {
+      "key": "stanziola2023lbs",
+      "kind": "journal",
+      "doi": "10.1121/10.0017937",
+      "arxiv": "",
+      "url": "",
+      "checked": "2026-11-10",
+      "verdict": "ok",
+      "detail": "JASA Express Letters 3:052401 (2023)",
+      "doi_record": {
+        "resolved": true,
+        "title": "A learned Born series for highly-scattering media",
+        "container": "JASA Express Letters",
+        "volume": "3",
+        "page": "052401",
+        "year": 2023,
+        "type": "journal-article"
+      }
+    },
+    {
+      "key": "gin2021deepgreen",
+      "kind": "journal",
+      "doi": "10.1038/s41598-021-00773-x",
+      "arxiv": "",
+      "url": "",
+      "checked": "2026-11-10",
+      "verdict": "ok",
+      "detail": "Scientific Reports 11:21614 (2021)",
+      "doi_record": {
+        "resolved": true,
+        "title": "DeepGreen: deep learning of Green’s functions for nonlinear boundary value problems",
+        "container": "Scientific Reports",
+        "volume": "11",
+        "page": "21614",
+        "year": 2021,
+        "type": "journal-article"
+      }
+    },
+    {
+      "key": "you2026inverse",
+      "kind": "preprint",
+      "doi": "",
+      "arxiv": "2606.08448",
+      "url": "",
+      "checked": "2026-11-10",
+      "verdict": "ok",
+      "detail": "preprint only, arXiv:2606.08448"
+    },
+    {
+      "key": "benitez2024ood",
+      "kind": "journal",
+      "doi": "10.1016/j.jcp.2024.113168",
+      "arxiv": "",
+      "url": "",
+      "checked": "2026-11-10",
+      "verdict": "ok",
+      "detail": "Journal of Computational Physics 513:113168 (2024)",
+      "doi_record": {
+        "resolved": true,
+        "title": "Out-of-distributional risk bounds for neural operators with applications to the Helmholtz equation",
+        "container": "Journal of Computational Physics",
+        "volume": "513",
+        "page": "113168",
+        "year": 2024,
+        "type": "journal-article"
+      }
+    },
+    {
+      "key": "wang2024tlfno",
+      "kind": "journal",
+      "doi": "10.1109/TGRS.2024.3440199",
+      "arxiv": "",
+      "url": "",
+      "checked": "2026-11-10",
+      "verdict": "ok",
+      "detail": "IEEE Transactions on Geoscience an 62:1-11 (2024)",
+      "doi_record": {
+        "resolved": true,
+        "title": "Transfer Learning Fourier Neural Operator for Solving Parametric Frequency-Domain Wave Equations",
+        "container": "IEEE Transactions on Geoscience and Remote Sensing",
+        "volume": "62",
+        "page": "1-11",
+        "year": 2024,
+        "type": "journal-article"
+      }
+    },
+    {
+      "key": "li2019deepnis",
+      "kind": "journal",
+      "doi": "10.1109/TAP.2018.2885437",
+      "arxiv": "",
+      "url": "",
+      "checked": "2026-11-10",
+      "verdict": "ok",
+      "detail": "IEEE Transactions on Antennas and  67:1819-1825 (2019)",
+      "doi_record": {
+        "resolved": true,
+        "title": "DeepNIS: Deep Neural Network for Nonlinear Electromagnetic Inverse Scattering",
+        "container": "IEEE Transactions on Antennas and Propagation",
+        "volume": "67",
+        "page": "1819-1825",
+        "year": 2019,
+        "type": "journal-article"
+      }
+    },
+    {
+      "key": "li2019performance",
+      "kind": "journal",
+      "doi": "10.1109/LAWP.2019.2927543",
+      "arxiv": "",
+      "url": "",
+      "checked": "2026-11-10",
+      "verdict": "ok",
+      "detail": "IEEE Antennas and Wireless Propaga 18:2259-2263 (2019)",
+      "doi_record": {
+        "resolved": true,
+        "title": "Performance Analysis and Dynamic Evolution of Deep Convolutional Neural Network for Electromagnetic Inverse Scattering",
+        "container": "IEEE Antennas and Wireless Propagation Letters",
+        "volume": "18",
+        "page": "2259-2263",
+        "year": 2019,
+        "type": "journal-article"
+      }
+    },
+    {
+      "key": "wang2017patches",
+      "kind": "journal",
+      "doi": "10.1109/LGRS.2017.2688461",
+      "arxiv": "",
+      "url": "",
+      "checked": "2026-11-10",
+      "verdict": "ok",
+      "detail": "IEEE Geoscience and Remote Sensing 14:941-945 (2017)",
+      "doi_record": {
+        "resolved": true,
+        "title": "A Fast Patches-Based Imaging Algorithm for 3-D Multistatic Imaging",
+        "container": "IEEE Geoscience and Remote Sensing Letters",
+        "volume": "14",
+        "page": "941-945",
+        "year": 2017,
+        "type": "journal-article"
+      }
+    },
+    {
+      "key": "wang2018largescale",
+      "kind": "journal",
+      "doi": "10.13443/j.cjors.2017092602",
+      "arxiv": "",
+      "url": "",
+      "checked": "2026-11-10",
+      "verdict": "ok",
+      "detail": "registered outside Crossref: www.chndoi.org",
+      "doi_record": {
+        "resolved": false,
+        "error": "HTTP Error 404: Not Found"
+      }
+    },
+    {
+      "key": "versteeg1994marmousi",
+      "kind": "journal",
+      "doi": "10.1190/1.1437051",
+      "arxiv": "",
+      "url": "",
+      "checked": "2026-11-10",
+      "verdict": "ok",
+      "detail": "The Leading Edge 13:927-936 (1994)",
+      "doi_record": {
+        "resolved": true,
+        "title": "The Marmousi experience: Velocity model determination on a synthetic complex data set",
+        "container": "The Leading Edge",
+        "volume": "13",
+        "page": "927-936",
+        "year": 1994,
+        "type": "journal-article"
+      }
+    },
+    {
+      "key": "bourgeois1991marmousi",
+      "kind": "proceedings",
+      "doi": "10.3997/2214-4609.201411190",
+      "arxiv": "",
+      "url": "",
+      "checked": "2026-11-10",
+      "verdict": "ok",
+      "detail": "EAEG Workshop - Practical Aspects  : (1990)",
+      "doi_record": {
+        "resolved": true,
+        "title": "Marmousi, model and data",
+        "container": "EAEG Workshop - Practical Aspects of Seismic Data Inversion",
+        "volume": "",
+        "page": "",
+        "year": 1990,
+        "type": "proceedings-article"
+      }
+    },
+    {
+      "key": "mlamoureuxMarmousi",
+      "kind": "repository",
+      "doi": "",
+      "arxiv": "",
+      "url": "https://github.com/mlamoureux/Marmousi",
+      "checked": "2026-11-10",
+      "verdict": "ok",
+      "detail": "https://github.com/mlamoureux/Marmousi"
+    },
+    {
+      "key": "shenyaojinMarmousi",
+      "kind": "repository",
+      "doi": "",
+      "arxiv": "",
+      "url": "https://github.com/shenyaojin/reverse_time_migration",
+      "checked": "2026-11-10",
+      "verdict": "ok",
+      "detail": "https://github.com/shenyaojin/reverse_time_migration"
+    },
+    {
+      "key": "devitocodesMarmousi3D",
+      "kind": "repository",
+      "doi": "",
+      "arxiv": "",
+      "url": "https://github.com/devitocodes/data",
+      "checked": "2026-11-10",
+      "verdict": "ok",
+      "detail": "https://github.com/devitocodes/data"
+    },
+    {
+      "key": "song2022wavefield",
+      "kind": "journal",
+      "doi": "10.1093/jge/gxac016",
+      "arxiv": "",
+      "url": "",
+      "checked": "2026-11-10",
+      "verdict": "ok",
+      "detail": "Journal of Geophysics and Engineer 19:269-282 (2022)",
+      "doi_record": {
+        "resolved": true,
+        "title": "High-frequency wavefield extrapolation using the Fourier neural operator",
+        "container": "Journal of Geophysics and Engineering",
+        "volume": "19",
+        "page": "269-282",
+        "year": 2022,
+        "type": "journal-article"
+      }
+    },
+    {
+      "key": "li2022pfno",
+      "kind": "journal",
+      "doi": "10.1109/TGRS.2023.3333663",
+      "arxiv": "",
+      "url": "",
+      "checked": "2026-11-10",
+      "verdict": "ok",
+      "detail": "IEEE Transactions on Geoscience an 61:1-18 (2023)",
+      "doi_record": {
+        "resolved": true,
+        "title": "Solving Seismic Wave Equations on Variable Velocity Models With Fourier Neural Operator",
+        "container": "IEEE Transactions on Geoscience and Remote Sensing",
+        "volume": "61",
+        "page": "1-18",
+        "year": 2023,
+        "type": "journal-article"
+      }
+    },
+    {
+      "key": "harandi2024spifol",
+      "kind": "journal",
+      "doi": "10.1016/j.jmps.2025.106219",
+      "arxiv": "",
+      "url": "",
+      "checked": "2026-11-10",
+      "verdict": "ok",
+      "detail": "Journal of the Mechanics and Physi 203:106219 (2025)",
+      "doi_record": {
+        "resolved": true,
+        "title": "SPiFOL: A Spectral-based physics-informed finite operator learning for prediction of mechanical behavior of microstructures",
+        "container": "Journal of the Mechanics and Physics of Solids",
+        "volume": "203",
+        "page": "106219",
+        "year": 2025,
+        "type": "journal-article"
+      }
+    },
+    {
+      "key": "apex2026",
+      "kind": "preprint",
+      "doi": "",
+      "arxiv": "2605.26732",
+      "url": "",
+      "checked": "2026-11-10",
+      "verdict": "ok",
+      "detail": "preprint only, arXiv:2605.26732"
+    },
+    {
+      "key": "balaji2026hybrid",
+      "kind": "preprint",
+      "doi": "",
+      "arxiv": "2602.11197",
+      "url": "",
+      "checked": "2026-11-10",
+      "verdict": "ok",
+      "detail": "preprint only, arXiv:2602.11197"
+    },
+    {
+      "key": "lai2026meanflows",
+      "kind": "preprint",
+      "doi": "",
+      "arxiv": "2610.31071",
+      "url": "",
+      "checked": "2026-11-10",
+      "verdict": "ok",
+      "detail": "preprint only, arXiv:2610.31071"
+    },
+    {
+      "key": "wang2026npbs",
+      "kind": "proceedings",
+      "doi": "",
+      "arxiv": "2603.18527",
+      "url": "",
+      "checked": "2026-11-10",
+      "verdict": "ok",
+      "detail": "preprint only, arXiv:2603.18527"
+    },
+    {
+      "key": "ronneberger2015unet",
+      "kind": "proceedings",
+      "doi": "10.1007/978-3-319-24574-4_28",
+      "arxiv": "",
+      "url": "",
+      "checked": "2026-11-10",
+      "verdict": "ok",
+      "detail": "Lecture Notes in Computer Science :234-241 (2015)",
+      "doi_record": {
+        "resolved": true,
+        "title": "U-Net: Convolutional Networks for Biomedical Image Segmentation",
+        "container": "Lecture Notes in Computer Science",
+        "volume": "",
+        "page": "234-241",
+        "year": 2015,
+        "type": "book-chapter"
+      }
+    },
+    {
+      "key": "psaros2023uq",
+      "kind": "journal",
+      "doi": "10.1016/j.jcp.2022.111902",
+      "arxiv": "",
+      "url": "",
+      "checked": "2026-11-10",
+      "verdict": "ok",
+      "detail": "Journal of Computational Physics 477:111902 (2023)",
+      "doi_record": {
+        "resolved": true,
+        "title": "Uncertainty quantification in scientific machine learning: Methods, metrics, and comparisons",
+        "container": "Journal of Computational Physics",
+        "volume": "477",
+        "page": "111902",
+        "year": 2023,
+        "type": "journal-article"
+      }
+    }
+  ]
+}

@@ -4,8 +4,8 @@ How a neural operator fails once it is evaluated above the frequency band it was
 trained on, and what buys that accuracy back. On a paired numerical benchmark for
 the periodic Lippmann–Schwinger integral equation (one equation family,
 fixed-loss-tangent propagator, contrasts up to \(v_{\max}=1\)), the error
-multiplies by a factor of seven to eight over the first hertz past the training
-edge and saturates at the trivial incident-field baseline. A 2.6-fold wider
+multiplies by a factor of seven to eight over the first unit of frequency past
+the training edge and saturates at the trivial incident-field baseline. A 2.6-fold wider
 network, an eight-fold training set, a larger retained-mode budget and a change of
 architecture all leave that boundary in place; only a wider training band, or the
 analytic Born head the paper supplies, moves it. The boundary is separated from
@@ -48,8 +48,11 @@ and refuses to run without a verdict).
 
 ## Manuscript status
 
-**Not submitted to any journal**, and the manuscript it accompanies is not
-simultaneously under consideration elsewhere. The exact state the paper's
+**Prepared for submission to *IEEE Access***; not under consideration by any
+journal at the time of writing. (An earlier version was submitted to Applied
+Sciences and returned without review; that version is superseded by the
+IEEE-formatted manuscript this README now accompanies.) The exact state the
+paper's
 numbers were produced
 from is identified by the commit hash and tree hash quoted in its Data
 Availability Statement; that commit's tree is this repository's content, so

@@ -42,7 +42,13 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import common as C
 
 NBOOT = 4000
-SEEDS = (0, 1, 2)
+# Every seed the arm carries, not a fixed prefix of three.  The headline tables
+# are six-seed means, so a three-seed interval table reported the same quantity
+# at a different value (0.9631 against 0.966 on the reference arm, and r = 7.48
+# against 7.31) with nothing on the page to say so.  A referee who divides the
+# printed eps(5) by the printed eps(4) then cannot recover r.  load_arm() takes
+# whatever per-cell files exist, so the six-seed arms now carry six here too.
+SEEDS = (0, 1, 2, 3, 4, 5)
 FREQS = C.F_TEST
 PLAT_F = [f for f in FREQS if f >= 6.0]
 
@@ -161,7 +167,15 @@ def main():
         per, ib, nseed = got
         ci = int(np.argmin(np.abs(np.array(C.VMAX_LIST) - vmax)))
         p_arm = per[ci]                     # [fi, mi]
-        ib_arm = ib[ci]                     # [mi]
+        # The in-band level is the mean over the in-band NODES of the same curve
+        # the plateau comes from.  `per_ib` is a second instrument: it averages
+        # media and nodes into one number and returns 0.0817 where the nodes give
+        # 0.0883 on the first seed of the reference arm.  Two instruments for
+        # one column is how 0.086 and 0.092 came to be printed in two tables of
+        # the same paper; the node mean is the one a reader can recompute from
+        # the per-frequency table, so it is the one used here.
+        i_in = [i for i, f in enumerate(FREQS) if f <= C.F_TRAIN[1] + 1e-9]
+        ib_arm = p_arm[i_in].mean(axis=0)   # [mi]
         i4 = FREQS.index(4.0)
         i5 = FREQS.index(5.0)
         ip = [FREQS.index(f) for f in PLAT_F]

@@ -12,6 +12,8 @@ Checks performed
   5. the headline macros are re-derived INDEPENDENTLY from results/eval_*.json
      with plain numpy, i.e. not through the generator that wrote them
   6. the compiled PDFs: page count, embedded fonts, and text extraction
+  7. the reference list: every preprint says so, every .bib note reaches the
+     page, and no cited preprint has been withdrawn at arXiv
 
 Exit code is non-zero if any hard check fails.
 """
@@ -28,6 +30,9 @@ import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import common as C
 import make_results_tex as G
+import make_bib_tex as B
+from check_arxiv_status import arxiv_id, RECORD
+from check_ref_publication import RECORD as PUB_RECORD
 
 FAIL = []
 
@@ -356,12 +361,195 @@ def bib_locators(folder):
 
 
 # ---------------------------------------------------------------------------
+# Entries that have no DOI and whose venue is not a proceedings volume have to
+# say so in the printed list, or the reader cannot tell an oral from a paper.
+# One token per key, asserted against the rendered entry.
+NO_LOCATOR_DISCLOSURE = {
+    "bourgeois1991marmousi": "The Marmousi Experience",
+    "millet2024acoustic": "Meeting Abstracts",
+    "mlamoureuxMarmousi": "github.com/mlamoureux/Marmousi",
+    "shenyaojinMarmousi": "github.com/shenyaojin",
+    "ray2026extrapolate": "no proceedings volume",
+}
+
+
+def bib_publication_kind(folder):
+    """Class gate: the printed entry says what kind of publication it is.
+
+    Three ways an entry can lose that information, all present in this list on
+    2026-11-03:
+      * a preprint rendered without the word "Preprint" -- the APEX entry, the
+        only one of ten that a reader could not tell apart from a report;
+      * an `inproceedings` whose .bib `note` the renderer dropped, so an oral
+        with no proceedings volume printed as "In <conference>; 2026.";
+      * an entry with neither a DOI nor an arXiv number, whose exception is
+        documented in this file but never reached the page.
+
+    Each rule is stated over a class, so the next entry of the same shape is
+    caught without anyone remembering this file exists.
+    """
+    bib = {e["key"]: e for e in B.parse_bib(
+        open(os.path.join(folder, "refs.bib"), encoding="utf-8").read())}
+    p = os.path.join(folder, "gen_bib.tex")
+    if not os.path.exists(p):
+        bad("%s: gen_bib.tex missing" % folder)
+        return
+    body = {}
+    for it in re.split(r"\\bibitem\{", open(p, encoding="utf-8").read())[1:]:
+        key, rest = it.split("}", 1)
+        body[key] = " ".join(rest.split())
+
+    n_pre, n_note = 0, 0
+    for key, e in bib.items():
+        if key not in body:
+            continue
+        txt = body[key]
+        preprint_only = (e.get("journal", "").lower().startswith("arxiv")
+                         or (e["type"] == "misc" and e.get("eprint")))
+        if preprint_only:
+            n_pre += 1
+            if "Preprint" not in txt:
+                bad("%s: %r is a preprint but the entry does not say so"
+                    % (os.path.basename(folder), key))
+        note = e.get("note", "")
+        if note:
+            n_note += 1
+            if " ".join(note.split()) not in txt:
+                bad("%s: the .bib note of %r (%r) is missing from the entry"
+                    % (os.path.basename(folder), key, note))
+        tok = NO_LOCATOR_DISCLOSURE.get(key)
+        if tok and tok not in txt:
+            bad("%s: %r has no DOI and no arXiv number; the entry has to "
+                "disclose why (%r missing)"
+                % (os.path.basename(folder), key, tok))
+    ok("%s: %d preprints labelled, %d notes carried into the list"
+       % (os.path.basename(folder), n_pre, n_note))
+
+
+def bib_status_record(folder, max_age_days=180):
+    """Offline twin of check_arxiv_status.py: the record must exist and be clean.
+
+    The network question is asked by that script; here it is only read.  A
+    withdrawn preprint is a hard failure: arXiv serves the withdrawal notice
+    and no PDF, so the reader cannot run the work that is being cited.  A stale
+    record is a warning -- the answer does not change often, but it does change.
+    """
+    if not os.path.exists(RECORD):
+        bad("%s: no preprint status record; run "
+            "`python code/check_arxiv_status.py`" % os.path.basename(folder))
+        return
+    rec = json.load(open(RECORD, encoding="utf-8"))
+    rows = {r["key"]: r for r in rec.get("entries", [])}
+    bib = B.parse_bib(open(os.path.join(folder, "refs.bib"),
+                           encoding="utf-8").read())
+    keys = [(e["key"], arxiv_id(e)) for e in bib if arxiv_id(e)]
+    miss, dead = [], []
+    for key, aid in keys:
+        r = rows.get(key)
+        if r is None or r.get("arxiv") != aid:
+            miss.append(key)
+        elif r.get("status") != "live":
+            dead.append("%s (%s)" % (key, r.get("status")))
+        elif not r.get("title_match"):
+            bad("%s: arXiv:%s resolves to a different paper than %r"
+                % (os.path.basename(folder), aid, key))
+    if miss:
+        bad("%s: no status record for %s" % (os.path.basename(folder), miss))
+    if dead:
+        bad("%s: preprint no longer citable: %s"
+            % (os.path.basename(folder), ", ".join(dead)))
+    # A record older than the window is a warning, not a failure: the audit is
+    # offline, and refusing to build because a date aged would just get the
+    # gate switched off.
+    import datetime
+    try:
+        age = (datetime.date.today()
+               - datetime.date.fromisoformat(rec.get("checked", ""))).days
+    except ValueError:
+        age = None
+    if age is None:
+        warn("%s: preprint status record has no usable date" %
+             os.path.basename(folder))
+    elif age > max_age_days:
+        warn("%s: preprint status record is %d days old; re-run "
+             "`python code/check_arxiv_status.py`" %
+             (os.path.basename(folder), age))
+    if not miss and not dead:
+        ok("%s: %d preprints live at arXiv as of %s"
+           % (os.path.basename(folder), len(keys), rec.get("checked", "?")))
+
+
+def bib_publication_form(folder, max_age_days=180):
+    """Offline twin of check_ref_publication.py: three rules, stated as a gate.
+
+    The author's rules (2026-11-03): a work that has appeared is cited in its
+    published version; a withdrawn work is not cited; a work with no exact
+    locator is not cited.  The first rule is the one no reading of the .bib can
+    enforce, because the .bib records what the authors believed on the day they
+    wrote the entry -- `li2022pfno` sat there as arXiv:2209.12340 for two years
+    after it had become IEEE TGRS 61:1-18.
+
+    A key present in the .bib but absent from the record is also a failure: it
+    means an entry was added after the last refresh, so nobody has asked
+    whether it is published, withdrawn or unlocatable.
+    """
+    if not os.path.exists(PUB_RECORD):
+        bad("%s: no publication record; run "
+            "`python code/check_ref_publication.py`" % os.path.basename(folder))
+        return
+    import datetime
+    rec = json.load(open(PUB_RECORD, encoding="utf-8"))
+    rows = {r["key"]: r for r in rec.get("entries", [])}
+    bib = {e["key"] for e in B.parse_bib(
+        open(os.path.join(folder, "refs.bib"), encoding="utf-8").read())}
+
+    unasked = sorted(bib - set(rows))
+    if unasked:
+        bad("%s: %d entries have never been checked for a published version: "
+            "%s" % (os.path.basename(folder), len(unasked), unasked))
+    stale = sorted(set(rows) - bib)
+    if stale:
+        warn("%s: the publication record still lists dropped entries: %s"
+             % (os.path.basename(folder), stale))
+
+    broken = [r for k, r in rows.items()
+              if k in bib and r.get("verdict") != "ok"]
+    for r in broken:
+        bad("%s: %r is not cited in a citable form [%s] %s"
+            % (os.path.basename(folder), r["key"], r["verdict"],
+               r.get("detail", "")))
+    try:
+        age = (datetime.date.today()
+               - datetime.date.fromisoformat(rec.get("checked", ""))).days
+    except ValueError:
+        age = None
+    if age is not None and age > max_age_days:
+        warn("%s: publication record is %d days old; re-run "
+             "`python code/check_ref_publication.py`"
+             % (os.path.basename(folder), age))
+    if not broken and not unasked:
+        ok("%s: %d entries cited in published or exactly locatable form as of %s"
+           % (os.path.basename(folder), len(bib), rec.get("checked", "?")))
+
+
+# ---------------------------------------------------------------------------
 def rederive():
     """Recompute the headline numbers from the raw eval JSONs with plain numpy."""
     ev = {}
     for p in sorted(glob.glob(os.path.join(C.RES, "eval_*.json"))):
         d = json.load(open(p, encoding="utf-8"))
         ev[d["name"]] = d
+
+    def edge_of(rec):
+        """Upper end of the arm's training band, read off its cache name.
+
+        Written here rather than imported so this re-derivation does not go
+        through the generator it is auditing; the rule itself is the one the
+        generator documents (`train_b025_2` -> 2, otherwise the default band).
+        """
+        base = os.path.basename(str(rec.get("train_data", "")).replace("\\", "/"))
+        m = re.search(r"_b\d+_(\d+(?:\.\d+)?)$", base)
+        return float(m.group(1)) if m else float(C.F_TRAIN[1])
 
     def arm(vmax):
         tag = "a%03d" % int(round(vmax * 100))
@@ -371,8 +559,25 @@ def rederive():
         F = np.array([r["f"] for r in ev[names[0]]["sweep"]["%.2f" % vmax]])
         M = np.mean([[r["mean"] for r in ev[n]["sweep"]["%.2f" % vmax]]
                      for n in names], axis=0)
-        ib = np.mean([r["mean"] for n in names for r in ev[n]["in_band"]
-                      if abs(r["vmax"] - vmax) < 1e-6])
+        # The in-band level the caption defines: per seed, the mean of that
+        # seed's curve at the in-band NODES, then the mean across seeds.  The
+        # stored `in_band` field is a different statistic -- it pools every
+        # media x node sample into one number -- and reading it here made this
+        # audit report 0.016 where the manuscript prints 0.018, a disagreement
+        # that was in the instrument, not in the table.  Both are computed so
+        # that the gap stays visible instead of being silently reconciled.
+        per_seed = []
+        pooled = []
+        for n in names:
+            rows = ev[n]["sweep"]["%.2f" % vmax]
+            e = edge_of(ev[n])
+            v = [r["mean"] for r in rows if r["f"] <= e + 1e-9]
+            if v:
+                per_seed.append(float(np.mean(v)))
+            pooled += [r["mean"] for r in ev[n]["in_band"]
+                       if abs(r["vmax"] - vmax) < 1e-6]
+        ib = float(np.mean(per_seed))
+        ib_pooled = float(np.mean(pooled)) if pooled else float("nan")
         plateau = float(np.mean(M[F >= 6]))
         e4 = float(M[np.isclose(F, 4.0)][0])
         e5 = float(M[np.isclose(F, 5.0)][0])
@@ -383,7 +588,8 @@ def rederive():
         coef = np.linalg.lstsq(A, y, rcond=None)[0]
         yh = A @ coef
         r2 = 1 - ((y - yh) ** 2).sum() / max(((y - y.mean()) ** 2).sum(), 1e-30)
-        return dict(n_seeds=len(names), inband=float(ib), plateau=plateau,
+        return dict(n_seeds=len(names), inband=ib, inband_pooled=ib_pooled,
+                    plateau=plateau,
                     e4=e4, cliff=cliff, alpha=float(coef[0]), r2=float(r2),
                     # two-point slope at the band edge: the exponent the same
                     # data give when the fit is confined to the rise
@@ -426,10 +632,10 @@ def check_rederived(folder):
     print("    arm table (re-derived):")
     for k in sorted(got["arms"]):
         a = got["arms"][k]
-        print("      v=%.2f  seeds=%d  in=%.3f  plateau=%.3f  r=%.2f  "
-              "alpha=%.2f (R2=%.2f)"
-              % (k, a["n_seeds"], a["inband"], a["plateau"], a["cliff"],
-                 a["alpha"], a["r2"]))
+        print("      v=%.2f  seeds=%d  in=%.3f (pooled field %.3f)  plateau=%.3f  "
+              "r=%.2f  alpha=%.2f (R2=%.2f)"
+              % (k, a["n_seeds"], a["inband"], a["inband_pooled"], a["plateau"],
+                 a["cliff"], a["alpha"], a["r2"]))
     for k in ("InBandLo", "InBandHi", "PlateauLo", "PlateauHi", "CliffLo",
               "CliffHi", "AlphaLo", "AlphaHi", "AlphaEdge", "RiseLo", "RiseHi"):
         if k not in have:
@@ -521,6 +727,9 @@ def main():
         check_labels(tex)
         check_bib(tex, bib)
         check_bib_inline_tex(folder)
+        bib_publication_kind(folder)
+        bib_status_record(folder)
+        bib_publication_form(folder)
         check_figures(folder)
         if lang == "en":
             check_rederived(folder)

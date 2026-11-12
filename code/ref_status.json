@@ -1,0 +1,131 @@
+{
+  "checked": "2026-11-03",
+  "entries": [
+    {
+      "key": "li2021fno",
+      "arxiv": "2010.08895",
+      "status": "live",
+      "checked": "2026-11-03",
+      "title_match": true,
+      "arxiv_title": "Fourier Neural Operator for Parametric Partial Differential Equations",
+      "comment": ""
+    },
+    {
+      "key": "kovachki2023neural",
+      "arxiv": "2108.08481",
+      "status": "live",
+      "checked": "2026-11-03",
+      "title_match": true,
+      "arxiv_title": "Neural Operator: Learning Maps Between Function Spaces",
+      "comment": ""
+    },
+    {
+      "key": "xie2026frequency",
+      "arxiv": "2605.12997",
+      "status": "live",
+      "checked": "2026-11-03",
+      "title_match": true,
+      "arxiv_title": "Frequency Bias and OOD Generalization in Neural Operators under a Variable-Coefficient Wave Equation",
+      "comment": ""
+    },
+    {
+      "key": "li2025scaleconsistent",
+      "arxiv": "2507.18813",
+      "status": "live",
+      "checked": "2026-11-03",
+      "title_match": true,
+      "arxiv_title": "Scale-Consistent Learning for Partial Differential Equations",
+      "comment": ""
+    },
+    {
+      "key": "rahaman2019spectral",
+      "arxiv": "1806.08734",
+      "status": "live",
+      "checked": "2026-11-03",
+      "title_match": true,
+      "arxiv_title": "On the Spectral Bias of Neural Networks",
+      "comment": "23 pages"
+    },
+    {
+      "key": "tancik2020fourier",
+      "arxiv": "2006.10739",
+      "status": "live",
+      "checked": "2026-11-03",
+      "title_match": true,
+      "arxiv_title": "Fourier Features Let Networks Learn High Frequency Functions in Low Dimensional Domains",
+      "comment": "Project page: https://people.eecs.berkeley.edu/~bmild/fourfeat/"
+    },
+    {
+      "key": "takamoto2022pdebench",
+      "arxiv": "2210.07182",
+      "status": "live",
+      "checked": "2026-11-03",
+      "title_match": true,
+      "arxiv_title": "PDEBENCH: An Extensive Benchmark for Scientific Machine Learning",
+      "comment": "16 pages (main body) + 34 pages (supplemental material), accepted for publication in NeurIPS 2022 Track Datasets and Benchmarks"
+    },
+    {
+      "key": "hao2024dpot",
+      "arxiv": "2403.03542",
+      "status": "live",
+      "checked": "2026-11-03",
+      "title_match": true,
+      "arxiv_title": "DPOT: Auto-Regressive Denoising Operator Transformer for Large-Scale PDE Pre-Training",
+      "comment": ""
+    },
+    {
+      "key": "brandstetter2022message",
+      "arxiv": "2202.03376",
+      "status": "live",
+      "checked": "2026-11-03",
+      "title_match": true,
+      "arxiv_title": "Message Passing Neural PDE Solvers",
+      "comment": "Published at ICLR 2022 (Spotlight paper), Github: https://github.com/brandstetter-johannes/MP-Neural-PDE-Solvers"
+    },
+    {
+      "key": "you2026inverse",
+      "arxiv": "2606.08448",
+      "status": "live",
+      "checked": "2026-11-03",
+      "title_match": true,
+      "arxiv_title": "Multiscale Fourier Neural Operator for Inverse Wave Scattering in Highly Oscillatory Media",
+      "comment": "33 pages, 15 figures"
+    },
+    {
+      "key": "apex2026",
+      "arxiv": "2605.26732",
+      "status": "live",
+      "checked": "2026-11-03",
+      "title_match": true,
+      "arxiv_title": "APEX: Amplitude Anchors and Phase Priors for Target-Scarce Higher-Frequency Wave Prediction",
+      "comment": ""
+    },
+    {
+      "key": "balaji2026hybrid",
+      "arxiv": "2602.11197",
+      "status": "live",
+      "checked": "2026-11-03",
+      "title_match": true,
+      "arxiv_title": "Hybrid operator learning of wave scattering maps in high-contrast media",
+      "comment": ""
+    },
+    {
+      "key": "lai2026meanflows",
+      "arxiv": "2610.31071",
+      "status": "live",
+      "checked": "2026-11-03",
+      "title_match": true,
+      "arxiv_title": "Conditional Mean Flows for Frequency-Domain Scattered Wavefield Generation",
+      "comment": ""
+    },
+    {
+      "key": "wang2026npbs",
+      "arxiv": "2603.18527",
+      "status": "live",
+      "checked": "2026-11-03",
+      "title_match": true,
+      "arxiv_title": "Born-Preconditioned Learning for Iterative Neural PDE Solvers",
+      "comment": "25 pages; Accepted at NeurIPS 2026"
+    }
+  ]
+}

@@ -1488,7 +1488,14 @@ def fig_training(out):
     ax.yaxis.set_minor_formatter(NullFormatter())
     despine(ax)
     end_labels(ax, ends, fs=7.0)
-    badge(ax, 0.03, 0.05, "band: seed span", ha="left", va="bottom")
+    # No in-panel note for the shading.  The one that stood here read "band:
+    # seed span", and "band" is this paper's word for the training frequency
+    # interval [1,4], so the label named a different object from the one it
+    # described; it also sat in the lower left, where the v_max=0.05 curve runs
+    # through it.  The statement now lives in the caption, where "shading" and
+    # "seeds" can be spelled out once.  Nothing is lost in the axes: the filled
+    # region is visible without a key, and its meaning is one caption away.
+    require_inside(ax)
     save(fig, os.path.join(out, "fig_training"))
 
 
@@ -1647,18 +1654,32 @@ def fig_c1(out):
                      "baseline", BLUE),
                     (float(d["arms"]["compensated"]["mean"][-1]),
                      "compensated", ORANGE)], fs=7.2)
-    badge(ax, 0.5, 0.955,
-          r"onset $[%s,%s]$, $\pm1$ SD, %d seeds -- identical in both arms"
-          % (_fl(lo), _fl(hi), d["arms"]["baseline"]["seeds"]),
-          ha="center", fs=6.8)
+    # One statement per quantity, and the quantity read from the records: the
+    # note used to say "onset [4.0, 4.25], \pm1 SD, 3 seeds -- identical in
+    # both arms", which packed the seed count, the bar definition and the
+    # interval claim into one clause and left "identical" without a subject.
+    # The caption already defines the bars, so the panel states the one thing
+    # it can show that the caption cannot: where the two steps fall.  The
+    # prefix is built from the two intervals rather than asserted, so a
+    # compensation that moved the step would print two intervals instead of a
+    # false "both".
+    olim = "[%s,%s]" % (_fl(lo), _fl(hi))
+    clo, chi = d["arms"]["compensated"]["onset"]
+    if [float(clo), float(chi)] == [float(lo), float(hi)]:
+        head = "both arms step inside %s" % olim
+    else:
+        head = ("baseline %s, compensated [%s,%s]"
+                % (olim, _fl(clo), _fl(chi)))
+    badge(ax, 0.02, 0.97, head, ha="left", fs=6.6)
     panel_label(ax, "a")
+    require_inside(ax)
 
     # ---- (b) the manipulated quantity: attained operator norm
     ax = axes[1]
     F = d["arms"]["baseline"]["f"]
     for key, col, mk, lab in specs:
         ax.plot(F, d["arms"][key]["attained"], color=col, marker=mk, ls="-",
-                lw=1.3, clip_on=False, zorder=3)
+                lw=1.3, zorder=3)
     band(ax)
     ax.set_ylim(2.0, 11.0)
     sweep_axis(ax)
@@ -1667,17 +1688,20 @@ def fig_c1(out):
                      "baseline", BLUE),
                     (float(d["arms"]["compensated"]["attained"][-1]),
                      "compensated", ORANGE)], fs=7.2)
-    # The spread->constant statement lives in the caption: inside the panel it
-    # collided with the compensated arm, which is a flat line at the only
-    # height the note could occupy.
-    # The two panels share the colour code; (b) states it in a legend because
-    # its two series are the point of the panel (what the compensation did to
-    # the norm) and a reader should not have to carry the code across panels.
-    ax.legend([Line2D([], [], color=BLUE, marker="o", ls="-", lw=1.3),
-               Line2D([], [], color=ORANGE, marker="s", ls="-", lw=1.3)],
-              ["baseline", "compensated"], fontsize=7.4, loc="upper left",
-              frameon=False, handlelength=1.8, labelspacing=0.3)
+    # This panel has two series and three labels too many.  It carried a legend
+    # in the upper left AND a direct label at the right edge, and the legend sat
+    # exactly where the baseline climbs through 8 to its plateau, so the word
+    # "compensated" printed on top of the rising curve.  The end labels already
+    # name both series; the legend is gone.  What the panel argues -- that the
+    # manipulated quantity is now flat -- is stated once, on the line it is
+    # about, at the height the line sits at.
+    ax.annotate("held constant at $%.2f$" % v["attained_compensated"],
+                xy=(0.42, float(d["arms"]["compensated"]["attained"][-1])),
+                xycoords=("axes fraction", "data"),
+                xytext=(0, 7), textcoords="offset points",
+                fontsize=6.6, color=ORANGE, ha="left", va="bottom")
     panel_label(ax, "b")
+    require_inside(ax)
     save(fig, os.path.join(out, "fig_c1"))
 
 
@@ -2117,15 +2141,22 @@ def fig_c3probe(out):
             fs = sorted(float(k) for k in arm["energy"])
             ys = [arm["energy"]["%.2f" % f][field] for f in fs]
             ax.plot(fs, ys, color=col, marker=mk, ls="-", lw=1.3,
-                    clip_on=False, zorder=3)
+                    zorder=3)
         band(ax, lo=1.0, hi=4.0)
         ax.set_xlabel("frequency $f$")
         ax.set_ylabel(ylab)
         ax.set_xticks([4, 5, 6, 8, 10, 12])
-        ax.set_xlim(3.6, 12.4)
-        ax.set_ylim(-0.45 if pi else 0.0, 1.75)
+        # The window is stated once and both panels obey it.  Everything drawn
+        # inside it is inside it: the previous version kept clip_on=False on
+        # every line (so that a marker on the frame is not halved) and let the
+        # signed curve, which starts at f=1.5, paint itself across the y axis
+        # and into the gap between the panels.  A limit that the data exceeds
+        # is not a limit; require_inside() now makes that statement checkable.
+        ax.set_xlim(3.45, 12.5)
+        ax.set_ylim(-0.28 if pi else 0.0, 1.45 if pi else 1.70)
         despine(ax)
         panel_label(ax, "ab"[pi])
+        require_inside(ax)
     # The signed correlation, on the arm where it was measured.  |<u,u_hat>|
     # cannot separate "aligned but small" from "antiparallel", so the absolute
     # value alone cannot support the sentence in the text that the emitted
@@ -2138,11 +2169,16 @@ def fig_c3probe(out):
     cp = os.path.join(C.RES, "corr_energy.json")
     if os.path.exists(cp):
         cd = json.load(open(cp, encoding="utf-8"))
-        fq = [float(x) for x in cd["f"]]
+        # The probe runs from f=1.5, the window opens at 3.45.  Plot only the
+        # nodes the panel actually shows: an in-band point off the left edge
+        # carries nothing the reader can see, and drawing it is what pushed the
+        # curve over the axis.  The in-band level is still visible at f=3.5.
+        fq = [float(x) for x in cd["f"]
+              if float(x) >= 3.45]
         ax = axes[1]
         ax.plot(fq, [cd["signed"]["%g" % f] for f in fq], color=BLUE,
                 marker="o", mfc="none", ms=4.0, lw=1.2, ls=(0, (4, 1.6)),
-                clip_on=False, zorder=4)
+                zorder=4)
         ax.axhline(0.0, color=INK, lw=0.6, zorder=1)
     # No end labels here: the whole point of the right panel is that the three
     # arms CONVERGE (alignment collapses to the same floor for all of them),

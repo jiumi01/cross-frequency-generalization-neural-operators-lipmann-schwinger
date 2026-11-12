@@ -58,9 +58,31 @@ for lang, engine in LANGS:
     if not os.path.exists(pdf):
         print("[si:%s] no PDF produced" % lang)
         sys.exit(1)
+    # Keep the build output next to its sources first.  That path is never held
+    # open by the desktop preview, so it always gets the fresh file; the
+    # delivered copy is attempted afterwards.  Without this, a preview holding
+    # submission/paper_<lang>/SI_main.pdf made the script exit on the
+    # PermissionError and the *other* language was never compiled at all --
+    # one locked file silently costing a whole document.
+    keep = os.path.join(src, "SI_main.pdf")
+    shutil.copy2(pdf, keep)
+    # The .aux is the only independent record of the numbers LaTeX actually
+    # assigned, and `check_si_refs.py` cross-checks the generated symbol map
+    # against it.  That instrument was reading a stale aux, because only the
+    # PDF was ever delivered; a map that disagreed with the render therefore
+    # passed by comparing itself with an older render.
+    aux = os.path.join(work, "SI_main.aux")
+    if os.path.exists(aux):
+        shutil.copy2(aux, os.path.join(src, "SI_main.aux"))
+        shutil.copy2(aux, os.path.join(ROOT, "submission", "paper_%s" % lang,
+                                       "SI_main.aux"))
     dst = os.path.join(ROOT, "submission", "paper_%s" % lang, "SI_main.pdf")
     os.makedirs(os.path.dirname(dst), exist_ok=True)
-    shutil.copy2(pdf, dst)
-    print("[si:%s] wrote %s (%d bytes)" % (lang, dst, os.path.getsize(pdf)))
+    try:
+        shutil.copy2(pdf, dst)
+        print("[si:%s] wrote %s (%d bytes)" % (lang, dst, os.path.getsize(pdf)))
+    except PermissionError:
+        print("[si:%s] could not replace %s: the file is open in another "
+              "program.  Close it and copy %s over it." % (lang, dst, keep))
     shutil.rmtree(tmp, ignore_errors=True)
 print("SI PDFs compiled and delivered.")

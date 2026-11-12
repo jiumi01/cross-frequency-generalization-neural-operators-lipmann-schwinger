@@ -56,3 +56,9 @@ results/.finish_state
 results/.lastmile_state
 results/.residual_state
 results/.residual2_state
+
+# Working documents fetched/generated during journal migration (not
+# reproduction code; keep them out of the public tree)
+doc-fetch-resources/
+draft_b9ad4331_folder/
+draft_fbee5f21_folder/

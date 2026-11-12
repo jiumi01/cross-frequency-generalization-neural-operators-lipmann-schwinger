@@ -235,13 +235,31 @@ def ci_guard(ev=None, res=None):
     if r is None:
         bad("ci: the reference arm main_fno_a025 is missing from the intervals")
         return
-    if abs(r["e_plat"] - 0.963) < 5e-4 and abs(r["e_in"] - 0.0854) < 5e-4:
-        ok("ci: the interval pipeline independently reproduces the main-table "
-           "values (in band %.4f, plateau %.4f)" % (r["e_in"], r["e_plat"]))
+    # The comparison targets are the PRINTED values, read from the generated
+    # macro file, not literals.  They were literals ("0.963", "0.0854") until
+    # 2026-11-10, and both went stale when the in-band level was redefined from
+    # the pooled `in_band` field to the per-seed mean over the in-band nodes:
+    # the guard then failed on a table that was right, which is the same class
+    # of defect as a hand-copied number, only harder to see.
+    macros = {}
+    mp = os.path.join(C.ROOT, "paper", "en", "gen_macros.tex")
+    if os.path.exists(mp):
+        macros = dict(re.findall(r"\\newcommand\{\\(\w+)\}\{([^}]*)\}",
+                                 open(mp, encoding="utf-8").read()))
+    try:
+        t_in = float(macros["ModeRefIn"])
+        t_plat = float(macros["PlateauRef"])
+    except (KeyError, ValueError):
+        bad("ci: \\ModeRefIn / \\PlateauRef not readable from gen_macros.tex")
+        return
+    if abs(r["e_plat"] - t_plat) < 5e-4 and abs(r["e_in"] - t_in) < 5e-4:
+        ok("ci: the interval pipeline independently reproduces the printed "
+           "values (in band %.4f against %.3f, plateau %.4f against %.3f)"
+           % (r["e_in"], t_in, r["e_plat"], t_plat))
     else:
         bad("ci: the interval pipeline gives in band %.4f and plateau %.4f, "
-            "which do not match Table 1's 0.0854 and 0.963"
-            % (r["e_in"], r["e_plat"]))
+            "which do not match the printed %.3f and %.3f"
+            % (r["e_in"], r["e_plat"], t_in, t_plat))
 
     if r["e_in_lo"] < r["e_in"] < r["e_in_hi"] and \
             r["e_plat_lo"] < r["e_plat"] < r["e_plat_hi"]:
