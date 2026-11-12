@@ -773,7 +773,9 @@ def batch_label_guard(root=None):
         bad("no manuscript binds a batch size to the measurement")
 
 
-ABSTRACT_EN_LIMIT = 200   # MDPI submission cap, counted on the rendered PDF
+ABSTRACT_EN_LIMIT = 250   # IEEE Access guidance (150-250 words); counted on
+                          # the rendered PDF.  MDPI's hard 200 cap applied to
+                          # the previous build and the abstract sits at 200.
 ABSTRACT_CN_LIMIT = 400   # reading units: twice the EN cap (1 Latin word = 2 chars)
 
 
@@ -786,7 +788,8 @@ def pdf_text(pdf):
     import subprocess
     try:
         r = subprocess.run(["pdftotext", pdf, "-"], capture_output=True,
-                           text=True, timeout=120)
+                           text=True, encoding="utf-8", errors="replace",
+                           timeout=120)
     except OSError:
         return None
     return r.stdout if r.returncode == 0 else None
@@ -812,7 +815,8 @@ def rendered_abstract_words(text, heading="Abstract", keywords="Keywords:"):
     if i < 0:
         return 0, "abstract region not found in the rendered text"
     stops = [text.find(k, i + 1) for k in
-             (keywords, "Received:", "Copyright:", "Submitted to")]
+             (keywords, "Index Terms", "Received:", "Copyright:",
+              "Submitted to")]
     stops = [j for j in stops if j > i]
     if not stops:
         return 0, "abstract region not found in the rendered text"

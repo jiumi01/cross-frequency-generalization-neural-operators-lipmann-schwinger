@@ -502,8 +502,14 @@ def doi_guard(root=None):
         note("doi: delivered PDF or refs.bib absent, placeholder check skipped")
         return
     try:
+        # pdftotext emits UTF-8 regardless of the host locale; text=True alone
+        # decodes with the locale codec (GBK on a Chinese Windows), which
+        # raises UnicodeDecodeError inside the reader thread and surfaces as
+        # stdout=None.  Pin the codec so a non-ASCII text layer can never
+        # crash the gate.
         out = subprocess.run(["pdftotext", pdf, "-"], capture_output=True,
-                             text=True, timeout=120)
+                             text=True, encoding="utf-8", errors="replace",
+                             timeout=120)
     except (OSError, subprocess.SubprocessError):
         note("doi: pdftotext unavailable, placeholder check skipped")
         return

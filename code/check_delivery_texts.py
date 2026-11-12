@@ -130,9 +130,12 @@ def tex_title(src, cmd="Title"):
 def title_failures(texts):
     """texts: {name: contents} for every carrier of the title."""
     fails = []
-    en = tex_title(texts.get("paper_en", ""), "Title")
+    # The MDPI build carries \Title{...}; the IEEE Access build uses the
+    # standard \title{...}.  Try the former, then the latter.
+    en = tex_title(texts.get("paper_en", ""), "Title") or \
+        tex_title(texts.get("paper_en", ""), "title")
     if not en:
-        return ["paper_en: no \\Title{...} found"]
+        return ["paper_en: no \\Title{...} or \\title{...} found"]
     canonical = norm(en)
     if len(canonical.split()) < 8:
         fails.append("paper_en: the parsed title is implausibly short (%r)"
