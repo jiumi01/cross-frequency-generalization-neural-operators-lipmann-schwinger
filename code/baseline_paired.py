@@ -70,9 +70,14 @@ def prefix_check(dev):
 
 
 def cell(vi, vmax, f, dev):
-    """Per-medium baseline for one (contrast, frequency) cell, cached."""
+    """Per-medium baseline for one (contrast, frequency) cell, cached.
+
+    The cache key carries the correlation length: the cached medium is drawn
+    through common.MM_REF, so a family run under LS_MM_REF must not hit the
+    default family's cells (the unkeyed cache returned byte-identical
+    baselines for all three families on 2026-11-14)."""
     os.makedirs(CELLS, exist_ok=True)
-    p = os.path.join(CELLS, "v%.2f_f%05.2f.npz" % (vmax, f))
+    p = os.path.join(CELLS, "v%.2f_f%05.2f_mm%.4f.npz" % (vmax, f, C.MM_REF))
     if os.path.exists(p):
         d = np.load(p)
         # npz returns 0-d arrays for scalars, and those are unhashable; the
