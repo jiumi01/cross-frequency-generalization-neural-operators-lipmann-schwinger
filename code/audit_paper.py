@@ -553,7 +553,8 @@ def rederive():
 
     def arm(vmax):
         tag = "a%03d" % int(round(vmax * 100))
-        names = sorted(n for n in ev if n.startswith("main_fno_%s_" % tag))
+        names = sorted(n for n in ev if n.startswith("main_fno_%s_" % tag)
+                         and "_cl" not in n)
         if not names:
             return None
         F = np.array([r["f"] for r in ev[names[0]]["sweep"]["%.2f" % vmax]])

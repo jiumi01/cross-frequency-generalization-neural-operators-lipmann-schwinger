@@ -62,6 +62,7 @@ def keys(ev, prefix):
     """
     return sorted(n for n in ev
                   if n.startswith(prefix)
+                  and "_cl" not in n  # robustness probes, not headline seeds
                   and list(ev[n].get("f_test") or []) == list(C.F_TEST))
 
 
@@ -1857,7 +1858,8 @@ def anchor_guard(ev, res=None):
     for vmax in C.VMAX_LIST:
         a = d["arms"]["%.2f" % vmax]
         flat.append(a["e5"] / a["e4"])
-        names = [n for n in ev if n.startswith("main_fno_a%03d_"
+        names = [n for n in ev if "_cl" not in n
+                 and n.startswith("main_fno_a%03d_"
                                              % int(round(vmax * 100)))]
         if not names:
             bad("no trained records for v=%.2f -- cannot state the contrast "

@@ -316,6 +316,10 @@ def runs_for(ev, prefix):
     for n in sorted(ev):
         if not n.startswith(prefix):
             continue
+        # robustness arms <arm>_clXX_sN share the headline prefix; they are
+        # probes, not extra seeds of the headline arm (2026-11-14 pooling)
+        if "_cl" in n:
+            continue
         if list(ev[n].get("f_test") or []) != list(C.F_TEST):
             continue
         cur.append(n)
