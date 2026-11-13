@@ -4872,7 +4872,70 @@ def build(lang):
         # the supplementary material is English-only; its paired table used to
         # be hand-maintained inside SI_main.tex and now shares this source
         tabs["si_paired"] = table_si_paired(CAP["en"])
+        # S21/S22 bodies were hand-written in SI_main.tex; they now come from
+        # the same records as the printed numbers (see _pair3).
+        for label, fn in (("si_mixed", table_si_mixed),
+                          ("si_gamma", table_si_gamma)):
+            body = fn()
+            if body is not None:
+                tabs[label] = body
     return mac, tabs
+
+
+def _pair3(v):
+    """[mean, sd] -> $m\pm$s$ at three decimals (the SI tables' house style)."""
+    return "$%.3f\pm%.3f$" % (v[0], v[1])
+
+
+def table_si_mixed():
+    """S21: mixed-contrast deployment vs the single-contrast baseline.
+
+    Reads results/major4_tables.json (written by analyze_major4.py from the
+    same eval records as every other table); replaces the hand-written cells
+    that used to sit in SI_main.tex."""
+    import json as _json
+    p = os.path.join(RES_DIR or C.RES, "major4_tables.json")
+    if not os.path.exists(p):
+        return None
+    mt = {r["label"]: r for r in _json.load(open(p))["mixed_table"]}
+    b = mt["single-contrast (baseline)"]
+    d = mt["mixed-contrast (deployment)"]
+    t = ("\\begin{tabular}{lccc}\n\\toprule\n"
+         "Configuration & Band-edge ratio $e(5)/e(4)$ & "
+         "\\shortstack{Plateau @ $v{=}0.25$\\\\ $e(\\ge f=6)$} & "
+         "\\shortstack{Plateau, 5 arms\\\\ $e(\\ge f=6)$} \\\\\n\\midrule\n")
+    t += "Single-contrast baseline & $%.2f\\pm%.2f$ & %s & %s \\\\\n" % (
+        b["ratio"][0], b["ratio"][1], _pair3(b["plateau25"]),
+        _pair3(b["plateau5"]))
+    t += "Mixed-contrast deployment & $%.2f\\pm%.2f$ & %s & %s \\\\\n" % (
+        d["ratio"][0], d["ratio"][1], _pair3(d["plateau25"]),
+        _pair3(d["plateau5"]))
+    return t + "\\bottomrule\n\\end{tabular}\n"
+
+
+def table_si_gamma():
+    """S22: robustness to the propagator loss tangent, same source."""
+    import json as _json
+    p = os.path.join(RES_DIR or C.RES, "major4_tables.json")
+    if not os.path.exists(p):
+        return None
+    rows = _json.load(open(p))["gamma_table"]
+    # The continuum norm is recomputed in decimal from gamma: the JSON carries
+    # the float 10.024999... for gamma=0.05, and %.2f of that prints 10.02
+    # where the exact value 10.025 rounds to 10.03.
+    from decimal import Decimal, ROUND_HALF_UP
+    t = ("\\begin{tabular}{lccc}\n\\toprule\n"
+         "Loss tangent $\\gamma$ & Continuum norm $(1+\\gamma^{2})/(2\\gamma)$ & "
+         "In-band error $e(\\le f=4)$ & "
+         "\\shortstack{Out-of-band plateau\\\\ $e(\\ge f=6)$} \\\\\n\\midrule\n")
+    for r in rows:
+        g = Decimal(str(r["gamma"]))
+        norm = str(((1 + g * g) / (2 * g)).quantize(Decimal("0.01"),
+                                                  rounding=ROUND_HALF_UP))
+        assert abs(float(norm) - r["norm"]) < 0.005 + 1e-9
+        t += "$%.2f$ & $%s$ & %s & %s \\\\\n" % (
+            r["gamma"], norm, _pair3(r["inband"]), _pair3(r["plateau"]))
+    return t + "\\bottomrule\n\\end{tabular}\n"
 
 
 def main():
@@ -4940,7 +5003,7 @@ def main():
 TAB_ORDER = ("main", "summary", "banddown", "propnorm", "paired", "arch", "band",
              "mode", "data", "born", "cost", "realgeo", "arms", "c1", "disc",
              "anchor", "deep", "gridthree", "ci",
-             "locators", "res", "si_paired")
+             "locators", "res", "si_paired", "si_mixed", "si_gamma")
 
 
 if __name__ == "__main__":

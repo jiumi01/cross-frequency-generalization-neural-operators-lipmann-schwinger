@@ -62,3 +62,6 @@ results/.residual2_state
 doc-fetch-resources/
 draft_b9ad4331_folder/
 draft_fbee5f21_folder/
+
+# Correlation-length chain status (machine-local, like the w2 status file)
+results/_cl_arms_status.json
