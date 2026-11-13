@@ -32,7 +32,13 @@ F_TEST = [1.5, 2.5, 3.5, 4.0, 4.25, 4.5, 4.75, 5.0,
           6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0]
 F_MAX = 12.0
 VMAX_LIST = [0.05, 0.10, 0.25, 0.50, 1.00]
-MM_REF = 0.12           # contrast correlation length (domain units)
+# Contrast correlation length (domain units).  A correlation-length
+# robustness arm must run its WHOLE pipeline (cache generation, training,
+# evaluation, gates) under one exported LS_MM_REF: every stage draws media
+# through this constant, so a stage run without the override silently changes
+# the medium family between stages.  gen_caches refuses to write a family
+# folder whose LS_MM_REF does not match (see CL_MM there).
+MM_REF = float(os.environ.get("LS_MM_REF", "0.12"))
 
 # The architecture families compared in Table III and Fig. 4.  The prefix takes
 # the contrast key (a025 / a100).  Defined in exactly ONE place on purpose: an

@@ -96,6 +96,11 @@ def main():
     ap.add_argument("--go", action="store_true",
                     help="required: this writes results/triv_paired.json, which "
                          "the manuscript's plateau-to-baseline ratio reads")
+    ap.add_argument("--out", default=None,
+                    help="output filename under results/ (default "
+                         "triv_paired.json); the correlation-length arms pass "
+                         "their own name so the family baseline never "
+                         "overwrites the default family's")
     a = ap.parse_args()
     if not a.go:
         raise SystemExit("refusing to run without --go (see module docstring)")
@@ -148,8 +153,9 @@ def main():
     except Exception as e:
         print("[cross-check] skipped (%s)" % e, flush=True)
 
-    C.save_json(out, OUT)
-    print("saved %s" % OUT)
+    out_path = os.path.join(C.RES, a.out) if a.out else OUT
+    C.save_json(out, out_path)
+    print("saved %s" % out_path)
 
 
 if __name__ == "__main__":

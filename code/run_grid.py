@@ -27,9 +27,9 @@ DON = ["--model", "deeponet", "--width", "32", "--p", "128"]
 EP = ["--epochs", "55", "--n-train", "12288"]
 
 
-def spec(name, data, arch, seed=0, extra=None):
+def spec(name, data, arch, seed=0, extra=None, env=None):
     return dict(name=name, data=os.path.join(C.DATA, data), arch=arch, seed=seed,
-                extra=extra or [])
+                extra=extra or [], env=env or {})
 
 
 def grid():
@@ -40,6 +40,15 @@ def grid():
     for arm in ["a005", "a010", "a025", "a050", "a100"]:
         for s in [0, 1, 2]:
             G.append(spec("main_fno_%s_s%d" % (arm, s), "train_" + arm, FNO, s))
+    # ---- A2. correlation-length robustness (v_max = 0.25, one family each) --
+    # Trained under the family's LS_MM_REF (spec env below); the cache
+    # folders refuse generation under any other value.  See
+    # reviews/correlation_length_arm_plan_2026-11-12.md.
+    for fam, mm in (("cl06", 0.06), ("cl24", 0.24)):
+        for s in (0, 1, 2):
+            G.append(spec("main_fno_a025_%s_s%d" % (fam, s),
+                          "train_a025_%s" % fam, FNO, s,
+                          env={"LS_MM_REF": "%.2f" % mm}))
     # ---- B. architecture baselines -----------------------------------------
     for arm in ["a025", "a100"]:
         G.append(spec("base_unet_%s_s0" % arm, "train_" + arm, UNET, 0))
@@ -231,7 +240,8 @@ def main():
         try:
             p = subprocess.run(cmd, capture_output=True, text=True,
                                timeout=PER_SPEC_TIMEOUT,
-                               encoding="utf-8", errors="backslashreplace")
+                               encoding="utf-8", errors="backslashreplace",
+                               env=dict(os.environ, **s.get("env", {})))
             ok = p.returncode == 0
         except Exception as e:  # pragma: no cover
             ok = False

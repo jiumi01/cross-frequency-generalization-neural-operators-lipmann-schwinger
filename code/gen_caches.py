@@ -40,7 +40,17 @@ ARMS = [
     # --- C1: per-frequency loss tangent (gamma(f) flattens the attained
     # operator norm over the whole test grid); paired with train_a025 ------
     ("train_gc", 1.0, 4.0, 0.25, 0.25, NPER, 4000),
+    # --- correlation-length robustness at fixed contrast v_max = 0.25 -------
+    # Valid only under the matching LS_MM_REF (see CL_MM below and
+    # common.MM_REF); same seed0 as the fixed-contrast arms so the media
+    # draws are paired within each family.
+    ("train_a025_cl06", 1.0, 4.0, 0.25, 0.25, NPER, 4000),
+    ("train_a025_cl24", 1.0, 4.0, 0.25, 0.25, NPER, 4000),
 ]
+# The correlation length each family folder must be generated under.  The
+# loop below skips a cl folder under any other value, so a default (0.12)
+# run can never contaminate a family cache.
+CL_MM = {"train_a025_cl06": 0.06, "train_a025_cl24": 0.24}
 GAMMA_ARM = {"train_g02": 0.02, "train_g10": 0.10}
 # Arms whose regularisation is a function of the per-sample frequency rather
 # than a constant.  Resolved lazily so this module stays importable without
@@ -59,6 +69,10 @@ if __name__ == "__main__":
         have = len([f for f in os.listdir(folder) if f.endswith(".npz")]) \
             if os.path.isdir(folder) else 0
         need = int((n + 511) // 512)
+        if name in CL_MM and abs(C.MM_REF - CL_MM[name]) > 1e-12:
+            print("skip %s (LS_MM_REF=%.3f; this family needs %.2f)"
+                  % (name, C.MM_REF, CL_MM[name]))
+            continue
         if have >= need:
             print("skip %s (%d/%d chunks present)" % (name, have, need))
             continue
