@@ -61,7 +61,8 @@ SKIP_NAME_PATTERNS = ("scratch", "bak")
 # this is a name list, not a "dot-files" rule -- release_docs/.gitignore is a
 # dot-file that very much has to ship.
 SKIP_STATE_FILES = {".finish_state", ".lastmile_state", ".pipeline_done",
-                    ".residual_state", ".residual2_state"}
+                    ".residual_state", ".residual2_state",
+                    "_w2_seeds_status.json", "_cl_arms_status.json"}
 
 # The curated copy set: (source relative to ROOT, whether to recurse).
 COPY_TREE = ("code", "paper", "results", "data/real")
