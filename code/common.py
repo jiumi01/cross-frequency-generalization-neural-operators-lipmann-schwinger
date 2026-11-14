@@ -20,7 +20,10 @@ for _d in (DATA, RUNS, RES, FIG):
 
 # ---- global physics configuration -----------------------------------------
 N = 64                 # grid points per dimension
-GAMMA = 0.05           # loss tangent of the propagator (kappa = k (1 + i gamma))
+# Loss tangent of the propagator (kappa = k (1 + i gamma)).  Overridable
+# for the loss-tangent robustness arm: every stage (reference solves,
+# Born terms, fitting, evaluation) must run under one exported LS_GAMMA.
+GAMMA = float(os.environ.get("LS_GAMMA", "0.05"))
 F_TRAIN = (1.0, 4.0)   # training frequency band (wavelengths per domain)
 # Test frequencies.  The band edge at f = 4 is resolved to 0.25 because the
 # headline claim is that the rise is a *step*, not a decay: with only the nodes

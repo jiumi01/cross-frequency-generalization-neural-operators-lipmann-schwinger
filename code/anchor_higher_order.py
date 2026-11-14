@@ -60,6 +60,10 @@ COND_CEIL = 1e12        # above this the normal equations are noise
 # the improving part of the curve would be selective reporting.
 CACHE = {0.05: "train_a005", 0.10: "train_a010", 0.25: "train_a025",
          0.50: "train_a050", 1.00: "train_a100"}
+# The stored references of a cache are solved at the cache's own loss
+# tangent (see gen_caches.GAMMA_ARM); fitting under any other C.GAMMA
+# would calibrate against the wrong operator.
+CACHE_GAMMA = {"train_g02": 0.02, "train_g10": 0.10}
 
 
 def born_terms(v, k, theta, order, gamma=None, Ngrid=None):
@@ -140,8 +144,22 @@ def main():
                  "label), scored on the manuscript's eval seeds (70000+vi in "
                  "band, 60000+vi per frequency) at n=200.",
         arms={})
+    only = None
+    if "--vmax" in sys.argv:
+        only = float(sys.argv[sys.argv.index("--vmax") + 1])
+    cache_all = None
+    if "--cache" in sys.argv:
+        cache_all = sys.argv[sys.argv.index("--cache") + 1]
     for vi, vmax in enumerate(C.VMAX_LIST):
-        v, k, th, u = cache_batch(CACHE[vmax], N_FIT)
+        if only is not None and abs(vmax - only) > 1e-9:
+            continue
+        cache = cache_all or CACHE[vmax]
+        want_g = CACHE_GAMMA.get(cache, 0.05)
+        if abs(want_g - C.GAMMA) > 1e-12:
+            raise SystemExit("%s stores references at gamma=%.2f but "
+                             "LS_GAMMA=%.2f is active -- refusing" %
+                             (cache, want_g, C.GAMMA))
+        v, k, th, u = cache_batch(cache, N_FIT)
         key = "%.2f" % vmax
         out["arms"][key] = dict(orders={})
 
@@ -199,7 +217,8 @@ def main():
                   % (vmax, order, cond, np.mean(ib), e4, e5, e5 / e4, plateau),
                   flush=True)
 
-    path = os.path.join(C.RES, "anchor_higher_order.json")
+    path = os.path.join(C.RES, sys.argv[sys.argv.index("--out") + 1]
+                        if "--out" in sys.argv else "anchor_higher_order.json")
     with open(path, "w", encoding="utf-8") as fh:
         json.dump(out, fh, indent=1)
     print("wrote %s" % path)

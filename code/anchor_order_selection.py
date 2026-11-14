@@ -54,6 +54,7 @@ MAX_M = 8
 COND_CEIL = 1e12
 CACHE = {0.05: "train_a005", 0.10: "train_a010", 0.25: "train_a025",
          0.50: "train_a050", 1.00: "train_a100"}
+CACHE_GAMMA = {"train_g02": 0.02, "train_g10": 0.10}
 
 
 def born_terms(v, k, theta, order):
@@ -122,9 +123,21 @@ def main():
                          "protocol (n=200, seeds 60000+vi per frequency)."
                          % (N_FIT, N_VAL),
                arms={})
+    only = None
+    if "--vmax" in sys.argv:
+        only = float(sys.argv[sys.argv.index("--vmax") + 1])
     for vi, vmax in enumerate(C.VMAX_LIST):
-        vf, kf, thf, uf = cache_batch(CACHE[vmax], N_FIT)
-        vv, kv, thv, uv = cache_batch(CACHE[vmax], N_FIT + N_VAL)
+        if only is not None and abs(vmax - only) > 1e-9:
+            continue
+        cache = (sys.argv[sys.argv.index("--cache") + 1]
+                 if "--cache" in sys.argv else CACHE[vmax])
+        want_g = CACHE_GAMMA.get(cache, 0.05)
+        if abs(want_g - C.GAMMA) > 1e-12:
+            raise SystemExit("%s stores references at gamma=%.2f but "
+                             "LS_GAMMA=%.2f is active -- refusing" %
+                             (cache, want_g, C.GAMMA))
+        vf, kf, thf, uf = cache_batch(cache, N_FIT)
+        vv, kv, thv, uv = cache_batch(cache, N_FIT + N_VAL)
         # disjoint slice: the second block only
         vv, kv, thv, uv = (vv[N_FIT:], kv[N_FIT:], thv[N_FIT:], uv[N_FIT:])
 
@@ -180,7 +193,9 @@ def main():
               % (vmax, M_sel, val_err[M_sel], plat(M_sel), M_or, plat(M_or),
                  plat(2), ibs[M_sel]), flush=True)
 
-    path = os.path.join(C.RES, "anchor_order_selection.json")
+    path = os.path.join(C.RES, sys.argv[sys.argv.index("--out") + 1]
+                        if "--out" in sys.argv else
+                        "anchor_order_selection.json")
     with open(path, "w", encoding="utf-8") as fh:
         json.dump(out, fh, indent=1)
     print("wrote %s" % path)
