@@ -90,6 +90,7 @@ def main():
     # claimed the curves' own samples.
     vi = C.VMAX_LIST.index(a.vmax)
     acc = {f: dict(ratio=[], signed=[], absalign=[], err_ratio=[], proj=[],
+                  cross=[], ratio2=[], err2=[],
                    nu=[], nuh=[], npsi=[]) for f in F}
     for cp in ckpts:
         model, _ = E.load_model(cp, dev)
@@ -117,14 +118,24 @@ def main():
             # is what ties these numbers to the error the tables report.
             re_ip = (hf.conj() * uf).sum(dim=1).real
             den = (nh * nu).clamp_min(1e-30)
-            acc[f]["ratio"] += [float(t) for t in (nh / nu.clamp_min(1e-30)).cpu()]
-            acc[f]["signed"] += [float(t) for t in (re_ip / den).cpu()]
+            a_s = nh / nu.clamp_min(1e-30)
+            b_s = re_ip / den
+            acc[f]["ratio"] += [float(t) for t in a_s.cpu()]
+            acc[f]["signed"] += [float(t) for t in b_s.cpu()]
+            # cross term and second moments: the per-sample identity
+            #   e^2 = 1 + a^2 - 2 a b
+            # is linear in the moments once averaged, so E[e^2] must equal
+            # 1 + E[a^2] - 2 E[a b] to float precision (checked below).
+            acc[f]["cross"] += [float(t) for t in (a_s * b_s).cpu()]
+            acc[f]["ratio2"] += [float(t) for t in (a_s * a_s).cpu()]
             # the magnitude of the same quantity, kept so the paper can state
             # what the magnitude would have said and why it is not enough
             acc[f]["absalign"] += [float(t) for t in (re_ip.abs() / den).cpu()]
             # measured directly, not composed from the two means above: the
             # identity is per-sample, so E[err_ratio^2] != 1 + E[ratio]^2 - ...
-            acc[f]["err_ratio"] += [float(t) for t in (ne / nu.clamp_min(1e-30)).cpu()]
+            e_s = ne / nu.clamp_min(1e-30)
+            acc[f]["err_ratio"] += [float(t) for t in e_s.cpu()]
+            acc[f]["err2"] += [float(t) for t in (e_s * e_s).cpu()]
             acc[f]["proj"] += [float(t) for t in
                                (re_ip / (nu * nu).clamp_min(1e-30)).cpu()]
             acc[f]["nu"] += [float(t) for t in nu.cpu()]
@@ -135,6 +146,7 @@ def main():
     res = dict(arm=a.arm, vmax=a.vmax, n_per_seed=a.n,
                n_seeds=len(ckpts), device=dev, f=F,
                ratio={}, signed={}, absalign={}, err_ratio={}, proj={},
+               cross={}, ratio2={}, err2={},
                resolution={})
     for f in F:
         res["ratio"]["%g" % f] = float(np.mean(acc[f]["ratio"]))
@@ -142,6 +154,9 @@ def main():
         res["absalign"]["%g" % f] = float(np.mean(acc[f]["absalign"]))
         res["err_ratio"]["%g" % f] = float(np.mean(acc[f]["err_ratio"]))
         res["proj"]["%g" % f] = float(np.mean(acc[f]["proj"]))
+        res["cross"]["%g" % f] = float(np.mean(acc[f]["cross"]))
+        res["ratio2"]["%g" % f] = float(np.mean(acc[f]["ratio2"]))
+        res["err2"]["%g" % f] = float(np.mean(acc[f]["err2"]))
         res["resolution"]["%g" % f] = float(
             np.mean(acc[f]["nu"]) / np.mean(acc[f]["npsi"]))
     # Self-check of the per-sample identity against the aggregated numbers.
@@ -154,6 +169,13 @@ def main():
         e = res["err_ratio"]["%g" % f]
         resid.append(abs(e * e - (1 + r * r - 2 * r * s)))
     res["identity_residual_max"] = float(max(resid))
+    # exact check on the averaged per-sample identity (linear in moments)
+    exact = [abs(res["err2"]["%g" % f]
+                 - (1.0 + res["ratio2"]["%g" % f]
+                    - 2.0 * res["cross"]["%g" % f])) for f in F]
+    res["identity_exact_max"] = float(max(exact))
+    print("[identity] max |E[e^2] - (1 + E[a^2] - 2 E[ab])| = %.3e"
+          % res["identity_exact_max"])
     C.save_json(res, a.out)
 
     print("   f    E|uh|/|u|  E[signed]  E[|align|]  E|uh-u|/|u|  E[Re<uh,u>/|u|^2]  E|u|/E|psi|")

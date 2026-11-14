@@ -114,9 +114,10 @@ CAP = { "en": dict(
         "Born corrections, $M_{\\mathrm{sel}}$ is picked in band. The last "
         "column is the trained plateau over the head's."),
   gridthree=("(a) Reference convergence: one medium drawn at $256^2$ and "
-             "downsampled to the two coarser grids. (b) The trained FNO, on its "
-             "native $64^2$ input, scored against three targets. $\\varepsilon$ values "
-             "are seed means; (a) uses a single medium."),
+             "downsampled to the two coarser grids. (b) The multi-resolution "
+             "crossed-grid model (one model, all three meshes, a third of the "
+             "steps each) against three targets. Levels differ from "
+             "Table~\\ref{tab:main}: different model and media draw."),
   ci=("Headline scalars with $95\\%$ intervals from \\CIBoot\\ bootstrap "
       "replicates resampling media, one index shared by numerator and "
       "denominator. Six seeds for the contrast and residual arms, three for "
@@ -2358,6 +2359,9 @@ def macros(ev, arms, res):
         bq = [cd["absalign"]["%g" % f] for f in Fq]
         eq = [cd["err_ratio"]["%g" % f] for f in Fq]
         pq = [cd["proj"]["%g" % f] for f in Fq]
+        cq = [cd.get("cross", {}).get("%g" % f) for f in Fq]
+        r2q = [cd.get("ratio2", {}).get("%g" % f) for f in Fq]
+        e2q = [cd.get("err2", {}).get("%g" % f) for f in Fq]
         ii = [i for i, f in enumerate(Fq) if f <= C.F_TRAIN[1] + 1e-9]
         pp = [i for i, f in enumerate(Fq) if f >= 6.0]
         # the peak of err_ratio over the whole sweep: this is where the model is
@@ -2371,7 +2375,13 @@ def macros(ev, arms, res):
                           (prefix + "AbsAlignOut", [bq[i] for i in pp]),
                           (prefix + "ErrIn", [eq[i] for i in ii]),
                           (prefix + "ErrOut", [eq[i] for i in pp]),
-                          (prefix + "ProjOut", [pq[i] for i in pp])):
+                          (prefix + "ProjOut", [pq[i] for i in pp]),
+                          (prefix + "CrossIn", [cq[i] for i in ii]),
+                          (prefix + "CrossOut", [cq[i] for i in pp]),
+                          (prefix + "RatioTwoIn", [r2q[i] for i in ii]),
+                          (prefix + "RatioTwoOut", [r2q[i] for i in pp]),
+                          (prefix + "ErrTwoIn", [e2q[i] for i in ii]),
+                          (prefix + "ErrTwoOut", [e2q[i] for i in pp])):
             L.append("\\newcommand{\\%s}{%s}"
                      % (mac, fmt(float(np.mean(vals))) if vals else "--"))
         L.append("\\newcommand{\\%sErrPeak}{%s}"
@@ -3732,11 +3742,18 @@ def table_deep(cap):
         ratio runs past 1e5.  Printing it would claim a precision the
         measurement does not have -- the head's error there is at the level
         where the reference solver's own tolerance matters -- so it is
-        reported as a bound instead.
+        reported as a bound instead.  The ratio is the quotient of the two
+        PRINTED plateaus (round-22 convention R3): an unrounded quotient
+        printed 44.3 here while the text's quotient of the same printed cells
+        is 0.966/0.022 = 43.9, and a table cell must not disagree with the
+        prose about the same comparison.
         """
         if ref is None or not np.isfinite(plateau) or plateau <= 0:
             return "n/a"
-        r = ref[1] / plateau
+        p_print = float("%.3f" % plateau)
+        if p_print <= 0:
+            return ">10^{3}"
+        r = float("%.3f" % ref[1]) / p_print
         return ">10^{3}" if r > 1000.0 else fmt(r, 1)
 
     for vmax in C.VMAX_LIST:
@@ -4085,8 +4102,8 @@ def table_gridthree(cap):
                  fmt(r1["d64v128"]), fmt(r1["d128v256"]), fmt(r1["p"], 2)))
     t += ("\\bottomrule\n\\end{tabular}\n\n\\vspace{6pt}\n\n"
           "\\begin{tabular}{llrrrr}\n\\toprule\n"
-          "\\multicolumn{6}{c}{\\textbf{(b) FNO error against the same prediction "
-          "scored on three targets, $v_{\\max}=0.25$}}\\\\\n\\midrule\n"
+          "\\multicolumn{6}{c}{\\textbf{(b) Multi-resolution model error against "
+          "the same prediction scored on three targets, $v_{\\max}=0.25$}}\\\\\n\\midrule\n"
           "$f$ & target & $\\varepsilon$ & $\\varepsilon_{\\mathrm{triv}}$ & "
           "$\\varepsilon/\\varepsilon_{\\mathrm{triv}}$ & $\\sqrt{\\varepsilon^2"
           "+\\delta_{64\\to256}^2}$ \\\\\n\\midrule\n")
