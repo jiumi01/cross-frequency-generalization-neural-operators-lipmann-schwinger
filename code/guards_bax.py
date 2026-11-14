@@ -222,6 +222,11 @@ def bax_text_guard(paths=None):
         os.path.abspath(__file__))), "submission")
     paths = paths or {"en": os.path.join(sub, "paper_en", "main.tex"),
                       "cn": os.path.join(sub, "paper_cn", "main.tex")}
+    txt = None
+    si_flat = ""
+    si_path = os.path.join(sub, "paper_en", "SI_main.tex")
+    if os.path.exists(si_path):
+        si_flat = " ".join(open(si_path, encoding="utf-8").read().split())
     for lang, root in paths.items():
         if not os.path.exists(root):
             bad("%s: manuscript not found" % lang)
@@ -259,7 +264,14 @@ def bax_text_guard(paths=None):
             if re.search(pat, flat):
                 bad("%s: withdrawn sentence present: %s" % (lang, pat))
         for pat in anchored:
-            if not re.search(pat, flat):
+            found = bool(re.search(pat, flat))
+            # The record-keeping half of the corrected-reading disclosure may
+            # live in the supplement: review round 3 (P1-3) moved it out of
+            # the main text, and S18 carries it.  The methodological half
+            # ("head sums what it was fitted to sum") stays main-text-only.
+            if not found and lang == "en" and pat == "protocol key":
+                found = bool(re.search(pat, si_flat))
+            if not found:
                 bad("%s: required corrected-reading text missing: %s"
                     % (lang, pat))
         for pat in stale:
