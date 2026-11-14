@@ -115,9 +115,8 @@ CAP = { "en": dict(
         "column is the trained plateau over the head's."),
   gridthree=("(a) Reference convergence: one medium drawn at $256^2$ and "
              "downsampled to the two coarser grids. (b) The multi-resolution "
-             "crossed-grid model (one model, all three meshes, a third of the "
-             "steps each) against three targets. Levels differ from "
-             "Table~\\ref{tab:main}: different model and media draw."),
+             "crossed-grid model against three targets; levels differ from "
+             "Table~\\ref{tab:main} by model and media draw."),
   ci=("Headline scalars with $95\\%$ intervals from \\CIBoot\\ bootstrap "
       "replicates resampling media, one index shared by numerator and "
       "denominator. Six seeds for the contrast and residual arms, three for "
